@@ -23,6 +23,11 @@ namespace Vamsurlike.Player
             stats = GetComponent<PlayerStats>();
 
             if (mainCamera == null) mainCamera = Camera.main;
+            if (mainCamera == null)
+            {
+                Debug.LogError($"[{nameof(PlayerController)}] Main Camera not found. Tag a camera 'MainCamera'.", this);
+                enabled = false;
+            }
         }
 
         private void FixedUpdate()

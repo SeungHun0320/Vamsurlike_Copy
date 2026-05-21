@@ -10,8 +10,12 @@ public class DummyEnemyInit : MonoBehaviour
 
     private void Start()
     {
-        GetComponent<EnemyBase>().Initialize(enemyData);
+        if (enemyData == null) { Debug.LogError("[DummyEnemyInit] enemyData is not assigned.", this); return; }
 
+        var enemy = GetComponent<EnemyBase>();
+        if (enemy == null) { Debug.LogError("[DummyEnemyInit] EnemyBase not found.", this); return; }
+
+        enemy.Initialize(enemyData);
         Invoke(nameof(HitPlayer), 2f);
     }
 

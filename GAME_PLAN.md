@@ -50,7 +50,7 @@
    스테이지, 웨이브, 스폰, 드랍, 게임 상태를 흩뿌리지 않는다.
 
 3. 직접 참조를 줄이고 Facade를 사용하되, 책임을 작게 유지한다.  
-   `GameInstance.I.Core`, `GameInstance.I.World`, `PlayerFacade`를 통해 주요 시스템에 접근하되, Facade가 모든 로직을 떠안지 않게 하고 각 Manager의 역할을 명확히 나눈다.
+   `GameInstance.Instance.Core`, `GameInstance.Instance.World`, `PlayerDamageReceiver`를 통해 주요 시스템에 접근하되, Facade가 모든 로직을 떠안지 않게 하고 각 Manager의 역할을 명확히 나눈다.
 
 4. 데이터는 ScriptableObject로 분리한다.  
    캐릭터, 적, 스킬, 아이템, 조합식, 웨이브, 스테이지는 코드가 아니라 데이터로 관리한다.
@@ -72,25 +72,25 @@
 ```csharp
 public class GameInstance : MonoBehaviour
 {
-    public static GameInstance I { get; private set; }
+    public static GameInstance Instance { get; private set; }
 
-    [SerializeField] private CoreFacade  m_coreFacade;
-    [SerializeField] private WorldFacade m_worldFacade;
-    [SerializeField] private GameManager m_gameManager;
+    [SerializeField] private CoreFacade  coreFacade;
+    [SerializeField] private WorldFacade worldFacade;
+    [SerializeField] private GameManager gameManager;
 
-    public ICoreFacade  Core  => m_coreFacade;
-    public IWorldFacade World => m_worldFacade;
-    public GameManager  Game  => m_gameManager;
+    public ICoreFacade  Core  => coreFacade;
+    public IWorldFacade World => worldFacade;
+    public GameManager  Game  => gameManager;
 
     private void Awake()
     {
-        if (I != null)
+        if (Instance != null)
         {
             Destroy(gameObject);
             return;
         }
 
-        I = this;
+        Instance = this;
         DontDestroyOnLoad(gameObject);
     }
 }
@@ -116,14 +116,11 @@ GameInstance
    └─ Playing / Paused / GameOver 상태 관리
 
 Player GameObject
-└─ PlayerFacade
-   ├─ PlayerStats
-   ├─ PlayerLevelSystem
-   ├─ SkillManager
-   └─ ItemManager
+└─ PlayerDamageReceiver   ← IDamageable 구현체
+   └─ (PlayerStats, PlayerController, PlayerAnimator 등과 함께 배치)
 ```
 
-`PlayerFacade`를 `GameInstance` 안에 넣지 않는 이유는 멀티플레이에서 플레이어마다 별도 인스턴스가 필요하기 때문이다.
+`PlayerDamageReceiver` 등 플레이어 컴포넌트들을 `GameInstance` 안에 넣지 않는 이유는 멀티플레이에서 플레이어마다 별도 인스턴스가 필요하기 때문이다.
 
 ---
 
@@ -153,16 +150,11 @@ public interface IWorldFacade
     Vector3 GetRandomSpawnPoint();
 }
 
-public interface IPlayerFacade
-{
-    void AddXP(int amount);
-    void TakeDamage(float damage);
-    float GetCurrentHP();
-    float GetMaxHP();
-    void ApplyPassiveStat(StatType stat, float multiplier);
-    bool TryEquipSkill(SkillDataSO data);
-    bool TryEquipItem(ItemDataSO data);
-}
+// IPlayerFacade는 Phase 4(레벨업) 이후 필요 시 추가한다.
+// 현재 플레이어 진입점:
+//   IDamageable  → PlayerDamageReceiver (HP 조회, TakeDamage)
+//   PlayerStats  → HP, MoveSpeed 등 스탯 직접 참조
+// Phase 4에서 XP·스킬·아이템 시스템이 붙을 때 IPlayerFacade를 정의한다.
 ```
 
 ---
@@ -431,17 +423,17 @@ Done when: Bootstrap 씬이 켜지고 MainMenu 씬으로 자동 전환되며 콘
 
 Done when: 캐릭터가 WASD로 이동하고 Cinemachine 카메라가 따라오며 HP/MoveSpeed 값을 Inspector에서 확인할 수 있다.
 
-- [ ] GameInstance 최소 구조 구현
-- [ ] GameManager 기본 상태 구현
+- [x] GameInstance 최소 구조 구현
+- [x] GameManager 기본 상태 구현
 - [ ] SceneLoader 최소 구현
-- [ ] CharacterDataSO 구현
-- [ ] PlayerInput 구현
-- [ ] PlayerController 구현
-- [ ] PlayerStats 구현
-- [ ] PlayerFacade 구현
-- [ ] Cinemachine 카메라 설정
-- [ ] PlayerAnimator 연결
-- [ ] 더미 적 1마리를 배치하고 데미지 로그 확인
+- [x] CharacterDataSO 구현
+- [x] PlayerInput 구현
+- [x] PlayerController 구현 (FixedUpdate, 중력, 카메라 상대 이동)
+- [x] PlayerStats 구현 (CharacterDataSO 연결, TakeDamage, Heal)
+- [x] PlayerDamageReceiver 구현 (IDamageable 구현, null 체크)
+- [x] Cinemachine 카메라 설정 (CinemachineFollow offset -18,30,-18)
+- [x] PlayerAnimator 연결 (상태머신, Speed/Die 파라미터)
+- [x] 더미 적 1마리를 배치하고 데미지 로그 확인
 
 Phase 1에서는 저장, 오디오, 범용 이벤트, 풀링을 완성하려고 하지 않는다. 먼저 움직이는 플레이어와 카메라, HP/MoveSpeed 데이터, 간단한 데미지 흐름을 확인한다.
 

@@ -1,10 +1,10 @@
 using UnityEngine;
 using Vamsurlike.Core;
-using Vamsurlike.Data;
 
 namespace Vamsurlike.Player
 {
-    public class Player : MonoBehaviour, IDamageable
+    [RequireComponent(typeof(PlayerStats))]
+    public class PlayerDamageReceiver : MonoBehaviour, IDamageable
     {
         private PlayerStats stats;
 
@@ -15,11 +15,13 @@ namespace Vamsurlike.Player
         private void Awake()
         {
             stats = GetComponent<PlayerStats>();
+            if (stats == null)
+            {
+                Debug.LogError($"[{nameof(PlayerDamageReceiver)}] PlayerStats not found.", this);
+                enabled = false;
+            }
         }
 
         public void TakeDamage(float amount) => stats?.TakeDamage(amount);
-        public void Heal(float amount)        => stats?.Heal(amount);
-
-        public float GetStat(StatType type) => stats != null ? stats.GetStat(type) : 0f;
     }
 }

@@ -53,3 +53,9 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/
+
+# Third-party assets (not redistributable)
+/[Aa]ssets/[Rr]esources/QuarterView 3D Action BE5/
+
+# IDE
+.vscode/

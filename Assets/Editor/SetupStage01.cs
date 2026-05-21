@@ -42,7 +42,7 @@ public class SetupStage01
         player.AddComponent<PlayerInput>();
         player.AddComponent<PlayerStats>();
         player.AddComponent<PlayerController>();
-        player.AddComponent<Player>();
+        player.AddComponent<PlayerDamageReceiver>();
         player.AddComponent<PlayerAnimator>();
 
         // Capsule placeholder mesh

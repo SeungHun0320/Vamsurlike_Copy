@@ -27,6 +27,10 @@ namespace Vamsurlike.Player
             animator = GetComponentInChildren<Animator>();
             input    = GetComponent<PlayerInput>();
             stats    = GetComponent<PlayerStats>();
+
+            if (animator == null) { Debug.LogError($"[{nameof(PlayerAnimator)}] Animator not found in children.", this); enabled = false; return; }
+            if (input    == null) { Debug.LogError($"[{nameof(PlayerAnimator)}] PlayerInput not found.", this);           enabled = false; return; }
+            if (stats    == null) { Debug.LogError($"[{nameof(PlayerAnimator)}] PlayerStats not found.", this);           enabled = false; return; }
         }
 
         void Start() => ChangeState(idleState);
