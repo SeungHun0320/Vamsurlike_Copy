@@ -35,73 +35,50 @@
 
 ---
 
-## 3. 헝가리안 표기법
+## 3. 네이밍 컨벤션 (Unity 스타일)
 
-### 변수 접두사
+### 기본 규칙
 
-타입 식별자는 **소문자**, 이후 이름은 **대문자로 시작(PascalCase)** 한다.
-
-| 타입 | 접두사 | 예시 |
+| 대상 | 스타일 | 예시 |
 |---|---|---|
-| `bool` | `b` | `bIsAlive`, `bIsDead` |
-| `int` | `i` | `iKillCount`, `iLevel` |
-| `float` | `f` | `fMoveSpeed`, `fCooldown` |
-| `string` | `str` | `strEnemyName` |
-| `GameObject` | `go` | `goPlayer`, `goProjectile` |
-| `Transform` | `tr` | `trTarget`, `trSpawnPoint` |
-| `T[]` | `arr` | `arrEnemies`, `arrSkills` |
-| `List<T>` | `list` | `listEnemies`, `listSkills` |
-| `Dictionary<K,V>` | `dict` | `dictSkillMap` |
-| `Coroutine` | `co` | `coAttackRoutine` |
-| `Action` / `Func` | `on` | `onDeath`, `onLevelUp` |
-| `ScriptableObject` | `so` | `soCharacterData` |
-| 커스텀 클래스/컴포넌트 | 없음 (타입명이 식별자) | `m_playerStats`, `m_skillManager` |
+| 클래스 / 구조체 | `PascalCase` | `PlayerController`, `EnemyBase` |
+| 메서드 | `PascalCase` | `TakeDamage()`, `SpawnEnemy()` |
+| 프로퍼티 | `PascalCase` | `CurrentHP`, `IsAlive` |
+| 인터페이스 | `I` + `PascalCase` | `IDamageable`, `IPickupable` |
+| 추상 클래스 | `Base` 접미사 | `SkillBase`, `EnemyBase` |
+| 이벤트 | `PascalCase` | `OnPlayerDied`, `OnLevelUp` |
+| enum 타입 / 값 | `PascalCase` | `GameState.Playing` |
+| private 필드 | `camelCase` | `currentHP`, `playerStats` |
+| [SerializeField] 필드 | `camelCase` | `moveSpeed`, `attackPower` |
+| 상수 (`const` / `static readonly`) | `PascalCase` | `MaxSkillSlot`, `RespawnTime` |
+| 지역 변수 / 파라미터 | `camelCase` | `float amount`, `bool isGrounded` |
+| 네임스페이스 | `PascalCase` | `Vamsurlike.Player` |
 
-### 접근 제한자별 규칙
-
-```csharp
-// 멤버 변수: m_ + 소문자 타입 접두사 + PascalCase 이름
-// public 필드는 최대한 자제 — 외부 노출 필요 시 프로퍼티 사용
-private   float           m_fCurrentHP;
-private   bool            m_bIsAttacking;
-protected int             m_iLevel;
-[SerializeField]
-private   List<SkillBase> m_listEquippedSkills;
-private   PlayerStats     m_playerStats;       // 커스텀 클래스: 타입 접두사 없이 m_ + camelCase
-
-// const: 소문자 타입 접두사 + PascalCase 이름 (m_ 없음)
-private const float fRespawnTime  = 3.0f;
-private const int   iMaxSkillSlot = 6;
-
-// static: 소문자 타입 접두사 + PascalCase 이름 (m_ 없음)
-private static int iInstanceCount;
-
-// 지역 변수: 소문자 타입 접두사 + PascalCase 이름
-float fSpeed      = 5.0f;
-bool  bIsGrounded = false;
-
-// 인터페이스: I 접두사 (기존 C# 관례 유지)
-public interface IDamageable { }
-
-// 추상 클래스: Base 접미사
-public abstract class SkillBase { }
-public abstract class EnemyBase  { }
-```
-
-### 메서드 / 프로퍼티
+### 코드 예시
 
 ```csharp
-// 메서드: PascalCase, 동사로 시작, 파라미터도 소문자 타입 접두사 + PascalCase
-public void TakeDamage(float fAmount) { }
-private void SpawnEnemy() { }
+public class PlayerController : MonoBehaviour
+{
+    // SerializeField: camelCase
+    [SerializeField] private Camera mainCamera;
 
-// 프로퍼티: PascalCase, 헝가리안 없음 (타입 명확)
-public float CurrentHP { get; private set; }
-public bool  IsAlive   { get; private set; }
+    // private 필드: camelCase
+    private CharacterController cc;
+    private PlayerStats          playerStats;
+    private float                verticalVelocity = -2f;
 
-// 이벤트 채널 멤버 필드: m_ + on 접두사 + PascalCase
-[SerializeField] private VoidEventSO m_onPlayerDied;
-[SerializeField] private IntEventSO  m_onLevelUp;
+    // const / static readonly: PascalCase
+    private const float Gravity      = -20f;
+    private static int  instanceCount;
+
+    // 프로퍼티: PascalCase
+    public float CurrentHP  { get; private set; }
+    public bool  IsAlive    => playerStats != null && playerStats.IsAlive;
+
+    // 메서드: PascalCase, 파라미터: camelCase
+    public void TakeDamage(float amount) { }
+    private void Move() { }
+}
 ```
 
 ---
@@ -119,14 +96,14 @@ public bool  IsAlive   { get; private set; }
 ### 코드 패턴 예시
 
 ```csharp
-// ✅ 올바른 null 체크 패턴
+// ✅ null 체크 패턴
 private void Start()
 {
-    m_playerStats = GetComponent<PlayerStats>();   // 멤버니까 m_ 붙음, 타입 접두사 생략 가능(컴포넌트류)
-    if (m_playerStats == null)
+    playerStats = GetComponent<PlayerStats>();
+    if (playerStats == null)
     {
         Debug.LogError($"[{nameof(PlayerController)}] PlayerStats 컴포넌트를 찾을 수 없습니다.", this);
-        enabled = false;   // 컴포넌트 비활성화로 이후 오류 방지
+        enabled = false;
         return;
     }
 }
@@ -134,12 +111,12 @@ private void Start()
 // ✅ SerializeField null 체크
 private void Awake()
 {
-    if (soCharacterData == null)
+    if (characterData == null)
     {
         Debug.LogError($"[{nameof(PlayerStats)}] CharacterDataSO가 할당되지 않았습니다.", this);
         return;
     }
-    m_fCurrentHP = soCharacterData.fBaseHP;
+    currentHP = characterData.baseHP;
 }
 
 // ✅ 이벤트 구독 null 체크
@@ -159,30 +136,17 @@ private void OnDisable()
         onPlayerDied.OnEventRaised -= HandlePlayerDied;
 }
 
-// ✅ try-catch: 외부 시스템(파일, 네트워크) 경계
-private void LoadStageData(string strPath)
+// ✅ early return
+public void TakeDamage(float amount)
 {
-    try
+    if (!isAlive) return;
+    if (amount <= 0f)
     {
-        // 로드 로직
-    }
-    catch (System.Exception e)
-    {
-        Debug.LogError($"[{nameof(StageManager)}] 스테이지 데이터 로드 실패: {e.Message}");
-    }
-}
-
-// ✅ early return: 조건 불충족 시 조기 반환
-public void TakeDamage(float fAmount)
-{
-    if (!m_bIsAlive) return;
-    if (fAmount <= 0f)
-    {
-        Debug.LogWarning($"[{nameof(EnemyBase)}] 유효하지 않은 데미지 값: {fAmount}");
+        Debug.LogWarning($"[{nameof(EnemyBase)}] 유효하지 않은 데미지 값: {amount}");
         return;
     }
-    m_fCurrentHP -= fAmount;
-    if (m_fCurrentHP <= 0f) Die();
+    currentHP -= amount;
+    if (currentHP <= 0f) Die();
 }
 ```
 
@@ -190,16 +154,15 @@ public void TakeDamage(float fAmount)
 
 ## 5. 추가 규칙
 
-- **주석**: 코드가 **왜** 이렇게 짜여졌는지 비자명한 경우에만 한국어 주석 1줄 허용. 무엇을 하는지 설명하는 주석은 작성하지 않음.
+- **주석**: 코드가 **왜** 이렇게 짜여졌는지 비자명한 경우에만 한국어 주석 1줄 허용. 무엇을 하는지 설명하는 주석 금지.
 - **Magic Number 금지**: 수치는 반드시 `const`, `SO 필드`, 또는 명명된 변수로 추출.
-- **단위 표기**: `f` 접두사 float 변수 중 단위가 불명확하면 주석 또는 변수명에 단위 포함 (`fCooldownSec`, `fRangeMeters`).
 - **멀티 대비**: 게임 로직(데미지, 스폰, 드롭)은 반드시 매니저 경유. 직접 처리 금지.
 - **랜덤**: `Random.Range` 대신 시드 기반 `System.Random` 인스턴스 사용 (서버/클라 재현성 보장).
+- **물리 처리**: `CharacterController`, 중력, `Rigidbody` 관련 처리는 모두 `FixedUpdate` + `Time.fixedDeltaTime`. 입력 읽기는 `Update`.
 
 ---
 
 ## Notes
 
 - 규칙이 충돌하면 더 구체적인 규칙이 우선됩니다.
-- 헝가리안 표기법과 C# 기본 스타일이 충돌할 경우, 헝가리안 우선 적용합니다.
 - 규칙 추가/변경이 필요하면 이 파일에 직접 수정합니다.

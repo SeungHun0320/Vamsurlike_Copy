@@ -5,18 +5,18 @@ namespace Vamsurlike.Data
     [CreateAssetMenu(fileName = "CharacterData", menuName = "Vamsurlike/Data/Character")]
     public class CharacterDataSO : ScriptableObject
     {
-        public string m_strCharacterName = "Player";
-        public Sprite m_sprPortrait;
-        public GameObject m_goModelPrefab;
+        public string     characterName = "Player";
+        public Sprite     portrait;
+        public GameObject modelPrefab;
 
         [Header("Base Stats")]
-        public float m_fBaseHP         = 100f;
-        public float m_fBaseMoveSpeed  = 5f;
-        public float m_fBaseAttackPower = 10f;
-        public float m_fBaseDefense    = 0f;
-        public float m_fBasePickupRadius = 2f;
+        public float baseHP           = 100f;
+        public float baseMoveSpeed    = 5f;
+        public float baseAttackPower  = 10f;
+        public float baseDefense      = 0f;
+        public float basePickupRadius = 2f;
 
         [Header("Starting Skills")]
-        public SkillDataSO[] m_startingSkills;
+        public SkillDataSO[] startingSkills;
     }
 }

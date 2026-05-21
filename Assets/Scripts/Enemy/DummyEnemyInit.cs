@@ -6,13 +6,12 @@ using Vamsurlike.Enemy;
 // then deals damage to the player after a short delay to verify the damage pipeline.
 public class DummyEnemyInit : MonoBehaviour
 {
-    public EnemyDataSO m_data;
+    public EnemyDataSO enemyData;
 
     private void Start()
     {
-        GetComponent<EnemyBase>().Initialize(m_data);
+        GetComponent<EnemyBase>().Initialize(enemyData);
 
-        // Hit player after 2 seconds to test damage log
         Invoke(nameof(HitPlayer), 2f);
     }
 
@@ -21,9 +20,9 @@ public class DummyEnemyInit : MonoBehaviour
         var player = GameObject.FindWithTag("Player");
         if (player == null) { Debug.LogWarning("[DummyEnemyInit] Player not found."); return; }
 
-        if (player.TryGetComponent(out Vamsurlike.Player.IPlayerFacade facade))
-            facade.TakeDamage(m_data.m_fAttackPower);
+        if (player.TryGetComponent(out Vamsurlike.Core.IDamageable target))
+            target.TakeDamage(enemyData.attackPower);
         else
-            Debug.LogWarning("[DummyEnemyInit] IPlayerFacade not found on Player.");
+            Debug.LogWarning("[DummyEnemyInit] IDamageable not found on Player.");
     }
 }

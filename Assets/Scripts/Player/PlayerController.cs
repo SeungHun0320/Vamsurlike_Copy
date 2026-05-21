@@ -7,43 +7,57 @@ namespace Vamsurlike.Player
     [RequireComponent(typeof(PlayerStats))]
     public class PlayerController : MonoBehaviour
     {
-        private CharacterController m_cc;
-        private PlayerInput         m_input;
-        private PlayerStats         m_stats;
+        [SerializeField] private Camera mainCamera;
 
-        private Vector3 m_vVelocity;
-        private const float k_fGravity = -20f;
+        private CharacterController cc;
+        private PlayerInput         input;
+        private PlayerStats         stats;
+
+        private float verticalVelocity = -2f; // 첫 프레임부터 grounded 판정을 유지하는 초기값
+        private const float Gravity = -20f;
 
         private void Awake()
         {
-            m_cc     = GetComponent<CharacterController>();
-            m_input  = GetComponent<PlayerInput>();
-            m_stats  = GetComponent<PlayerStats>();
+            cc    = GetComponent<CharacterController>();
+            input = GetComponent<PlayerInput>();
+            stats = GetComponent<PlayerStats>();
+
+            if (mainCamera == null) mainCamera = Camera.main;
         }
 
-        private void Update()
+        private void FixedUpdate()
         {
-            if (!m_stats.IsAlive) return;
+            if (!stats.IsAlive)
+                return;
+
+            if (cc.isGrounded && verticalVelocity < 0f)
+                verticalVelocity = -2f;
+            else
+                verticalVelocity += Gravity * Time.fixedDeltaTime;
+
             Move();
         }
 
         private void Move()
         {
-            Vector2 raw   = m_input.MoveInput;
-            Vector3 dir   = new Vector3(raw.x, 0f, raw.y).normalized;
-            float   speed = m_stats.MoveSpeed;
+            Vector2 raw = input.MoveInput;
 
-            // quarter-view: camera is at ~50° pitch, so world X/Z maps directly to input X/Y
-            if (m_cc.isGrounded && m_vVelocity.y < 0f)
-                m_vVelocity.y = -2f;
+            // 카메라 기준 XZ 기저벡터 (Y 성분 제거 후 정규화)
+            Vector3 camForward = new(mainCamera.transform.forward.x, 0f, mainCamera.transform.forward.z);
+            Vector3 camRight   = new(mainCamera.transform.right.x,   0f, mainCamera.transform.right.z);
 
-            m_vVelocity.y += k_fGravity * Time.deltaTime;
+            if (camForward.sqrMagnitude > 0.001f) camForward.Normalize();
+            if (camRight.sqrMagnitude   > 0.001f) camRight.Normalize();
 
-            Vector3 motion = dir * speed * Time.deltaTime + Vector3.up * m_vVelocity.y * Time.deltaTime;
-            m_cc.Move(motion);
+            // 축별 기여도 누적 → 마지막에 한 번 정규화 (대각 입력 속도 보정)
+            Vector3 dir = camForward * raw.y + camRight * raw.x;
+            if (dir.sqrMagnitude > 0.001f) dir.Normalize();
 
-            if (dir != Vector3.zero)
-                transform.forward = dir;
+            Vector3 motion = dir * (stats.MoveSpeed * Time.fixedDeltaTime);
+            motion.y = verticalVelocity * Time.fixedDeltaTime;
+            cc.Move(motion);
+
+            if (Vector3.zero != dir) transform.forward = dir;
         }
     }
 }

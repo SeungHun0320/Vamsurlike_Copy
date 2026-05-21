@@ -5,22 +5,22 @@ namespace Vamsurlike.Core
 {
     public class BootstrapLoader : MonoBehaviour
     {
-        [SerializeField] private string m_strTargetScene = "MainMenu";
-        [SerializeField] private float m_fDelay = 0f;
+        [SerializeField] private string targetScene = "MainMenu";
+        [SerializeField] private float  delay       = 0f;
 
         private void Start()
         {
-            if (m_fDelay <= 0f)
+            if (delay <= 0f)
             {
                 LoadTargetScene();
                 return;
             }
-            Invoke(nameof(LoadTargetScene), m_fDelay);
+            Invoke(nameof(LoadTargetScene), delay);
         }
 
         private void LoadTargetScene()
         {
-            SceneManager.LoadScene(m_strTargetScene);
+            SceneManager.LoadScene(targetScene);
         }
     }
 }

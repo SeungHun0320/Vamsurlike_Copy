@@ -5,69 +5,69 @@ namespace Vamsurlike.Player
 {
     public class PlayerStats : MonoBehaviour
     {
-        [SerializeField] private CharacterDataSO m_data;
+        [SerializeField] private CharacterDataSO characterData;
 
         [Header("Runtime Stats (read-only)")]
-        [SerializeField] private float m_fHP;
-        [SerializeField] private float m_fMaxHP;
-        [SerializeField] private float m_fMoveSpeed;
-        [SerializeField] private float m_fAttackPower;
-        [SerializeField] private float m_fDefense;
-        [SerializeField] private float m_fPickupRadius;
+        [SerializeField] private float currentHP;
+        [SerializeField] private float maxHP;
+        [SerializeField] private float moveSpeed;
+        [SerializeField] private float attackPower;
+        [SerializeField] private float defense;
+        [SerializeField] private float pickupRadius;
 
-        public float HP           => m_fHP;
-        public float MaxHP        => m_fMaxHP;
-        public float MoveSpeed    => m_fMoveSpeed;
-        public float AttackPower  => m_fAttackPower;
-        public float Defense      => m_fDefense;
-        public float PickupRadius => m_fPickupRadius;
-        public bool  IsAlive      => m_fHP > 0f;
+        public float HP           => currentHP;
+        public float MaxHP        => maxHP;
+        public float MoveSpeed    => moveSpeed;
+        public float AttackPower  => attackPower;
+        public float Defense      => defense;
+        public float PickupRadius => pickupRadius;
+        public bool  IsAlive      => currentHP > 0f;
 
         private void Awake()
         {
-            if (m_data != null)
-                InitFromData(m_data);
+            if (characterData != null)
+                InitFromData(characterData);
             else
             {
-                m_fMaxHP        = 100f;
-                m_fHP           = 100f;
-                m_fMoveSpeed    = 5f;
-                m_fAttackPower  = 10f;
-                m_fDefense      = 0f;
-                m_fPickupRadius = 2f;
+                maxHP        = 100f;
+                currentHP    = 100f;
+                moveSpeed    = 5f;
+                attackPower  = 10f;
+                defense      = 0f;
+                pickupRadius = 2f;
             }
         }
 
         public void InitFromData(CharacterDataSO data)
         {
-            m_data        = data;
-            m_fMaxHP      = data.m_fBaseHP;
-            m_fHP         = m_fMaxHP;
-            m_fMoveSpeed  = data.m_fBaseMoveSpeed;
-            m_fAttackPower = data.m_fBaseAttackPower;
-            m_fDefense    = data.m_fBaseDefense;
-            m_fPickupRadius = data.m_fBasePickupRadius;
+            characterData = data;
+            maxHP         = data.baseHP;
+            currentHP     = maxHP;
+            moveSpeed     = data.baseMoveSpeed;
+            attackPower   = data.baseAttackPower;
+            defense       = data.baseDefense;
+            pickupRadius  = data.basePickupRadius;
         }
 
-        public void TakeDamage(float raw)
+        public void TakeDamage(float amount)
         {
-            float dmg = Mathf.Max(0f, raw - m_fDefense);
-            m_fHP = Mathf.Max(0f, m_fHP - dmg);
-            Debug.Log($"[PlayerStats] Took {dmg:F1} dmg (raw {raw:F1}). HP: {m_fHP:F1}/{m_fMaxHP:F1}");
+            float dmg = Mathf.Max(0f, amount - defense);
+            currentHP = Mathf.Max(0f, currentHP - dmg);
+            Debug.Log($"[PlayerStats] Took {dmg:F1} dmg (raw {amount:F1}). HP: {currentHP:F1}/{maxHP:F1}");
         }
 
         public void Heal(float amount)
         {
-            m_fHP = Mathf.Min(m_fMaxHP, m_fHP + amount);
+            currentHP = Mathf.Min(maxHP, currentHP + amount);
         }
 
         public float GetStat(StatType type) => type switch
         {
-            StatType.HP           => m_fHP,
-            StatType.MoveSpeed    => m_fMoveSpeed,
-            StatType.AttackPower  => m_fAttackPower,
-            StatType.Defense      => m_fDefense,
-            StatType.PickupRadius => m_fPickupRadius,
+            StatType.HP           => currentHP,
+            StatType.MoveSpeed    => moveSpeed,
+            StatType.AttackPower  => attackPower,
+            StatType.Defense      => defense,
+            StatType.PickupRadius => pickupRadius,
             _                     => 0f,
         };
     }

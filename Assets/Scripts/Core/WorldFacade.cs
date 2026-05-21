@@ -7,53 +7,53 @@ namespace Vamsurlike.Core
 {
     public class WorldFacade : MonoBehaviour, IWorldFacade
     {
-        [SerializeField] private Transform[] m_spawnPoints;
+        [SerializeField] private Transform[] spawnPoints;
 
-        private float               m_fStageStartTime;
-        private bool                m_bStageCleared;
-        private List<EnemyBase>     m_activeEnemies = new List<EnemyBase>();
+        private float           stageStartTime;
+        private bool            stageCleared;
+        private List<EnemyBase> activeEnemies = new List<EnemyBase>();
 
         private void Awake()
         {
-            m_fStageStartTime = Time.time;
+            stageStartTime = Time.time;
         }
 
         // ── IWorldFacade ───────────────────────────────────────────────────
 
-        public float GetStageElapsedTime() => Time.time - m_fStageStartTime;
+        public float GetStageElapsedTime() => Time.time - stageStartTime;
 
-        public bool IsStageCleared() => m_bStageCleared;
+        public bool IsStageCleared() => stageCleared;
 
         public void OnEnemyDied(EnemyBase enemy)
         {
-            m_activeEnemies.Remove(enemy);
-            Debug.Log($"[WorldFacade] Enemy died: {enemy.name}. Remaining: {m_activeEnemies.Count}");
+            activeEnemies.Remove(enemy);
+            Debug.Log($"[WorldFacade] Enemy died: {enemy.name}. Remaining: {activeEnemies.Count}");
         }
 
         public void SpawnEnemy(EnemyDataSO data, Vector3 pos)
         {
-            if (data == null || data.m_goPrefab == null)
+            if (data == null || data.prefab == null)
             {
                 Debug.LogWarning("[WorldFacade] SpawnEnemy called with null data or prefab.");
                 return;
             }
-            GameObject go = Instantiate(data.m_goPrefab, pos, Quaternion.identity);
+            GameObject go = Instantiate(data.prefab, pos, Quaternion.identity);
             if (go.TryGetComponent(out EnemyBase enemy))
             {
                 enemy.Initialize(data);
-                m_activeEnemies.Add(enemy);
+                activeEnemies.Add(enemy);
             }
         }
 
         public Vector3 GetRandomSpawnPoint()
         {
-            if (m_spawnPoints == null || m_spawnPoints.Length == 0)
+            if (spawnPoints == null || spawnPoints.Length == 0)
                 return Vector3.zero;
-            return m_spawnPoints[Random.Range(0, m_spawnPoints.Length)].position;
+            return spawnPoints[Random.Range(0, spawnPoints.Length)].position;
         }
 
         // ── Public helpers ─────────────────────────────────────────────────
 
-        public void SetStageCleared(bool value) => m_bStageCleared = value;
+        public void SetStageCleared(bool value) => stageCleared = value;
     }
 }

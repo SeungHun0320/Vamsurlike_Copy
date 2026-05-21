@@ -11,6 +11,10 @@ public class SetupStage01
     {
         var scene = EditorSceneManager.OpenScene("Assets/Scenes/Stage_01.unity", OpenSceneMode.Single);
 
+        // 기존 오브젝트 전부 제거 (중복 방지)
+        foreach (var go in scene.GetRootGameObjects())
+            Object.DestroyImmediate(go);
+
         // ── Directional Light ──────────────────────────────────────────
         var lightGo = new GameObject("Directional Light");
         var light   = lightGo.AddComponent<Light>();
@@ -38,7 +42,7 @@ public class SetupStage01
         player.AddComponent<PlayerInput>();
         player.AddComponent<PlayerStats>();
         player.AddComponent<PlayerController>();
-        player.AddComponent<PlayerFacade>();
+        player.AddComponent<Player>();
         player.AddComponent<PlayerAnimator>();
 
         // Capsule placeholder mesh
@@ -81,7 +85,7 @@ public class SetupStage01
 
         // Position: fixed-offset follow
         var follow = vcamGo.AddComponent<CinemachineFollow>();
-        follow.FollowOffset = new Vector3(-6.4f, 10.7f, -6.4f);
+        follow.FollowOffset = new Vector3(-18f, 30f, -18f);
 
         // Aim: hard look at player
         vcamGo.AddComponent<CinemachineHardLookAt>();

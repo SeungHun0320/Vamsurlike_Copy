@@ -4,28 +4,35 @@ using Vamsurlike.Data;
 
 namespace Vamsurlike.Enemy
 {
-    public class EnemyBase : MonoBehaviour
+    public class EnemyBase : MonoBehaviour, IDamageable
     {
-        protected EnemyDataSO m_data;
+        protected EnemyDataSO data;
 
         [Header("Runtime (read-only)")]
-        [SerializeField] protected float m_fHP;
+        [SerializeField] protected float currentHP;
 
-        public bool IsAlive => m_fHP > 0f;
+        public float HP      => currentHP;
+        public float MaxHP   => data != null ? data.hp : 0f;
+        public bool  IsAlive => currentHP > 0f;
 
-        public virtual void Initialize(EnemyDataSO data)
+        public virtual void Initialize(EnemyDataSO enemyData)
         {
-            m_data = data;
-            m_fHP  = data.m_fHP;
+            data      = enemyData;
+            currentHP = enemyData.hp;
         }
 
-        public virtual void TakeDamage(float raw)
+        public virtual void TakeDamage(float amount)
         {
-            float dmg = Mathf.Max(0f, raw - m_data.m_fDefense);
-            m_fHP = Mathf.Max(0f, m_fHP - dmg);
-            Debug.Log($"[EnemyBase] {name} took {dmg:F1} dmg. HP: {m_fHP:F1}/{m_data.m_fHP:F1}");
+            float dmg = Mathf.Max(0f, amount - data.defense);
+            currentHP = Mathf.Max(0f, currentHP - dmg);
+            Debug.Log($"[EnemyBase] {name} took {dmg:F1} dmg. HP: {currentHP:F1}/{data.hp:F1}");
 
-            if (m_fHP <= 0f) Die();
+            if (currentHP <= 0f) Die();
+        }
+
+        public virtual void Heal(float amount)
+        {
+            currentHP = Mathf.Min(MaxHP, currentHP + amount);
         }
 
         protected virtual void Die()

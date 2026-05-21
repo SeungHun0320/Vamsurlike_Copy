@@ -6,16 +6,16 @@ namespace Vamsurlike.Core
 {
     public class CoreFacade : MonoBehaviour, ICoreFacade
     {
-        [SerializeField] private AudioSource m_bgmSource;
-        [SerializeField] private AudioSource m_sfxSource;
+        [SerializeField] private AudioSource bgmSource;
+        [SerializeField] private AudioSource sfxSource;
 
-        private GameSettings m_settings = new GameSettings();
-        private float        m_fGameStartTime;
+        private GameSettings settings      = new GameSettings();
+        private float        gameStartTime;
 
         private void Awake()
         {
-            m_fGameStartTime = Time.time;
-            m_settings = LoadSettings();
+            gameStartTime = Time.time;
+            settings      = LoadSettings();
             ApplySettings();
         }
 
@@ -24,29 +24,29 @@ namespace Vamsurlike.Core
         public void PlaySFX(AudioClip clip, Vector3 pos = default)
         {
             if (clip == null) return;
-            if (m_sfxSource != null)
-                m_sfxSource.PlayOneShot(clip);
+            if (sfxSource != null)
+                sfxSource.PlayOneShot(clip);
             else
                 AudioSource.PlayClipAtPoint(clip, pos);
         }
 
         public void PlayBGM(AudioClip clip, float fadeTime = 1f)
         {
-            if (m_bgmSource == null) return;
-            m_bgmSource.clip = clip;
-            m_bgmSource.Play();
+            if (bgmSource == null) return;
+            bgmSource.clip = clip;
+            bgmSource.Play();
         }
 
         public void SetBGMVolume(float value)
         {
-            m_settings.m_fBGMVolume = Mathf.Clamp01(value);
-            if (m_bgmSource != null) m_bgmSource.volume = m_settings.m_fBGMVolume;
+            settings.bgmVolume = Mathf.Clamp01(value);
+            if (bgmSource != null) bgmSource.volume = settings.bgmVolume;
         }
 
         public void SetSFXVolume(float value)
         {
-            m_settings.m_fSFXVolume = Mathf.Clamp01(value);
-            if (m_sfxSource != null) m_sfxSource.volume = m_settings.m_fSFXVolume;
+            settings.sfxVolume = Mathf.Clamp01(value);
+            if (sfxSource != null) sfxSource.volume = settings.sfxVolume;
         }
 
         // ── Scene ──────────────────────────────────────────────────────────
@@ -60,8 +60,8 @@ namespace Vamsurlike.Core
 
         public void SaveSettings()
         {
-            PlayerPrefs.SetFloat("BGMVolume", m_settings.m_fBGMVolume);
-            PlayerPrefs.SetFloat("SFXVolume", m_settings.m_fSFXVolume);
+            PlayerPrefs.SetFloat("BGMVolume", settings.bgmVolume);
+            PlayerPrefs.SetFloat("SFXVolume", settings.sfxVolume);
             PlayerPrefs.Save();
         }
 
@@ -69,8 +69,8 @@ namespace Vamsurlike.Core
         {
             return new GameSettings
             {
-                m_fBGMVolume = PlayerPrefs.GetFloat("BGMVolume", 1f),
-                m_fSFXVolume = PlayerPrefs.GetFloat("SFXVolume", 1f),
+                bgmVolume = PlayerPrefs.GetFloat("BGMVolume", 1f),
+                sfxVolume = PlayerPrefs.GetFloat("SFXVolume", 1f),
             };
         }
 
@@ -89,14 +89,14 @@ namespace Vamsurlike.Core
 
         // ── Time ───────────────────────────────────────────────────────────
 
-        public float GetGameTime() => Time.time - m_fGameStartTime;
+        public float GetGameTime() => Time.time - gameStartTime;
 
         // ── Private ────────────────────────────────────────────────────────
 
         private void ApplySettings()
         {
-            if (m_bgmSource != null) m_bgmSource.volume = m_settings.m_fBGMVolume;
-            if (m_sfxSource != null) m_sfxSource.volume = m_settings.m_fSFXVolume;
+            if (bgmSource != null) bgmSource.volume = settings.bgmVolume;
+            if (sfxSource != null) sfxSource.volume = settings.sfxVolume;
         }
     }
 }
