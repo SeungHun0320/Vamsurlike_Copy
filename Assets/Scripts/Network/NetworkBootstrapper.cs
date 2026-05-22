@@ -9,6 +9,28 @@ namespace Vamsurlike.Network
     // Bootstrap 씬에서 UGS 초기화 및 서버 빌드 자동 시작 담당
     public class NetworkBootstrapper : MonoBehaviour
     {
+        private static NetworkBootstrapper instance;
+
+        public static bool IsUgsReady { get; private set; }
+        public static event Action OnUgsReady;
+
+        private void Awake()
+        {
+            if (instance != null)
+            {
+                Destroy(this);
+                return;
+            }
+            instance = this;
+            IsUgsReady = false;
+            OnUgsReady = null;
+        }
+
+        private void OnDestroy()
+        {
+            if (instance == this) instance = null;
+        }
+
         private async void Start()
         {
             await InitializeUgsAsync();
@@ -27,6 +49,8 @@ namespace Vamsurlike.Network
                 if (!AuthenticationService.Instance.IsSignedIn)
                     await AuthenticationService.Instance.SignInAnonymouslyAsync();
                 Debug.Log($"[{nameof(NetworkBootstrapper)}] UGS 인증 완료. PlayerId: {AuthenticationService.Instance.PlayerId}");
+                IsUgsReady = true;
+                OnUgsReady?.Invoke();
             }
             catch (Exception e)
             {

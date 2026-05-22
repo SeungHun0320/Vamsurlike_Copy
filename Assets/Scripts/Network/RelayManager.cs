@@ -25,6 +25,24 @@ namespace Vamsurlike.Network
             Instance = this;
         }
 
+        private void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
+            if (currentSession == null) return;
+            var s = currentSession;
+            currentSession = null;
+            _ = BestEffortLeaveAsync(s);
+        }
+
+        private static async System.Threading.Tasks.Task BestEffortLeaveAsync(ISession session)
+        {
+            try { await session.LeaveAsync(); }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[RelayManager] OnDestroy leave 실패 (무시): {e.Message}");
+            }
+        }
+
         // 세션(Relay 포함) 생성 후 join code 반환. 실패 시 null.
         public async Task<string> CreateSessionAsync(int maxPlayers = 4)
         {
@@ -82,9 +100,5 @@ namespace Vamsurlike.Network
             }
         }
 
-        private async void OnDestroy()
-        {
-            await LeaveSessionAsync();
-        }
     }
 }

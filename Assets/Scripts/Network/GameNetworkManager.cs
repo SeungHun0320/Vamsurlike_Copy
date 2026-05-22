@@ -5,6 +5,7 @@ using Unity.Netcode.Transports.UTP;
 
 namespace Vamsurlike.Network
 {
+    [RequireComponent(typeof(UnityTransport))]
     public class GameNetworkManager : MonoBehaviour
     {
         public static GameNetworkManager Instance { get; private set; }
@@ -13,10 +14,15 @@ namespace Vamsurlike.Network
         public event Action<ulong> OnClientDisconnected;
 
         public int ConnectedPlayerCount =>
-            NetworkManager.Singleton?.ConnectedClients?.Count ?? 0;
+            NetworkManager.Singleton != null ? NetworkManager.Singleton.ConnectedClients?.Count ?? 0 : 0;
 
         public bool IsClientConnected =>
             NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient;
+
+        public bool IsAvailableToStart =>
+            NetworkManager.Singleton != null && !NetworkManager.Singleton.IsListening;
+
+        private UnityTransport transport;
 
         private void Awake()
         {
@@ -26,9 +32,9 @@ namespace Vamsurlike.Network
                 return;
             }
             Instance = this;
+            transport = GetComponent<UnityTransport>();
         }
 
-        // Start() 사용 — OnEnable() 시점엔 NetworkManager.Singleton이 미초기화일 수 있음
         private void Start()
         {
             if (NetworkManager.Singleton == null) return;
@@ -38,33 +44,55 @@ namespace Vamsurlike.Network
 
         private void OnDestroy()
         {
+            if (Instance == this) Instance = null;
             if (NetworkManager.Singleton == null) return;
             NetworkManager.Singleton.OnClientConnectedCallback    -= HandleClientConnected;
             NetworkManager.Singleton.OnClientDisconnectCallback   -= HandleClientDisconnected;
         }
 
-        // 로컬 / MPM 테스트용 직접 호스트
-        public void StartAsHost(string ip = "127.0.0.1", ushort port = 7777)
+        public bool StartAsHost(string ip = "127.0.0.1", ushort port = 7777)
         {
-            SetTransport(ip, port);
-            NetworkManager.Singleton.StartHost();
-            Debug.Log($"[GameNetworkManager] Host 시작 — {ip}:{port}");
+            if (!CanStart("StartAsHost")) return false;
+            if (!TrySetTransport(ip, port)) return false;
+            bool ok = NetworkManager.Singleton.StartHost();
+            Debug.Log($"[GameNetworkManager] Host 시작 — {ip}:{port} (ok={ok})");
+            return ok;
         }
 
-        // 로컬 / 같은 LAN 클라이언트 접속
-        public void StartAsClient(string ip = "127.0.0.1", ushort port = 7777)
+        // Relay 호스트 — SDK가 transport를 이미 설정했으므로 SetConnectionData 호출 안 함
+        public bool StartAsRelayHost()
         {
-            SetTransport(ip, port);
-            NetworkManager.Singleton.StartClient();
-            Debug.Log($"[GameNetworkManager] Client 시작 — {ip}:{port}");
+            if (!CanStart("StartAsRelayHost")) return false;
+            bool ok = NetworkManager.Singleton.StartHost();
+            Debug.Log($"[GameNetworkManager] Relay Host 시작 (ok={ok})");
+            return ok;
         }
 
-        // 전용 서버 빌드 진입점 (UNITY_SERVER 또는 -batchmode)
-        public void StartAsServer(string ip = "0.0.0.0", ushort port = 7777)
+        public bool StartAsClient(string ip = "127.0.0.1", ushort port = 7777)
         {
-            SetTransport(ip, port);
-            NetworkManager.Singleton.StartServer();
-            Debug.Log($"[GameNetworkManager] Server 시작 — {ip}:{port}");
+            if (!CanStart("StartAsClient")) return false;
+            if (!TrySetTransport(ip, port)) return false;
+            bool ok = NetworkManager.Singleton.StartClient();
+            Debug.Log($"[GameNetworkManager] Client 시작 — {ip}:{port} (ok={ok})");
+            return ok;
+        }
+
+        // Relay 클라이언트 — SDK가 transport를 이미 설정했으므로 SetConnectionData 호출 안 함
+        public bool StartAsRelayClient()
+        {
+            if (!CanStart("StartAsRelayClient")) return false;
+            bool ok = NetworkManager.Singleton.StartClient();
+            Debug.Log($"[GameNetworkManager] Relay Client 시작 (ok={ok})");
+            return ok;
+        }
+
+        public bool StartAsServer(string ip = "0.0.0.0", ushort port = 7777)
+        {
+            if (!CanStart("StartAsServer")) return false;
+            if (!TrySetTransport(ip, port)) return false;
+            bool ok = NetworkManager.Singleton.StartServer();
+            Debug.Log($"[GameNetworkManager] Server 시작 — {ip}:{port} (ok={ok})");
+            return ok;
         }
 
         public void Disconnect()
@@ -74,15 +102,32 @@ namespace Vamsurlike.Network
             Debug.Log("[GameNetworkManager] 연결 종료.");
         }
 
-        private void SetTransport(string ip, ushort port)
+        // Singleton null + IsListening 이중 가드
+        private bool CanStart(string caller)
         {
-            var transport = NetworkManager.Singleton?.GetComponent<UnityTransport>();
+            if (NetworkManager.Singleton == null)
+            {
+                Debug.LogError($"[GameNetworkManager] {caller}: NetworkManager.Singleton이 null입니다.");
+                return false;
+            }
+            if (NetworkManager.Singleton.IsListening)
+            {
+                Debug.LogWarning($"[GameNetworkManager] {caller}: 이미 실행 중 — 무시");
+                return false;
+            }
+            return true;
+        }
+
+        // transport 설정 실패 시 false 반환 → 시작 중단
+        private bool TrySetTransport(string ip, ushort port)
+        {
             if (transport == null)
             {
-                Debug.LogError($"[{nameof(GameNetworkManager)}] UnityTransport를 찾을 수 없습니다.");
-                return;
+                Debug.LogError($"[GameNetworkManager] UnityTransport를 찾을 수 없습니다.");
+                return false;
             }
             transport.SetConnectionData(ip, port);
+            return true;
         }
 
         private void HandleClientConnected(ulong clientId)

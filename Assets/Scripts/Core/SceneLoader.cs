@@ -18,9 +18,22 @@ namespace Vamsurlike.Core
             Instance = this;
         }
 
+        private void OnDestroy()
+        {
+            if (Instance == this) 
+            {
+                Instance = null;
+            }
+        }
+
         // 서버에서만 호출. NetworkManager.SceneManager가 모든 클라이언트 씬을 동기화함.
         public void LoadSceneNetwork(string sceneName)
         {
+            if (string.IsNullOrWhiteSpace(sceneName))
+            {
+                Debug.LogError($"[{nameof(SceneLoader)}] sceneName이 비어 있습니다.");
+                return;
+            }
             if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer)
             {
                 Debug.LogWarning($"[{nameof(SceneLoader)}] LoadSceneNetwork는 서버에서만 호출 가능합니다.");
@@ -32,6 +45,11 @@ namespace Vamsurlike.Core
         // 네트워크 없을 때 사용하는 로컬 씬 전환
         public void LoadSceneLocal(string sceneName)
         {
+            if (string.IsNullOrWhiteSpace(sceneName))
+            {
+                Debug.LogError($"[{nameof(SceneLoader)}] sceneName이 비어 있습니다.");
+                return;
+            }
             SceneManager.LoadScene(sceneName);
         }
     }

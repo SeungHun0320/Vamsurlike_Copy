@@ -16,6 +16,8 @@ namespace Vamsurlike.UI
         [SerializeField] private TextMeshProUGUI statusText;
         [SerializeField] private TextMeshProUGUI sessionCodeText;
 
+        private bool isBusy;
+
         private void Awake()
         {
             if (hostButton == null || soloButton == null)
@@ -29,7 +31,12 @@ namespace Vamsurlike.UI
             soloButton.onClick.AddListener(OnSoloClicked);
 
             if (relayHostButton != null)
+            {
                 relayHostButton.onClick.AddListener(() => _ = OnRelayHostClickedAsync());
+                relayHostButton.interactable = NetworkBootstrapper.IsUgsReady;
+                if (!NetworkBootstrapper.IsUgsReady)
+                    NetworkBootstrapper.OnUgsReady += EnableRelayButton;
+            }
             if (joinButton != null)
                 joinButton.onClick.AddListener(() => _ = OnJoinClickedAsync());
 
@@ -51,33 +58,78 @@ namespace Vamsurlike.UI
             GameNetworkManager.Instance.OnClientDisconnected -= HandlePlayerCountChanged;
         }
 
+        private void OnDestroy()
+        {
+            // 씬 파괴 전 static event 구독 해제 (죽은 UI 참조 방지)
+            NetworkBootstrapper.OnUgsReady -= EnableRelayButton;
+        }
+
+        private void EnableRelayButton()
+        {
+            NetworkBootstrapper.OnUgsReady -= EnableRelayButton;
+            if (relayHostButton != null)
+                relayHostButton.interactable = true;
+        }
+
         // 로컬 IP 직접 호스트 (MPM / LAN 테스트)
         private void OnLocalHostClicked()
         {
+            if (isBusy) return;
             SetStatus("로컬 호스트 시작 중...");
-            GameNetworkManager.Instance?.StartAsHost();
-            SetStatus("호스트 대기 중 — 127.0.0.1:7777");
+            var gnm = GameNetworkManager.Instance;
+            bool ok = gnm != null && gnm.StartAsHost();
+            SetStatus(ok ? "호스트 대기 중 — 127.0.0.1:7777" : "호스트 시작 실패.");
         }
 
         // Relay 세션 생성 후 호스트
         private async Task OnRelayHostClickedAsync()
         {
-            SetStatus("Relay 세션 생성 중...");
-            string code = await RelayManager.Instance?.CreateSessionAsync(4);
-            if (code == null)
+            if (isBusy) return;
+            isBusy = true;
+            try
             {
-                SetStatus("Relay 세션 생성 실패. 로컬 호스트를 사용하세요.");
-                return;
-            }
+                var gnm = GameNetworkManager.Instance;
+                if (gnm == null || !gnm.IsAvailableToStart)
+                {
+                    SetStatus(gnm == null ? "GameNetworkManager를 찾을 수 없습니다." : "이미 네트워크가 실행 중입니다.");
+                    return;
+                }
 
-            GameNetworkManager.Instance?.StartAsHost();
-            ShowSessionCode(code);
-            SetStatus($"호스트 대기 중. 코드: {code}");
+                var relay = RelayManager.Instance;
+                if (relay == null)
+                {
+                    SetStatus("RelayManager를 찾을 수 없습니다.");
+                    return;
+                }
+
+                SetStatus("Relay 세션 생성 중...");
+                string code = await relay.CreateSessionAsync(4);
+                if (code == null)
+                {
+                    SetStatus("Relay 세션 생성 실패. 로컬 호스트를 사용하세요.");
+                    return;
+                }
+
+                if (!gnm.StartAsRelayHost())
+                {
+                    SetStatus("호스트 시작 실패.");
+                    await relay.LeaveSessionAsync();
+                    return;
+                }
+                ShowSessionCode(code);
+                SetStatus($"호스트 대기 중. 코드: {code}");
+            }
+            finally
+            {
+                isBusy = false;
+            }
         }
 
         // 코드(Relay) 또는 IP(LAN)로 참여
         private async Task OnJoinClickedAsync()
         {
+            if (isBusy) return;
+
             string input = ipOrCodeInput != null ? ipOrCodeInput.text.Trim() : "";
 
             if (string.IsNullOrEmpty(input))
@@ -86,35 +138,72 @@ namespace Vamsurlike.UI
                 return;
             }
 
-            // 6자리 이하 → Relay 코드, 그 이상 → IP 주소로 판단
-            if (input.Length <= 8 && !input.Contains("."))
+            isBusy = true;
+            try
             {
-                SetStatus($"Relay 세션 참여 중: {input}");
-                bool success = await RelayManager.Instance?.JoinSessionAsync(input);
-                if (!success)
+                // 8자리 이하이고 점이 없으면 → Relay 코드, 그 외 → IP 주소
+                if (input.Length <= 8 && !input.Contains("."))
                 {
-                    SetStatus("세션 참여 실패.");
-                    return;
+                    // UGS 미준비 상태에서 Relay 코드 시도 차단 (IP 접속은 허용)
+                    if (!NetworkBootstrapper.IsUgsReady)
+                    {
+                        SetStatus("UGS 초기화 중입니다. 잠시 후 다시 시도하세요.");
+                        return;
+                    }
+
+                    var relay = RelayManager.Instance;
+                    if (relay == null)
+                    {
+                        SetStatus("RelayManager를 찾을 수 없습니다.");
+                        return;
+                    }
+
+                    SetStatus($"Relay 세션 참여 중: {input}");
+                    bool success = await relay.JoinSessionAsync(input);
+                    if (!success)
+                    {
+                        SetStatus("세션 참여 실패.");
+                        return;
+                    }
+
+                    var gnm = GameNetworkManager.Instance;
+                    if (gnm == null || !gnm.StartAsRelayClient())
+                    {
+                        SetStatus("클라이언트 시작 실패.");
+                        await relay.LeaveSessionAsync();
+                        return;
+                    }
+                    if (!await WaitForConnectionAsync(timeoutSeconds: 5f))
+                        await relay.LeaveSessionAsync();
                 }
-                GameNetworkManager.Instance?.StartAsClient();
+                else
+                {
+                    SetStatus($"로컬 접속 중: {input}");
+                    var gnm = GameNetworkManager.Instance;
+                    if (gnm == null || !gnm.StartAsClient(input))
+                    {
+                        SetStatus("클라이언트 시작 실패.");
+                        return;
+                    }
+                    await WaitForConnectionAsync(timeoutSeconds: 5f);
+                }
             }
-            else
+            finally
             {
-                SetStatus($"로컬 접속 중: {input}");
-                GameNetworkManager.Instance?.StartAsClient(input);
-                await WaitForConnectionAsync(timeoutSeconds: 5f);
+                isBusy = false;
             }
         }
 
         // 솔로: 로컬 호스트로 바로 게임 시작
         private void OnSoloClicked()
         {
+            if (isBusy) return;
             SetStatus("솔로 시작...");
             GameNetworkManager.Instance?.StartAsHost();
             // Phase 2에서 SceneLoader.LoadSceneNetwork("Stage_01") 추가 예정
         }
 
-        private async Task WaitForConnectionAsync(float timeoutSeconds)
+        private async Task<bool> WaitForConnectionAsync(float timeoutSeconds)
         {
             float elapsed = 0f;
             while (elapsed < timeoutSeconds)
@@ -122,13 +211,14 @@ namespace Vamsurlike.UI
                 if (GameNetworkManager.Instance != null && GameNetworkManager.Instance.IsClientConnected)
                 {
                     SetStatus($"접속 완료 — 플레이어 {GameNetworkManager.Instance.ConnectedPlayerCount}명");
-                    return;
+                    return true;
                 }
                 await Task.Delay(200);
                 elapsed += 0.2f;
             }
             SetStatus("접속 실패: 호스트를 찾을 수 없습니다.");
             GameNetworkManager.Instance?.Disconnect();
+            return false;
         }
 
         private void HandlePlayerCountChanged(ulong _)
