@@ -4,30 +4,45 @@ namespace Vamsurlike.Core
 {
     public class GameInstance : MonoBehaviour
     {
-        public static GameInstance Instance { get; private set; }
+        public static GameInstance I { get; private set; }
 
-        public ICoreFacade  Core    { get; private set; }
-        public IWorldFacade World   { get; private set; }
-        public GameManager  Manager { get; private set; }
+        private ICoreFacade coreFacade;
+        private IWorldFacade worldFacade;
+
+        public ICoreFacade Core => coreFacade;
+
+        // IWorldFacade는 서버에서만 실질적으로 동작
+        public IWorldFacade World => worldFacade;
 
         private void Awake()
         {
-            if (Instance != null)
+            if (I != null)
             {
                 Destroy(gameObject);
                 return;
             }
-            Instance = this;
+            I = this;
             DontDestroyOnLoad(gameObject);
-
-            Core    = GetComponentInChildren<CoreFacade>();
-            World   = GetComponentInChildren<WorldFacade>();
-            Manager = GetComponentInChildren<GameManager>();
-
-            if (Core    == null) Debug.LogWarning("[GameInstance] CoreFacade not found.");
-            if (Manager == null) Debug.LogWarning("[GameInstance] GameManager not found.");
         }
 
-        public void SetWorld(IWorldFacade world) => World = world;
+        public void RegisterCore(ICoreFacade facade)
+        {
+            if (facade == null)
+            {
+                Debug.LogError($"[{nameof(GameInstance)}] ICoreFacade 등록 실패: null 전달됨.", this);
+                return;
+            }
+            coreFacade = facade;
+        }
+
+        public void RegisterWorld(IWorldFacade facade)
+        {
+            if (facade == null)
+            {
+                Debug.LogError($"[{nameof(GameInstance)}] IWorldFacade 등록 실패: null 전달됨.", this);
+                return;
+            }
+            worldFacade = facade;
+        }
     }
 }

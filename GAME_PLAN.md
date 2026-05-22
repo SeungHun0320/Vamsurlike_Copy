@@ -1,9 +1,9 @@
-# 3D 뱀서라이크 게임 개발 계획
+# 3D 뱀서라이크 멀티플레이 게임 개발 계획
 
 > 작성일: 2026-05-19  
-> 최종 정리: 2026-05-20  
-> 엔진: Unity 3D  
-> 구현 순서: 싱글플레이 완성 후 Co-op 멀티플레이 확장
+> 전면 개정: 2026-05-22 — 처음부터 서버 권한 기반 멀티플레이로 전환  
+> 엔진: Unity 6 LTS  
+> 구현 순서: 네트워크 파운데이션 → 네트워크 플레이어 → 게임플레이 시스템
 
 ---
 
@@ -11,171 +11,293 @@
 
 | 항목 | 결정 |
 |---|---|
-| 장르 | 3D 쿼터뷰 뱀서라이크 액션 |
-| 캐릭터 | 1명으로 시작, 이후 추가 |
-| 조작 | WASD 이동, 자동 스킬 발동, 궁극기는 수동 발동 |
-| 성장 | XP 획득 → 레벨업 → 스킬/패시브 선택 |
-| 아이템 | 드랍 아이템 획득, 보유 스킬과 조합하여 진화 |
-| 스테이지 | 시간 생존형. Stage 1은 5분, Stage 2는 10분, 이후 확장 |
-| 최종 목표 | 30분 생존 스테이지까지 확장 가능하게 설계 |
-| 멀티플레이 | 싱글 완성 후 Co-op 추가 |
-| 네트워크 후보 | Unity Netcode for GameObjects + UGS Relay/Lobby |
+| 장르 | 3D 쿼터뷰 뱀서라이크 Co-op 액션 |
+| 플레이어 수 | 1~4인 Co-op |
+| 조작 | WASD 이동, 자동 스킬, 궁극기 수동 발동 |
+| 성장 | XP → 레벨업 → 스킬/패시브 선택 (플레이어별 독립) |
+| 아이템 | 드랍 획득 + 스킬 조합 진화 |
+| 스테이지 | 시간 생존형. Stage 1: 5분, 최장 30분 확장 가능 |
+| 네트워크 | Unity Netcode for GameObjects + UGS (Relay, Lobby) |
+| 서버 | 로컬 Windows PC에서 Server Build 실행. 원격 플레이는 Relay 코드 공유 방식 |
+| 솔로 플레이 | 로컬 Host로 진행 (서버 + 클라이언트 동일 프로세스) |
+| 기존 코드 | Phase 1 코드 전면 폐기. NGO 기반으로 재작성 |
 
 ---
 
-## 2. 현재 예상 개발 기간
-
-현재 프로젝트에는 에셋, 기본 패키지, `Assets/Scripts` 폴더가 준비되어 있으나 실제 게임플레이 코드는 아직 초기 단계이므로, 구현 상태는 Phase 0 후반~Phase 1 초입으로 본다.
+## 2. 예상 개발 기간
 
 | 목표 | 예상 기간 |
 |---|---:|
-| 최소 플레이 가능 루프: 이동, 적 스폰, 자동 공격, XP 획득 | 1.5~3주 |
-| 싱글플레이 MVP: Stage 1, 스킬, 레벨업, 아이템, 보스, 결과창 | 4~7주 |
-| 출시 가능한 싱글 데모: UI, 저장, 밸런스, 최적화 포함 | 6~10주 |
-| Relay 기반 Co-op | 추가 4~8주 |
-| 전용 서버/매치메이킹/배포 | 추가 6~12주 |
-
-권장 목표는 먼저 **6~8주 안에 싱글플레이 데모**를 완성하고, 그 뒤 멀티플레이를 분리해서 진행하는 것이다.
+| 네트워크 연결 + 2인 이동 동기화 | 2~3주 |
+| 4인 Co-op MVP: 이동, 적, 자동 스킬, XP | 5~8주 |
+| 싱글플레이 데모 수준 콘텐츠 (스킬, 레벨업, 보스) | 8~12주 |
+| 로컬 서버 빌드 안정화 + 친구와 원격 플레이 | 추가 1~2주 |
 
 ---
 
-## 3. 멀티플레이 대비 설계 원칙
+## 3. 네트워크 아키텍처
 
-싱글플레이부터 구현하되, 나중에 네트워크 구조로 갈아끼우기 쉽도록 아래 규칙을 지킨다.
+### 3.1 서버 권한 모델
 
-1. 입력과 로직을 분리한다.  
-   `PlayerInput`은 입력 수집만 담당하고, `PlayerController`가 이동 로직을 처리한다. 나중에 `NetworkPlayerInput`으로 교체할 수 있게 한다.
+모든 게임 결정은 **서버**가 내린다. 클라이언트는 의도(intent)만 보내고 결과를 표시한다.
 
-2. 게임 상태는 중앙 매니저에 모은다.  
-   스테이지, 웨이브, 스폰, 드랍, 게임 상태를 흩뿌리지 않는다.
+| 시스템 | 권한 | 방식 |
+|---|---|---|
+| 플레이어 이동 | **서버** | 입력 방향 `[ServerRpc]` → 서버가 이동·중력 처리 → NetworkTransform 보간 |
+| 데미지 판정 | 서버 | 서버 내부 계산. 클라이언트는 데미지 값을 보내지 않음 |
+| 스킬 발동 | 서버 | 클라이언트 요청(의도) → 서버 쿨다운 검증 → 서버 실행 |
+| 적 AI / 이동 | 서버 전용 | `IsServer` 체크, 클라이언트는 NetworkTransform 수신만 |
+| 스폰 / 웨이브 | 서버 전용 | SpawnManager, WaveController 서버에서만 실행 |
+| XP 드랍 | 서버 | 서버 데이터 목록 + 클라이언트 XPOrbVisualProxy (NetworkObject 아님) |
+| 아이템 드랍 | 서버 | NetworkedItemPickup (NetworkObject — 드랍 빈도 낮아 허용) |
+| 레벨업 옵션 | 서버 | 서버가 옵션 생성 → NGO 2.x: `[Rpc(SendTo.SpecificClients)]`, NGO 1.x: `ClientRpcParams`로 해당 clientId에만 전달 |
+| 게임 상태 | 서버 | Playing / Paused / GameOver를 NetworkVariable로 동기화 |
 
-3. 직접 참조를 줄이고 Facade를 사용하되, 책임을 작게 유지한다.  
-   `GameInstance.Instance.Core`, `GameInstance.Instance.World`, `PlayerDamageReceiver`를 통해 주요 시스템에 접근하되, Facade가 모든 로직을 떠안지 않게 하고 각 Manager의 역할을 명확히 나눈다.
+### 3.2 연결 흐름
 
-4. 데이터는 ScriptableObject로 분리한다.  
-   캐릭터, 적, 스킬, 아이템, 조합식, 웨이브, 스테이지는 코드가 아니라 데이터로 관리한다.
+운영 환경도 로컬 Windows 서버다. Linux 배포, Matchmaking, Multiplay는 사용하지 않는다.
 
-5. 랜덤은 시드 기반으로 관리하되, 판정은 Host/Server 권한을 우선한다.  
-   `Random.Range` 남용을 피하고 `System.Random(seed)`를 사용하되, 물리/AI/프레임 차이까지 완전한 결정성을 기대하지 않는다. 멀티플레이에서는 스폰, 드랍, 데미지 같은 핵심 결과를 Host/Server가 확정한다.
+#### 개발 (에디터)
 
-6. 데미지, 드랍, 스폰 판정은 중앙 시스템을 통한다.  
-   싱글플레이에서도 판정 경로를 한 곳으로 모아 나중에 서버 권한 모델로 전환하기 쉽게 만든다.
+```text
+[에디터 Host]
+    └─ NetworkManager.StartHost()  ← 서버 + 클라이언트 동시 실행
+       빠른 반복용. Multiplayer Play Mode로 클라이언트 추가
+```
+
+#### 운영 (로컬 서버 빌드)
+
+```text
+[서버 PC — Windows Server Build]
+    └─ StartServer() 실행
+       ──▶ UGS Relay Allocation (Relay 코드 획득)
+       ──▶ 코드 공유 (Discord, 문자 등)
+
+[클라이언트 PC]
+    └─ 코드 입력 ──▶ Relay 경유 서버 접속 ──▶ StartClient()
+
+[같은 LAN이면] 직접 IP 접속도 가능 (Relay 불필요)
+```
+
+> **Phase 1 필수:** `StartServer()` 로컬 smoke test를 Phase 1 완료 기준에 포함한다. Host 모드로만 테스트하면 서버 전용 경로 버그를 뒤늦게 발견한다.
+
+### 3.3 개발 환경 테스트
+
+| 방법 | 단계 | 용도 |
+|---|---|---|
+| Unity Multiplayer Play Mode | Phase 1~ | 에디터 안에서 가상 플레이어 4개 실행 |
+| ParrelSync | Phase 1~ | 에디터 2개 동시 실행 (Host + Client 역할 분리) |
+| 로컬 Windows Server Build | Phase 1 완료 기준 | `StartServer()` 경로 smoke test |
+| Server Build + 에디터 클라이언트 | Phase 2~ | 운영 환경과 동일한 구성으로 테스트 |
 
 ---
 
 ## 4. 아키텍처
 
-### GameInstance
+### GameNetworkManager
 
-`GameInstance`는 Bootstrap 씬에서 생성되고 `DontDestroyOnLoad`로 유지된다.
+Host / Client / Server 모드 진입점을 통합 관리한다.
+
+구현 방식은 NGO 버전에 따라 두 가지 중 하나를 선택한다:
+
+- **상속 방식**: `NetworkManager`를 직접 상속. 내부 메서드 접근이 편리하지만 NGO 버전 업에 따라 파괴적 변경이 생길 수 있다.
+- **래퍼 방식 (권장)**: `MonoBehaviour`로 두고 `NetworkManager.Singleton.StartHost()` 등을 호출. NetworkManager와 결합도가 낮아 유지보수가 안전하다.
+
+```csharp
+// 래퍼 방식 예시
+public class GameNetworkManager : MonoBehaviour
+{
+    public static GameNetworkManager Instance { get; private set; }
+
+    public void StartAsHost()   { /* Relay Allocation 생성 후 NetworkManager.Singleton.StartHost() */ }
+    public void StartAsClient() { /* Relay Join 후 NetworkManager.Singleton.StartClient() */ }
+    public void StartAsServer() { /* Relay Allocation 생성 또는 직접 IP로 NetworkManager.Singleton.StartServer() */ }
+}
+```
+
+### GameInstance (비-네트워크 싱글턴)
+
+GameInstance는 NetworkObject가 아니다. Bootstrap에서 생성, DontDestroyOnLoad. 로컬 서비스(오디오, 풀, 씬)만 관리한다.
 
 ```csharp
 public class GameInstance : MonoBehaviour
 {
-    public static GameInstance Instance { get; private set; }
-
-    [SerializeField] private CoreFacade  coreFacade;
-    [SerializeField] private WorldFacade worldFacade;
-    [SerializeField] private GameManager gameManager;
-
+    public static GameInstance I { get; private set; }
     public ICoreFacade  Core  => coreFacade;
-    public IWorldFacade World => worldFacade;
-    public GameManager  Game  => gameManager;
-
-    private void Awake()
-    {
-        if (Instance != null)
-        {
-            Destroy(gameObject);
-            return;
-        }
-
-        Instance = this;
-        DontDestroyOnLoad(gameObject);
-    }
+    public IWorldFacade World => worldFacade;   // 서버에서만 실질적으로 동작
 }
 ```
 
-### Facade 구조
+### 전체 구조
 
 ```text
-GameInstance
-├─ ICoreFacade
-│  ├─ AudioManager
-│  ├─ SaveManager
-│  ├─ SceneLoader
-│  ├─ PoolManager
-│  └─ TimeManager
-├─ IWorldFacade
-│  ├─ StageManager
-│  ├─ WaveController
-│  ├─ SpawnManager
-│  ├─ DropManager
-│  └─ MapManager
-└─ GameManager
-   └─ Playing / Paused / GameOver 상태 관리
+Bootstrap (DontDestroyOnLoad)
+├─ GameNetworkManager       ← NGO NetworkManager 상속
+├─ GameInstance
+│  ├─ ICoreFacade
+│  │  ├─ AudioManager       (클라이언트: 로컬 사운드)
+│  │  ├─ SaveManager        (클라이언트: 로컬 세이브)
+│  │  ├─ SceneLoader        (네트워크 씬 로딩 포함)
+│  │  └─ PoolManager        (서버/클라이언트 각자 풀)
+│  └─ IWorldFacade
+│     ├─ StageNetworkManager ← IsServer 체크 후 실행
+│     ├─ WaveController      ← IsServer 전용
+│     ├─ NetworkSpawnManager ← IsServer 전용
+│     └─ DropManager         ← IsServer 전용
+│
+└─ LobbyManager / RelayManager
 
-Player GameObject
-└─ PlayerDamageReceiver   ← IDamageable 구현체
-   └─ (PlayerStats, PlayerController, PlayerAnimator 등과 함께 배치)
+Stage 씬 (Network Objects)
+├─ NetworkedPlayer (per player)
+│  ├─ PlayerNetworkController  ← CharacterController + NetworkTransform
+│  ├─ PlayerNetworkStats       ← NetworkVariable<float> HP, XP 등
+│  ├─ PlayerNetworkInput       ← 입력 수집 → ServerRpc
+│  ├─ PlayerNetworkAnimator    ← NetworkAnimator
+│  ├─ SkillManager             ← IsServer에서 스킬 쿨다운 관리
+│  └─ PlayerLevelSystem        ← IsServer에서 XP 처리
+│
+├─ NetworkedEnemy (per enemy, server spawned)
+│  ├─ EnemyNetworkBase         ← IsServer에서 AI 실행
+│  └─ NetworkTransform         ← 서버→클라이언트 위치 동기화
+│
+├─ XPOrbVisualProxy (NetworkObject 아님 — 클라이언트 로컬 비주얼, 픽업은 PlayerPickupController ServerRpc)
+└─ NetworkedItemPickup (NetworkObject — 아이템은 드랍 빈도가 낮아 개별 동기화 허용)
 ```
-
-`PlayerDamageReceiver` 등 플레이어 컴포넌트들을 `GameInstance` 안에 넣지 않는 이유는 멀티플레이에서 플레이어마다 별도 인스턴스가 필요하기 때문이다.
 
 ---
 
 ## 5. 핵심 인터페이스
 
 ```csharp
+// 로컬 서비스 (변경 없음)
 public interface ICoreFacade
 {
     void PlaySFX(AudioClip clip, Vector3 pos = default);
     void PlayBGM(AudioClip clip, float fadeTime = 1f);
-    void SetBGMVolume(float value);
-    void SetSFXVolume(float value);
     void LoadScene(string sceneName);
     void SaveSettings();
     GameSettings LoadSettings();
     T GetFromPool<T>(string key) where T : Component;
     void ReturnToPool<T>(string key, T obj) where T : Component;
-    float GetGameTime();
 }
 
+// 서버 전용 게임 상태 (클라이언트에서 호출 시 로그 경고)
 public interface IWorldFacade
 {
     float GetStageElapsedTime();
     bool IsStageCleared();
-    void OnEnemyDied(EnemyBase enemy);
+    void OnEnemyDied(EnemyNetworkBase enemy, ulong killerClientId);
     void SpawnEnemy(EnemyDataSO data, Vector3 pos);
     Vector3 GetRandomSpawnPoint();
 }
 
-// IPlayerFacade는 Phase 4(레벨업) 이후 필요 시 추가한다.
-// 현재 플레이어 진입점:
-//   IDamageable  → PlayerDamageReceiver (HP 조회, TakeDamage)
-//   PlayerStats  → HP, MoveSpeed 등 스탯 직접 참조
-// Phase 4에서 XP·스킬·아이템 시스템이 붙을 때 IPlayerFacade를 정의한다.
+// 네트워크 플레이어 접근 진입점 (Phase 5 이후 추가)
+public interface IPlayerNetworkFacade
+{
+    NetworkVariable<float> HP       { get; }
+    NetworkVariable<float> XP       { get; }
+    NetworkVariable<int>   Level    { get; }
+    void ApplyLevelUpChoice(int choiceIndex); // ServerRpc
+}
 ```
 
 ---
 
-## 6. Unity 설정
+## 6. NetworkBehaviour 패턴
 
-### 권장 버전
+### 서버 전용 로직 분리
 
-- Unity 6000.0.x LTS 또는 2022.3 LTS
+```csharp
+public class EnemyNetworkBase : NetworkBehaviour
+{
+    private void Update()
+    {
+        if (!IsServer) return;   // 서버에서만 AI 실행
+        UpdateAI();
+    }
+
+    [ClientRpc]
+    private void PlayDeathVFXClientRpc() { /* 모든 클라이언트 VFX */ }
+}
+```
+
+### 입력 → ServerRpc (서버 권한 이동)
+
+```csharp
+public class PlayerNetworkInput : NetworkBehaviour
+{
+    private void Update()
+    {
+        if (!IsOwner) return;
+        Vector2 dir = actions.Player.Move.ReadValue<Vector2>();
+        SubmitMoveInputServerRpc(dir);   // 의도(방향)만 전송
+    }
+
+    [ServerRpc]
+    private void SubmitMoveInputServerRpc(Vector2 dir)
+    {
+        // 서버가 속도 적용·중력·충돌 처리 후 위치 결정
+        // NetworkTransform(Server Authority)이 클라이언트로 보간 전송
+    }
+}
+```
+
+### 특정 클라이언트에만 RPC 전송 (NGO 문법)
+
+NGO에는 Mirror의 `[TargetRpc]`가 없다. NGO 2.x 방식(Unity 6 기준):
+
+```csharp
+// NGO 2.x — [Rpc(SendTo.SpecificClients)]
+[Rpc(SendTo.SpecificClients)]
+private void ShowLevelUpOptionsRpc(UpgradeOption[] options, RpcParams rpcParams = default) { }
+
+// 호출
+ShowLevelUpOptionsRpc(options, RpcTarget.Single(targetClientId, RpcTargetUse.Temp));
+```
+
+NGO 1.x를 사용할 경우 `ClientRpcParams`로 대체:
+
+```csharp
+// NGO 1.x — ClientRpcParams
+[ClientRpc]
+private void ShowLevelUpOptionsClientRpc(UpgradeOption[] options, ClientRpcParams rpcParams = default) { }
+
+// 호출
+ShowLevelUpOptionsClientRpc(options, new ClientRpcParams {
+    Send = new ClientRpcSendParams { TargetClientIds = new ulong[] { targetClientId } }
+});
+```
+
+### NetworkVariable
+
+```csharp
+private NetworkVariable<float> _hp = new NetworkVariable<float>(
+    100f,
+    NetworkVariableReadPermission.Everyone,
+    NetworkVariableWritePermission.Server
+);
+```
+
+---
+
+## 7. Unity 설정
 
 ### 필수 패키지
 
 | 패키지 | 용도 |
 |---|---|
+| Netcode for GameObjects (NGO) | 네트워크 핵심 |
+| Unity Transport | 전송 레이어 |
+| Multiplayer Play Mode | 에디터 내 멀티 테스트 |
+| Multiplayer Tools | 네트워크 Profiler, Scene Debugger |
+| UGS Authentication | UGS 로그인 |
+| UGS Lobby | 방 생성·참여 (미래 확장용, 초기엔 Relay 코드 직접 공유로 대체 가능) |
+| UGS Relay | 로컬 서버 ↔ 원격 클라이언트 중계 |
 | Input System | 플레이어 입력 |
-| AI Navigation | NavMesh 기반 이동. 대량 적은 단순 추적/목적지 갱신 제한과 병행 |
+| AI Navigation | NavMesh 기반 적 이동 |
+| Cinemachine | 쿼터뷰 카메라 (클라이언트 전용) |
 | TextMeshPro | UI 텍스트 |
-| Cinemachine | 쿼터뷰 카메라 |
 | Newtonsoft Json | JSON 저장 |
-| Unity Netcode for GameObjects | 멀티플레이 |
-| Unity Gaming Services | Relay, Lobby |
 
 ### Physics Layer
 
@@ -188,11 +310,10 @@ public interface IWorldFacade
 | 10 | Item | Player |
 | 11 | Ground | Player, Enemy, Projectile |
 
-중요 설정:
-
+중요:
 - Projectile ↔ Player 충돌 OFF
 - Enemy ↔ Enemy 충돌 OFF
-- XPOrb와 Item은 Trigger 기반
+- XPOrb, Item은 Trigger 기반 + ServerRpc 픽업 검증
 
 ### Tags
 
@@ -200,44 +321,48 @@ public interface IWorldFacade
 Player, Enemy, Boss, Projectile, XPOrb, Item, Ground
 ```
 
-### 카메라
+### 카메라 (클라이언트 전용 — IsLocalPlayer 기준으로 생성)
 
 ```text
 Cinemachine Virtual Camera
-- Follow: Player
-- Body: Framing Transposer
-- Camera Distance: 12~15
+- Follow: 로컬 플레이어 Transform
+- Body: Framing Transposer, Distance 12~15
+- Rotation: X 50, Y 45 / FOV 40
 - Damping X/Y/Z: 0.5
-- Rotation: X 50, Y 45
-- FOV: 40
 ```
 
 ### CharacterController
 
 ```text
-Height: 1.8
-Radius: 0.4
-Step Offset: 0.3
-Slope Limit: 45
-Skin Width: 0.08
+Height: 1.8 / Radius: 0.4
+Step Offset: 0.3 / Slope Limit: 45 / Skin Width: 0.08
 ```
 
 ### 성능 목표
 
-| 항목 | 목표 |
-|---|---:|
-| FPS | PC 기준 60fps |
-| 화면 내 적 | 최종 목표 최대 200마리. MVP는 50~80마리부터 검증 |
-| 활성 투사체 | 최대 100개 |
-| XP 오브 | 최대 300개 |
-| Draw Call | 300 이하 |
-| Pool Warm-up | Enemy 50, Projectile 50, XPOrb 100 |
+| 항목 | 목표 | 비고 |
+|---|---:|---|
+| FPS | 60fps (PC) | |
+| 화면 내 적 | 최대 200마리 | MVP는 50~80마리부터 검증 |
+| 활성 투사체 | 최대 100개 | NetworkObject. Phase 4에서 검증 |
+| XP 오브 | 최대 300개 | NetworkObject 아님 — 아래 참고 |
+| Draw Call | 300 이하 | GPU Instancing 필수 |
+| 네트워크 틱 | 서버 30tick/s | NGO `NetworkManager.NetworkTickSystem` |
+| Pool Warm-up | Enemy 50, Projectile 50 | XPOrb는 별도 처리 |
+| Object Visibility | Phase 3 도입 | `CheckObjectVisibility` 거리 기반, 범위 밖 Enemy 동기화 제외 |
+
+**XP 오브 처리 방식 (NetworkObject 회피):** XP 오브를 전부 NetworkObject로 두면 300개 Spawn/Despawn이 서버·클라이언트 모두 부담이다. 대신:
+- 서버: `XPOrbData { Vector3 pos; ulong id; }` 목록 관리 (NetworkList 또는 ServerRpc 브로드캐스트)
+- 클라이언트: 로컬 비주얼 프록시 오브젝트 생성 (NetworkObject 아님)
+- 픽업: 클라이언트 OverlapSphere → 소유 `PlayerPickupController.RequestXPPickupServerRpc(ulong orbId)` → 서버 검증 후 목록에서 제거 → `[ClientRpc] DestroyOrbVisualClientRpc(ulong id)` 통보
+
+**Object Visibility (Phase 3 필수 검증):** Phase 8까지 미루면 적 200마리 동기화 부하를 뒤늦게 발견한다. Phase 3에서 50마리 기준 Network Profiler를 먼저 확인하고 `NetworkObject.CheckObjectVisibility` 오버라이드로 거리 기반 Visibility를 구현해 Phase 3 완료 기준에 포함한다.
 
 ---
 
-## 7. 전투 공식
+## 8. 전투 공식
 
-### 데미지
+### 데미지 (서버에서만 계산)
 
 ```text
 FinalDamage = SkillBaseDamage[level]
@@ -247,7 +372,7 @@ FinalDamage = SkillBaseDamage[level]
 EnemyDefenseRate = enemyDefense / (enemyDefense + 100)
 ```
 
-### 시간 기반 난이도 스케일링
+### 시간 기반 난이도 스케일링 (서버 WaveController)
 
 ```text
 EnemyHP(t)     = BaseHP     * (1 + t / 60 * 0.15)
@@ -261,381 +386,378 @@ SpawnRate(t)   = BaseRate   * (1 + t / 60 * 0.20)
 XPRequired(level) = Mathf.RoundToInt(10f * Mathf.Pow(level, 1.5f))
 ```
 
+### Co-op 밸런싱 (플레이어 수 연동)
+
+```text
+EnemyHP     *= 1 + (playerCount - 1) * 0.3f
+SpawnRate   *= 1 + (playerCount - 1) * 0.5f
+XPMultiplier = 1.0f (플레이어별 독립 XP — 공유 X)
+```
+
 ---
 
-## 8. 폴더 구조
+## 9. 폴더 구조
 
 ```text
 Assets/
 ├─ Scripts/
+│  ├─ Network/
+│  │  ├─ GameNetworkManager.cs
+│  │  ├─ NetworkBootstrapper.cs
+│  │  ├─ LobbyManager.cs
+│  │  └─ RelayManager.cs
 │  ├─ Core/
 │  │  ├─ GameInstance.cs
-│  │  ├─ GameManager.cs
-│  │  ├─ TimeManager.cs
+│  │  ├─ GameManager.cs          ← NetworkVariable<GameState>
 │  │  ├─ ObjectPool.cs
 │  │  ├─ PoolManager.cs
-│  │  ├─ SceneLoader.cs
+│  │  ├─ SceneLoader.cs          ← NetworkManager.SceneManager 연동
 │  │  ├─ SaveManager.cs
 │  │  ├─ AudioManager.cs
 │  │  ├─ Facades/
 │  │  └─ Events/
 │  ├─ Player/
+│  │  ├─ PlayerNetworkController.cs
+│  │  ├─ PlayerNetworkStats.cs
+│  │  ├─ PlayerNetworkInput.cs
+│  │  ├─ PlayerNetworkAnimator.cs
+│  │  ├─ PlayerLevelSystem.cs
+│  │  └─ SkillManager.cs
 │  ├─ Enemy/
+│  │  ├─ EnemyNetworkBase.cs
+│  │  ├─ EnemyAI.cs              ← IsServer 전용
+│  │  └─ BossNetworkBase.cs
 │  ├─ Skills/
+│  │  ├─ SkillNetworkBase.cs
+│  │  ├─ AutoTargeting.cs
+│  │  ├─ ProjectileNetworkSkill.cs
+│  │  ├─ OrbitalNetworkSkill.cs
+│  │  └─ AuraNetworkSkill.cs
 │  ├─ Items/
 │  ├─ Upgrades/
 │  ├─ Stage/
+│  │  ├─ StageNetworkManager.cs
+│  │  ├─ WaveController.cs
+│  │  ├─ NetworkSpawnManager.cs
+│  │  └─ DropManager.cs
 │  ├─ UI/
 │  └─ Data/
 ├─ Data/
-│  ├─ Characters/
-│  ├─ Enemies/
-│  ├─ Skills/
-│  ├─ Items/
-│  ├─ CombineRecipes/
-│  └─ Stages/
+│  ├─ Characters/ / Enemies/ / Skills/ / Items/ / CombineRecipes/ / Stages/
 ├─ Prefabs/
-│  ├─ Player/
-│  ├─ Enemies/
-│  ├─ Skills/
-│  ├─ Items/
-│  └─ VFX/
+│  ├─ Player/ / Enemies/ / Skills/ / Items/ / VFX/
 ├─ Scenes/
 │  ├─ Bootstrap.unity
 │  ├─ MainMenu.unity
 │  ├─ Stage_01.unity
 │  └─ Stage_02.unity
 └─ Resources/
-   ├─ Models/
-   ├─ Animations/
-   ├─ Materials/
-   ├─ Textures/
-   └─ UI/
+   ├─ Models/ / Animations/ / Materials/ / Textures/ / UI/
 ```
 
 ---
 
-## 9. ScriptableObject 데이터
+## 10. ScriptableObject 데이터
 
 ### CharacterDataSO
 
 ```text
-string characterName
-Sprite portrait
-GameObject modelPrefab
-float baseHP
-float baseMoveSpeed
-float baseAttackPower
-float baseDefense
-float basePickupRadius
+string characterName / Sprite portrait / GameObject modelPrefab
+float baseHP / baseMoveSpeed / baseAttackPower / baseDefense / basePickupRadius
 SkillDataSO[] startingSkills
 ```
 
 ### EnemyDataSO
 
 ```text
-string enemyName
-GameObject prefab
-float hp
-float moveSpeed
-float attackPower
-float defense
-float attackRange
-float attackInterval
-int xpDrop
-DropTableSO dropTable
-bool isElite
-bool isBoss
+string enemyName / GameObject prefab
+float hp / moveSpeed / attackPower / defense / attackRange / attackInterval
+int xpDrop / DropTableSO dropTable / bool isElite / bool isBoss
 ```
 
 ### SkillDataSO
 
 ```text
-string skillName
-Sprite icon
-SkillType skillType
-bool isManual
-int maxLevel
-SkillLevelData[] levels
-CombineRecipeSO evolutionRecipe
-GameObject effectPrefab
-AudioClip sfx
+string skillName / Sprite icon / SkillType skillType / bool isManual
+int maxLevel / SkillLevelData[] levels
+CombineRecipeSO evolutionRecipe / GameObject effectPrefab / AudioClip sfx
 ```
 
-### ItemDataSO
+### ItemDataSO / CombineRecipeSO / WaveDataSO / StageDataSO
 
-```text
-string itemName
-Sprite icon
-ItemType itemType
-int maxLevel
-ItemLevelData[] levels
-```
-
-### CombineRecipeSO
-
-```text
-SkillDataSO requiredSkill
-ItemDataSO requiredItem
-SkillDataSO resultSkill
-bool isAutoEvolve
-string evolutionDescription
-```
-
-### WaveDataSO
-
-```text
-string stageName
-float surviveDuration
-WaveEntryData[] entries
-```
-
-### StageDataSO
-
-```text
-string stageName
-SceneReference sceneRef
-WaveDataSO waveData
-EnemyDataSO bossEnemy
-float bossSpawnTime
-AudioClip bgm
-```
+구조는 기존 계획과 동일. WaveDataSO에 `int basePlayerCount` 추가 (Co-op 밸런싱 기준).
 
 ---
 
-## 10. 구현 Phase
+## 11. 구현 Phase
 
 ### Phase 0. 프로젝트 세팅
 
-Done when: Bootstrap 씬이 켜지고 MainMenu 씬으로 자동 전환되며 콘솔 에러가 없다.
+Done when: Bootstrap → MainMenu 씬이 에러 없이 전환되고 NGO/UGS 패키지가 설치되어 있다.
 
-- [ ] Unity 버전 확정
-- [ ] 필수 패키지 설치
-- [ ] Physics Layer와 Tag 설정
+- [ ] Unity 6 LTS 버전 확정
+- [ ] 필수 패키지 설치 (NGO, Transport, Multiplayer Play Mode, UGS SDK 포함)
+- [ ] Physics Layer, Tag 설정
 - [ ] 폴더 구조 생성
 - [ ] Bootstrap, MainMenu, Stage_01 씬 생성
-- [ ] Bootstrap에서 MainMenu 자동 전환 테스트
-- [ ] Git 초기화와 Unity `.gitignore` 추가
+- [ ] Bootstrap → MainMenu 자동 전환 테스트
+- [ ] Git 초기화 (Unity .gitignore)
+- [ ] Multiplayer Play Mode 환경 설정 (가상 플레이어 4개)
 
 예상 기간: 1~2일
 
-### Phase 1. 코어와 플레이어
+---
 
-Done when: 캐릭터가 WASD로 이동하고 Cinemachine 카메라가 따라오며 HP/MoveSpeed 값을 Inspector에서 확인할 수 있다.
+### Phase 1. 네트워크 파운데이션
 
-- [x] GameInstance 최소 구조 구현
-- [x] GameManager 기본 상태 구현
-- [ ] SceneLoader 최소 구현
-- [x] CharacterDataSO 구현
-- [x] PlayerInput 구현
-- [x] PlayerController 구현 (FixedUpdate, 중력, 카메라 상대 이동)
-- [x] PlayerStats 구현 (CharacterDataSO 연결, TakeDamage, Heal)
-- [x] PlayerDamageReceiver 구현 (IDamageable 구현, null 체크)
-- [x] Cinemachine 카메라 설정 (CinemachineFollow offset -18,30,-18)
-- [x] PlayerAnimator 연결 (상태머신, Speed/Die 파라미터)
-- [x] 더미 적 1마리를 배치하고 데미지 로그 확인
+Done when: 2개 이상의 클라이언트가 Relay 또는 로컬 직접 접속(127.0.0.1)으로 서버에 연결되고, 메인 메뉴 씬에서 "플레이어 X명 접속" 로그가 찍힌다.
 
-Phase 1에서는 저장, 오디오, 범용 이벤트, 풀링을 완성하려고 하지 않는다. 먼저 움직이는 플레이어와 카메라, HP/MoveSpeed 데이터, 간단한 데미지 흐름을 확인한다.
+- [ ] GameNetworkManager 구현 (Host / Client / Server 모드 분기)
+- [ ] NetworkBootstrapper 구현 (Bootstrap 씬 초기화)
+- [ ] UGS Authentication 초기화 (익명 로그인)
+- [ ] LobbyManager 구현 (방 생성, 방 검색, 방 참여)
+- [ ] RelayManager 구현 (Relay 코드 발급 · 접속)
+- [ ] 메인 메뉴 연결 UI (방 만들기 / 참여 / 솔로 시작)
+- [ ] GameInstance 최소 구조 (DontDestroyOnLoad, ICoreFacade / IWorldFacade 인터페이스)
+- [ ] Windows Dedicated Server Build 타깃 추가 (`UNITY_SERVER` 심볼 등록)
+- [ ] **로컬 Windows Server Build smoke test** — 서버 빌드를 로컬에서 실행해 클라이언트 접속 로그 확인 (Phase 1 완료 기준)
+- [ ] Multiplayer Play Mode로 Host + Client 2인 접속 테스트
+- [ ] SceneLoader 구현 (NetworkManager.SceneManager 기반 씬 동기화)
+- [ ] 로컬 PC 간이 서버 실행 경로 구현 (`-server` 또는 `-batchmode` 실행 시 StartServer())
+- [ ] Editor Client가 `127.0.0.1` 서버에 접속하는 테스트
+- [ ] Client Build 2개가 로컬 서버에 접속하는 테스트
 
-예상 기간: 2~4일
+예상 기간: 5~8일
 
-### Phase 2. 적과 스폰
+---
 
-Done when: 적 3종이 화면 밖에서 스폰되고 플레이어를 추적하며 공격, 사망, XP 드랍까지 동작한다.
+### Phase 2. 네트워크 플레이어
+
+Done when: 4명이 Stage_01에 접속하고 WASD 이동이 모든 클라이언트에서 동기화되며 로컬 Cinemachine이 각자 자신의 캐릭터를 따라간다.
+
+- [ ] PlayerNetworkController 구현
+  - NetworkBehaviour + CharacterController
+  - NetworkTransform (Server Authority: 서버가 위치를 쓰고 클라이언트는 보간 수신)
+  - `[ServerRpc] SubmitMoveInputServerRpc(Vector2 dir)` — 입력 의도만 전송
+  - FixedUpdate 기반 중력·이동·충돌 (서버에서 실행)
+  - 서버: 최대 속도 초과 검증 (Speed Hack 방어)
+- [ ] PlayerNetworkInput 구현
+  - IsOwner일 때만 Input Action 수집
+  - 매 FixedUpdate마다 이동 방향 ServerRpc 전송
+- [ ] PlayerNetworkStats 구현
+  - `NetworkVariable<float>` HP, MoveSpeed
+  - `TakeDamage(float amount)` — **서버 내부 메서드**, 클라이언트가 데미지 값을 보내지 않음
+  - HUD는 `hp.OnValueChanged` 구독으로 갱신 (별도 ClientRpc 불필요)
+  - 피격 연출처럼 값과 별개의 이벤트가 필요할 때만 `[ClientRpc]` 추가
+- [ ] PlayerNetworkAnimator 구현 (NetworkAnimator 연동)
+- [ ] 로컬 Cinemachine 설정 (OnNetworkSpawn에서 IsLocalPlayer 기준으로 카메라 활성화)
+- [ ] NetworkPlayerSpawner 구현 (서버가 플레이어 스폰 위치 지정)
+- [ ] CharacterDataSO 연결 (baseHP, baseMoveSpeed 초기화)
+- [ ] 더미 적 배치 테스트 (서버 내부에서 TakeDamage 호출 → NetworkVariable HP 감소 → 클라이언트 HUD 확인)
+
+예상 기간: 3~5일
+
+---
+
+### Phase 3. 적과 스폰
+
+Done when: 서버가 적 3종을 스폰하고 NavMesh로 플레이어를 추적하며, 공격·사망·XP 드랍이 모든 클라이언트에 동기화된다.
 
 - [ ] EnemyDataSO 3종 작성
-- [ ] WaveDataSO, WaveEntryData 구현
-- [ ] EnemyBase 구현
-- [ ] EnemyAI 구현
-- [ ] 대량 적 이동 방식 결정: NavMeshAgent, 단순 추적, 또는 혼합 방식
-- [ ] SpawnManager 구현
-- [ ] WaveController 구현
-- [ ] ObjectPool과 PoolManager 구현
-- [ ] ExperienceOrb 구현
-- [ ] Enemy 50개, XPOrb 100개 풀 예열
+- [ ] WaveDataSO, WaveEntryData 구현 (Co-op 플레이어 수 배율 포함)
+- [ ] EnemyNetworkBase 구현
+  - NetworkBehaviour + NetworkTransform (Server Authority)
+  - AI 로직은 `if (!IsServer) return;` 가드
+  - `[ClientRpc] PlayDeathVFXClientRpc()` — 전체 클라이언트 사망 연출
+- [ ] EnemyAI 구현 (NavMeshAgent, 서버 전용)
+- [ ] NetworkSpawnManager 구현 (서버가 NetworkObject.Spawn())
+- [ ] WaveController 구현 (서버 전용, 스폰 간격·갯수 관리)
+- [ ] NetworkObjectPool 구현 (NGO 기반 풀링 — Enemy, Projectile 전용)
+- [ ] XPOrb 구현 (NetworkObject **아님**)
+  - 서버: `XPOrbData { ulong id; Vector3 pos; int xp; }` 목록 관리
+  - 적 사망 시 서버 `[ClientRpc] SpawnXPOrbVisualClientRpc(ulong id, Vector3 pos)` → 클라이언트 비주얼 프록시 로컬 생성
+  - 클라이언트 OverlapSphere → 소유 `PlayerPickupController.RequestXPPickupServerRpc(ulong orbId)` (PlayerPickupController : NetworkBehaviour) → 서버 검증 후 목록 제거 → `[ClientRpc] DestroyOrbVisualClientRpc(ulong id)`
+  - 비주얼 프록시는 NetworkBehaviour가 아니므로 직접 RPC를 보낼 수 없다
+- [ ] DropManager 구현 (서버 전용, XP 오브 드랍 확률 처리)
+- [ ] **Object Visibility 검증 (Phase 3 완료 기준 포함)**
+  - `NetworkObject.CheckObjectVisibility` 오버라이드로 거리 기반 Visibility 직접 구현
+  - 50마리 기준 Network Profiler로 대역폭·CPU 측정
+  - 기준치 초과 시 가시 범위 축소 또는 동기화 주기 조정
+- [ ] Enemy 50개, Projectile 50개 풀 예열
 
-예상 기간: 4~6일
+예상 기간: 5~7일
 
-### Phase 3. 스킬 시스템
+---
 
-Done when: 자동 스킬이 주기적으로 발동하고 적에게 데미지를 주며 FloatingText가 표시된다.
+### Phase 4. 스킬 시스템
 
-- [ ] SkillDataSO와 SkillLevelData 구현
-- [ ] SkillBase 구현
-- [ ] AutoTargeting 구현
-- [ ] SkillManager 구현
-- [ ] ProjectileSkill 구현
-- [ ] OrbitalSkill 구현
-- [ ] AuraSkill 구현
-- [ ] UltimateSkill 구현
-- [ ] FloatingText 구현
+Done when: 자동 스킬이 서버에서 발동·판정되고 FloatingText가 모든 클라이언트에 표시된다.
+
+- [ ] SkillDataSO, SkillLevelData 구현
+- [ ] SkillNetworkBase 구현
+  - 쿨다운 타이머: 서버(`IsServer`)에서만 실행
+  - `[ClientRpc] PlaySkillVFXClientRpc(Vector3 pos)` — 비주얼만 클라이언트
+- [ ] AutoTargeting 구현 (서버 전용, Physics.OverlapSphere)
+- [ ] SkillManager 구현 (플레이어 컴포넌트, IsServer에서 스킬 발동 결정)
+- [ ] ProjectileNetworkSkill 구현 (NetworkObject 투사체, 서버가 이동+충돌 처리)
+- [ ] OrbitalNetworkSkill 구현 (서버 충돌, 클라이언트 회전 비주얼)
+- [ ] AuraNetworkSkill 구현 (서버 틱 데미지)
+- [ ] UltimateSkill 구현 (`[ServerRpc] ActivateUltServerRpc()` — 클라이언트 버튼 → 서버 실행)
+- [ ] FloatingText 구현 (`[ClientRpc]`로 데미지 숫자 전달)
 - [ ] 기본 스킬 4~6종 데이터 작성
 
-예상 기간: 4~7일
+예상 기간: 5~8일
 
-### Phase 4. 레벨업과 업그레이드
+---
 
-Done when: XP를 모아 레벨업하면 게임이 일시정지되고 선택지 3~4개가 표시되며 선택 결과가 적용된다.
+### Phase 5. 레벨업과 업그레이드
+
+Done when: 각 플레이어가 독립적으로 XP를 모아 레벨업하면, 해당 클라이언트에만 선택지 UI가 나타나고 선택 결과가 서버에 반영된다.
 
 - [ ] PlayerLevelSystem 구현
-- [ ] PassiveStatHandler 구현
-- [ ] LevelUpManager 구현
-- [ ] UpgradeOption 구현
-- [ ] LevelUpUI 구현
-- [ ] 패시브 스탯 종류 정의
+  - `NetworkVariable<float>` XP, `NetworkVariable<int>` Level
+  - XP 추가는 서버만 (`IsServer` 체크)
+  - 레벨업 조건 달성 시 `ShowLevelUpOptionsRpc` (NGO 2.x: `[Rpc(SendTo.SpecificClients)]`, NGO 1.x: `ClientRpcParams`) 호출
+- [ ] PassiveStatHandler 구현 (NetworkVariable<float> 스탯 배율)
+- [ ] LevelUpManager 구현 (서버가 랜덤 옵션 생성)
+- [ ] LevelUpUI 구현 (IsLocalPlayer 기준)
+  - **Time.timeScale 건드리지 않음** — 다른 플레이어 게임 흐름에 영향 없음
+  - 대신: 로컬 입력 잠금 + 선택 UI 표시 + 서버는 해당 플레이어의 스킬 발동만 보류 (서버 `isChoosingUpgrade` 플래그)
+- [ ] UpgradeOption ScriptableObject 목록 정의
 - [ ] XP 곡선 1차 밸런싱
 
 예상 기간: 3~5일
 
-### Phase 5. 아이템과 조합
+---
 
-Done when: 적이 아이템을 드랍하고, 아이템 보유 상태에 따라 스킬 진화 또는 조합 UI가 동작한다.
+### Phase 6. 아이템과 조합
+
+Done when: 적이 아이템을 드랍하고 픽업 후 조합 가능 상태가 되면 CombinationUI가 뜨며 스킬이 진화한다.
 
 - [ ] ItemDataSO, ItemLevelData, DropTableSO 구현
 - [ ] CombineRecipeSO 구현
-- [ ] ItemBase 구현
-- [ ] ItemManager 구현
-- [ ] DropManager 구현
-- [ ] ItemPickup 구현
-- [ ] CombinationSystem 구현
-- [ ] CombinationUI 구현
+- [ ] NetworkedItemPickup 구현 (NetworkObject — 드랍 빈도 낮아 개별 동기화 허용)
+  - 서버 드랍 시 `NetworkObject.Spawn()`, 클라이언트 범위 진입 → `PlayerPickupController.RequestItemPickupServerRpc(ulong networkObjectId)` → 서버 검증 후 `Despawn()`
+- [ ] ItemManager 구현 (플레이어별 보유 아이템, 서버 관리)
+- [ ] CombinationSystem 구현 (서버 검증 후 스킬 진화)
+- [ ] CombinationUI 구현 (`ShowCombinationRpc` — NGO 2.x: `[Rpc(SendTo.SpecificClients)]`, NGO 1.x: `ClientRpcParams`로 해당 클라이언트에만 표시)
 - [ ] SummonSkill 구현
 - [ ] 아이템 6~8종, 조합식 3~4종 작성
 
 예상 기간: 4~7일
 
-### Phase 6. 스테이지와 보스
+---
 
-Done when: Stage_01에서 5분 생존, 중간 보스 등장, 승리/패배 결과 UI 표시가 동작한다.
+### Phase 7. 스테이지와 보스
+
+Done when: Stage_01에서 5분 생존 후 보스가 등장하고, 보스 처치/전멸 결과가 전원에게 동기화된다.
 
 - [ ] StageDataSO 구현
-- [ ] StageManager 구현
+- [ ] StageNetworkManager 구현
+  - `NetworkVariable<GameState>` Playing / BossPhase / Clear / GameOver
+  - 생존 타이머 서버에서만 실행
 - [ ] MapManager 구현
-- [ ] BossBase 구현
-- [ ] BossHealthBar 구현
+- [ ] BossNetworkBase 구현 (EnemyNetworkBase 상속, 페이즈 전환 로직)
+- [ ] BossHealthBar 구현 (`NetworkVariable<float>` HP → 모든 클라이언트 HUD)
 - [ ] Stage_01 웨이브 데이터 작성
 - [ ] 보스 1종 데이터 작성
+- [ ] 승리/패배 `[ClientRpc]` 동기화 → 결과 화면 전환
 
 예상 기간: 4~7일
 
-### Phase 7. UI, 저장, 최적화, 밸런스
+---
 
-Done when: 메인 메뉴 → 스테이지 → 결과 화면 → 메인 메뉴 루프가 에러 없이 완성된다.
+### Phase 8. UI, 저장, 최적화, 밸런스
 
-- [ ] GameEventSO와 EventListener 구현
-- [ ] AudioManager 구현
-- [ ] SaveManager 구현
-- [ ] TimeManager 정리
-- [ ] HUDController 구현
+Done when: 메인 메뉴 → 방 생성 → 스테이지 → 결과 → 메인 메뉴 루프가 4인 모두 에러 없이 완성된다.
+
+- [ ] GameEventSO, EventListener 구현
+- [ ] AudioManager 구현 (클라이언트 로컬)
+- [ ] SaveManager 구현 (로컬 세이브: 설정, 통계)
+- [ ] HUDController 구현 (IsLocalPlayer 기준 HP, XP, 스킬 슬롯)
+- [ ] Co-op HUD 추가 (팀원 HP 미니 표시)
 - [ ] SkillSlotUI, ItemSlotUI 구현
-- [ ] ResultUI 구현
-- [ ] LoadingScreen 구현
-- [ ] MainMenu 구현
-- [ ] 설정 UI 구현
-- [ ] 카메라 쉐이크 연결
-- [ ] 씬 전환 연출
-- [ ] GPU Instancing 적용
-- [ ] Profiler로 FPS/Draw Call 확인
-- [ ] XP, 적 스케일링, 스킬 수치 최종 밸런싱
+- [ ] ResultUI 구현 (개인 통계: 처치수, 데미지, 생존 시간)
+- [ ] LoadingScreen 구현 (NetworkManager.SceneManager 로딩 이벤트 연동)
+- [ ] MainMenu 구현 (방 만들기/참여 UI 완성)
+- [ ] 설정 UI 구현 (음량, 해상도)
+- [ ] 카메라 쉐이크 (클라이언트 로컬)
+- [ ] GPU Instancing 적용 (Enemy 대량 렌더링)
+- [ ] Network Profiler + CPU Profiler로 병목 확인
+- [ ] Object Visibility 튜닝 (Phase 3 구현 기반, 가시 범위 수치 조정)
+- [ ] XP, 스폰, 스킬 수치 Co-op 밸런싱
 
 예상 기간: 1~2주
 
-### Phase 8. 멀티플레이
+---
 
-싱글플레이 완성 후 시작한다.
+### Phase 9. 로컬 서버 빌드 안정화
 
-#### Phase 8a. Host-Client + Relay
+Done when: Windows Server Build를 별도 실행해 서버 역할만 담당하고, 원격 친구가 Relay 코드로 접속해 4인 게임이 안정적으로 돌아간다.
 
-- [ ] Unity NGO, Unity Transport, UGS SDK 설치
-- [ ] NetworkBootstrapper 구현
-- [ ] LobbyManager 구현
-- [ ] RelayManager 구현
-- [ ] NetworkPlayerInput 구현
-- [ ] PlayerController 네트워크 동기화
-- [ ] PlayerStats HP 동기화
-- [ ] EnemyBase Host 권한 처리
-- [ ] SpawnManager와 WaveController 서버 권한 처리
-- [ ] 스킬 판정 ServerRpc/ClientRpc 구조로 전환
-- [ ] 플레이어별 LevelUpManager 처리
-- [ ] DropManager Host 권한 처리
-- [ ] 2~4인 Co-op 테스트
+- [ ] Windows Server Build 타깃 설정 (`UNITY_SERVER` 심볼 등록)
+- [ ] 서버 전용 컴포넌트 스트립 (`#if !UNITY_SERVER` 로 렌더링·오디오·Cinemachine 제외)
+- [ ] 서버 시작 시 자동으로 Relay Allocation → 코드 콘솔 출력
+- [ ] 서버 실행 배치 파일 작성 (클릭 한 번으로 서버 시작)
+- [ ] 서버 로그 파일 출력 (`Application.logMessageReceived` → txt 저장)
+- [ ] LAN 직접 IP 접속 지원 (같은 네트워크면 Relay 없이 연결)
+- [ ] 4인 원격 플레이 안정성 테스트 (30분 생존 스테이지 기준 크래시 없음)
+- [ ] 서버 치트 방지 기초 (속도 검증, 데미지 서버 내부 계산 재확인)
 
-예상 기간: 4~8주
-
-#### Phase 8b. Dedicated Server
-
-- [ ] Dedicated Server 빌드 타깃 추가
-- [ ] ServerGameManager와 ClientGameManager 분리
-- [ ] NetworkInputData 구현
-- [ ] Client-side Prediction 기초 구현
-- [ ] Server Reconciliation 기초 구현
-- [ ] NetworkTickSystem 30tick/s 기준 동기화
-- [ ] 치트 방지 기초 검증
-- [ ] 서버 빌드와 클라이언트 빌드 분리 테스트
-
-예상 기간: 4~8주
-
-#### Phase 8c. 서버 호스팅과 매치메이킹
-
-- [ ] Linux 서버 빌드
-- [ ] VPS 또는 UGS Multiplay 배포
-- [ ] MatchmakingManager 구현
-- [ ] 서버 헬스체크 구현
-- [ ] 서버 로그 수집
-- [ ] 동시 접속 부하 테스트
-
-예상 기간: 2~4주
+예상 기간: 1~2주
 
 ---
 
-## 11. 우선순위 로드맵
+## 12. 우선순위 로드맵
 
 ```text
-Phase 0: 프로젝트 세팅
+Phase 0: 프로젝트 세팅 + 패키지
   ↓
-Phase 1: 플레이어 이동 + 코어 매니저
+Phase 1: 네트워크 파운데이션 (연결, Lobby, Relay)
   ↓
-Phase 2: 적 스폰/AI + XP
+Phase 2: 네트워크 플레이어 (이동, 스탯, 카메라)
   ↓
-Phase 3: 스킬 시스템
+Phase 3: 네트워크 적 + 스폰 + XP
   ↓
-Phase 4: 레벨업/업그레이드
+Phase 4: 스킬 시스템 (서버 판정, 클라이언트 VFX)
   ↓
-Phase 5: 아이템/조합
+Phase 5: 레벨업 & 업그레이드 (플레이어별 독립)
   ↓
-Phase 6: 스테이지/보스
+Phase 6: 아이템 & 조합
   ↓
-Phase 7: UI/저장/최적화/밸런스
+Phase 7: 스테이지 & 보스
   ↓
-Phase 8a: NGO + Relay Co-op
+Phase 8: UI / 저장 / 최적화 / 밸런스
   ↓
-Phase 8b: Dedicated Server
-  ↓
-Phase 8c: 서버 호스팅/매치메이킹
+Phase 9: 로컬 서버 빌드 안정화 (Windows, Relay 코드 공유)
 ```
 
 ---
 
-## 12. 주요 리스크
+## 13. 주요 리스크
 
 | 리스크 | 영향 | 대응 |
 |---|---|---|
-| 멀티플레이 전환 | 매우 큼 | 싱글 코드부터 입력, 판정, 랜덤, 상태 관리를 분리 |
-| 200마리 적 성능 | 큼 | Pool, NavMesh 갱신 빈도 제한, GPU Instancing 사용 |
-| XP 오브 300개 | 중간 | OverlapSphere 체크 주기를 0.1초 단위로 제한 |
-| 스킬/아이템 밸런스 | 큼 | 데이터 기반 수치 조정, 초반에는 스킬 수를 제한 |
-| UI 작업량 | 중간 | MVP에서는 HUD, 레벨업, 결과창만 먼저 구현 |
-| 전용 서버 | 매우 큼 | Phase 8a Relay Co-op이 안정된 뒤 별도 진행 |
+| NGO 학습 곡선 | 매우 큼 | Phase 1~2에 충분히 투자, 공식 샘플(BossRoom) 참고 |
+| 네트워크 디버깅 복잡도 | 큼 | Multiplayer Play Mode + Network Profiler + 로컬 Headless 서버 병행 |
+| 이동 지연감 (입력 ServerRpc 왕복) | 큼 | 서버 틱 30Hz + NetworkTransform 보간으로 완화. 심하면 Phase 2에서 클라이언트 예측 레이어 추가 검토 |
+| 200마리 적 동기화 성능 | 매우 큼 | Phase 3에서 `CheckObjectVisibility` 거리 기반 Visibility 조기 검증 필수. XP 오브는 NetworkObject 제외 |
+| 플레이어별 독립 레벨업 UX | 중간 | Time.timeScale 대신 입력 잠금 + 서버 스킬 발동 보류 플래그 |
+| 클라이언트가 데미지 값 전송 (치트 구멍) | 큼 | TakeDamage는 서버 내부 메서드. 클라이언트 RPC는 의도(intent)만 전달 |
+| UGS Relay 비용 | 낮음 | Free Tier(월 50GB 데이터)로 소규모 테스트 충분. 초과 시 직접 IP 접속으로 대체 |
+| 서버 PC 방화벽/포트 | 중간 | LAN 직접 접속 시 방화벽 포트 개방 필요. Relay 사용 시 해당 없음 |
 
 ---
 
-## 13. 개발 원칙
+## 14. 개발 원칙
 
-1. 먼저 재미있는 5분짜리 Stage 1을 만든다.
-2. 시스템을 너무 일찍 일반화하지 않는다.
-3. 단, 멀티플레이 전환을 막는 구조는 피한다.
-4. 데이터는 ScriptableObject로 빼서 Inspector에서 조정 가능하게 한다.
-5. `Destroy` 대신 Pool을 기본으로 사용한다.
-6. 데미지 판정은 성능을 위해 이벤트보다 직접 호출을 우선한다.
-7. 씬은 Bootstrap → MainMenu → Stage_XX 흐름으로 유지한다.
-8. 매 Phase 끝마다 플레이 가능한 상태를 만든다.
+1. **서버가 진실이다.** 데미지, 스폰, 드랍, 레벨업 결과는 서버에서만 결정한다.
+2. **클라이언트는 의도만 보낸다.** ServerRpc에는 데미지 값, 아이템 획득 결과 같은 게임 상태를 넣지 않는다. 방향, 요청, ID만 전송한다.
+3. **클라이언트는 표현만 한다.** VFX, SFX, 카메라, 로컬 UI는 클라이언트 몫이다.
+4. **IsServer / IsOwner 가드를 빠뜨리지 않는다.** 모든 NetworkBehaviour에 명시적으로 작성한다.
+5. **NGO RPC 문법은 Mirror와 다르다.** `[TargetRpc]`·`NetworkConnection`은 Mirror 용어다. NGO 2.x는 `[Rpc(SendTo.SpecificClients)]`, NGO 1.x는 `ClientRpcParams`를 사용한다.
+6. **Time.timeScale을 건드리지 않는다.** 레벨업 등 일시정지 UX는 입력 잠금 + 서버 보류 플래그로 처리한다.
+7. **NetworkObject 수를 최소화한다.** XP 오브처럼 수백 개가 필요한 것은 서버 데이터 + 클라이언트 비주얼 프록시로 처리한다.
+8. **ScriptableObject로 데이터를 관리한다.** 수치는 코드가 아니라 Inspector에서 조정한다.
+9. **매 Phase 끝마다 멀티플레이 가능한 상태를 만든다.** Phase 완료 기준은 항상 2인 이상 동작 확인이다.
+10. **Host 모드로 빠르게 반복하되, Server Build 경로를 Phase 1에 smoke test한다.** Windows Server Build 안정화는 Phase 9까지 미룬다. Linux/클라우드 배포는 장기 확장으로 별도 Phase에서 다룬다.

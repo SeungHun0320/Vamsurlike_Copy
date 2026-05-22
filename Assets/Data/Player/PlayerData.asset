@@ -16,7 +16,7 @@ MonoBehaviour:
   portrait: {fileID: 0}
   modelPrefab: {fileID: 0}
   baseHP: 100
-  baseMoveSpeed: 7
+  baseMoveSpeed: 10
   baseAttackPower: 10
   baseDefense: 0
   basePickupRadius: 2
