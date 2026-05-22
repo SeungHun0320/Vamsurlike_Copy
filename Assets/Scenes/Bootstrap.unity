@@ -134,6 +134,7 @@ GameObject:
   - component: {fileID: 873381296}
   - component: {fileID: 873381295}
   - component: {fileID: 873381294}
+  - component: {fileID: 873381301}
   m_Layer: 0
   m_Name: NetworkManager
   m_TagString: Untagged
@@ -236,12 +237,12 @@ MonoBehaviour:
   NetworkConfig:
     ProtocolVersion: 0
     NetworkTransport: {fileID: 873381298}
-    PlayerPrefab: {fileID: 0}
+    PlayerPrefab: {fileID: 3346994395623583896, guid: 68cb901cabe727046afcbedc90b18183, type: 3}
     Prefabs:
       NetworkPrefabsLists: []
     TickRate: 30
     ClientConnectionBufferTimeout: 10
-    ConnectionApproval: 0
+    ConnectionApproval: 1
     ConnectionData: 
     EnableTimeResync: 0
     TimeResyncInterval: 30
@@ -256,7 +257,7 @@ MonoBehaviour:
     EnableNetworkLogs: 1
     NetworkTopology: 0
     UseCMBService: 0
-    AutoSpawnPlayerPrefabClientSide: 1
+    AutoSpawnPlayerPrefabClientSide: 0
     NetworkMessageMetrics: 1
     NetworkProfilingMetrics: 1
     OldPrefabList: []
@@ -277,6 +278,24 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &873381301
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 873381293}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cb76265aa3138f347911454e82cb8a21, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Network.NetworkPlayerSpawner
+  gameplaySceneName: Stage_01
+  spawnPositions:
+  - {x: -2, y: 10, z: -2}
+  - {x: 2, y: 10, z: -2}
+  - {x: -2, y: 10, z: 2}
+  - {x: 2, y: 10, z: 2}
 --- !u!1 &992708771
 GameObject:
   m_ObjectHideFlags: 0

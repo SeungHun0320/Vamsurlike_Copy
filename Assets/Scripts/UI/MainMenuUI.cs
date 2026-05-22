@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using Vamsurlike.Core;
 using Vamsurlike.Network;
 
 namespace Vamsurlike.UI
@@ -15,6 +16,7 @@ namespace Vamsurlike.UI
         [SerializeField] private TMP_InputField ipOrCodeInput;
         [SerializeField] private TextMeshProUGUI statusText;
         [SerializeField] private TextMeshProUGUI sessionCodeText;
+        [SerializeField] private string stageSceneName = "Stage_01";
 
         private bool isBusy;
 
@@ -78,7 +80,7 @@ namespace Vamsurlike.UI
             SetStatus("로컬 호스트 시작 중...");
             var gnm = GameNetworkManager.Instance;
             bool ok = gnm != null && gnm.StartAsHost();
-            SetStatus(ok ? "호스트 대기 중 — 127.0.0.1:7777" : "호스트 시작 실패.");
+            SetStatus(ok ? $"호스트 대기 중 — {gnm.CurrentIp}:{gnm.CurrentPort}" : "호스트 시작 실패.");
         }
 
         // Relay 세션 생성 후 호스트
@@ -141,6 +143,19 @@ namespace Vamsurlike.UI
             isBusy = true;
             try
             {
+                if (TryParseLocalEndpoint(input, out string ip, out ushort port))
+                {
+                    SetStatus($"로컬 접속 중: {ip}:{port}");
+                    var gnm = GameNetworkManager.Instance;
+                    if (gnm == null || !gnm.StartAsClient(ip, port))
+                    {
+                        SetStatus("클라이언트 시작 실패.");
+                        return;
+                    }
+                    await WaitForConnectionAsync(timeoutSeconds: 5f);
+                    return;
+                }
+
                 // 8자리 이하이고 점이 없으면 → Relay 코드, 그 외 → IP 주소
                 if (input.Length <= 8 && !input.Contains("."))
                 {
@@ -178,7 +193,7 @@ namespace Vamsurlike.UI
                 }
                 else
                 {
-                    SetStatus($"로컬 접속 중: {input}");
+                    SetStatus($"로컬 접속 중: {input}:7777");
                     var gnm = GameNetworkManager.Instance;
                     if (gnm == null || !gnm.StartAsClient(input))
                     {
@@ -194,13 +209,39 @@ namespace Vamsurlike.UI
             }
         }
 
-        // 솔로: 로컬 호스트로 바로 게임 시작
+        // 솔로/게임 시작: 네트워크가 없으면 혼자 시작, 호스트 대기 중이면 현재 세션을 시작
         private void OnSoloClicked()
         {
             if (isBusy) return;
-            SetStatus("솔로 시작...");
-            GameNetworkManager.Instance?.StartAsHost();
-            // Phase 2에서 SceneLoader.LoadSceneNetwork("Stage_01") 추가 예정
+
+            var gnm = GameNetworkManager.Instance;
+            if (gnm == null)
+            {
+                SetStatus("GameNetworkManager를 찾을 수 없습니다.");
+                return;
+            }
+
+            if (!gnm.IsListening)
+            {
+                SetStatus("솔로 시작...");
+                if (!gnm.StartAsHost())
+                {
+                    SetStatus("솔로 시작 실패.");
+                    return;
+                }
+
+                TryLoadStageNetwork();
+                return;
+            }
+
+            if (gnm.IsServer)
+            {
+                SetStatus("게임 시작...");
+                TryLoadStageNetwork();
+                return;
+            }
+
+            SetStatus("클라이언트는 게임을 시작할 수 없습니다.");
         }
 
         private async Task<bool> WaitForConnectionAsync(float timeoutSeconds)
@@ -219,6 +260,44 @@ namespace Vamsurlike.UI
             SetStatus("접속 실패: 호스트를 찾을 수 없습니다.");
             GameNetworkManager.Instance?.Disconnect();
             return false;
+        }
+
+        private void TryLoadStageNetwork()
+        {
+            if (SceneLoader.Instance == null)
+            {
+                SetStatus("SceneLoader를 찾을 수 없습니다.");
+                return;
+            }
+
+            SceneLoader.Instance.LoadSceneNetwork(stageSceneName);
+        }
+
+        private static bool TryParseLocalEndpoint(string input, out string ip, out ushort port)
+        {
+            const ushort defaultPort = 7777;
+
+            ip = input;
+            port = defaultPort;
+
+            if (ushort.TryParse(input, out ushort portOnly))
+            {
+                ip = "127.0.0.1";
+                port = portOnly;
+                return true;
+            }
+
+            int separatorIndex = input.LastIndexOf(':');
+            if (separatorIndex <= 0 || separatorIndex >= input.Length - 1)
+                return input.Contains(".");
+
+            string portText = input[(separatorIndex + 1)..];
+            if (!ushort.TryParse(portText, out ushort parsedPort))
+                return false;
+
+            ip = input[..separatorIndex];
+            port = parsedPort;
+            return true;
         }
 
         private void HandlePlayerCountChanged(ulong _)
