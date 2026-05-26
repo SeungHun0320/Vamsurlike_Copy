@@ -31,12 +31,22 @@ namespace Vamsurlike.Player
         private void FixedUpdate()
         {
             if (!IsServer || characterController == null) return;
+            if (stats != null && !stats.IsAlive)
+            {
+                moveInput = Vector2.zero;
+                return;
+            }
             MoveServer(Time.fixedDeltaTime);
         }
 
         [ServerRpc]
         public void SubmitMoveInputServerRpc(Vector2 input)
         {
+            if (stats != null && !stats.IsAlive)
+            {
+                moveInput = Vector2.zero;
+                return;
+            }
             moveInput = Vector2.ClampMagnitude(input, maxInputMagnitude);
         }
 
