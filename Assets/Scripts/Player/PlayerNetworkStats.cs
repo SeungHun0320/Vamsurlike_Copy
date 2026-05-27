@@ -25,6 +25,11 @@ namespace Vamsurlike.Player
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
 
+        public NetworkVariable<int> XP { get; } = new(
+            0,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
+
         public bool IsAlive => HP.Value > 0f;
 
         public override void OnNetworkSpawn()
@@ -43,6 +48,7 @@ namespace Vamsurlike.Player
             MaxHP.Value = Mathf.Max(1f, maxHP);
             HP.Value = MaxHP.Value;
             MoveSpeed.Value = Mathf.Max(0f, moveSpeed);
+            XP.Value = 0;
         }
 
         public void TakeDamage(float amount)
@@ -51,6 +57,7 @@ namespace Vamsurlike.Player
             if (amount <= 0f || !IsAlive) return;
 
             HP.Value = Mathf.Max(0f, HP.Value - amount);
+            Debug.Log($"[{nameof(PlayerNetworkStats)}] clientId {OwnerClientId} TakeDamage {amount} → HP {HP.Value}/{MaxHP.Value}");
         }
 
         public void Heal(float amount)
@@ -59,6 +66,13 @@ namespace Vamsurlike.Player
             if (amount <= 0f || !IsAlive) return;
 
             HP.Value = Mathf.Min(MaxHP.Value, HP.Value + amount);
+        }
+
+        public void AddXP(int amount)
+        {
+            if (!IsServer || amount <= 0) return;
+            XP.Value += amount;
+            Debug.Log($"[{nameof(PlayerNetworkStats)}] clientId {OwnerClientId} XP +{amount} → {XP.Value}");
         }
     }
 }

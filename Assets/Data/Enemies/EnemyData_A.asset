@@ -10,16 +10,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0c44eb3c800e7524393448d1f97c8141, type: 3}
-  m_Name: DummyEnemyData
+  m_Name: EnemyData_A
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Data.EnemyDataSO
-  enemyName: Dummy
-  prefab: {fileID: 0}
-  hp: 30
-  moveSpeed: 0
-  attackPower: 5
+  enemyName: Enemy
+  prefab: {fileID: 1464790703812295833, guid: e14d4019c80e13a4ebca15d899545a3a, type: 3}
+  hp: 50
+  moveSpeed: 7
+  attackPower: 10
   defense: 0
   attackRange: 1.5
   attackInterval: 1
-  xpDrop: 5
+  xpDrop: 10
   isElite: 0
   isBoss: 0

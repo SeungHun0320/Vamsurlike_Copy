@@ -135,6 +135,7 @@ GameObject:
   - component: {fileID: 873381295}
   - component: {fileID: 873381294}
   - component: {fileID: 873381301}
+  - component: {fileID: 873381302}
   m_Layer: 0
   m_Name: NetworkManager
   m_TagString: Untagged
@@ -239,7 +240,8 @@ MonoBehaviour:
     NetworkTransport: {fileID: 873381298}
     PlayerPrefab: {fileID: 3346994395623583896, guid: 68cb901cabe727046afcbedc90b18183, type: 3}
     Prefabs:
-      NetworkPrefabsLists: []
+      NetworkPrefabsLists:
+      - {fileID: 11400000, guid: fbf61d2add828e945b787adadbfe7d1d, type: 2}
     TickRate: 30
     ClientConnectionBufferTimeout: 10
     ConnectionApproval: 1
@@ -296,6 +298,18 @@ MonoBehaviour:
   - {x: 2, y: 10, z: -2}
   - {x: -2, y: 10, z: 2}
   - {x: 2, y: 10, z: 2}
+--- !u!114 &873381302
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 873381293}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c169684adec54344ca4dcd864c4aaba8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Network.EnemySpawnManager
 --- !u!1 &992708771
 GameObject:
   m_ObjectHideFlags: 0

@@ -549,7 +549,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Player.PlayerNetworkStats
   ShowTopMostFoldoutHeaderGroup: 1
-  characterData: {fileID: 0}
+  characterData: {fileID: 11400000, guid: 964b173f302986044b98b8a08fae49d7, type: 2}
   fallbackMaxHP: 100
   fallbackMoveSpeed: 5
 --- !u!114 &3212978654452102384
