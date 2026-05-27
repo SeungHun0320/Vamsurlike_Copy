@@ -1,19 +1,20 @@
 using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Data;
+using Vamsurlike.Enemy;
 using Vamsurlike.Network;
 using UnityEngine.InputSystem;
 
 namespace Vamsurlike.Stage
 {
     // 임시 스폰 테스터 — WaveController 완성 후 제거
+    // F5: 적 1마리 스폰 | F6: 버스트 스폰 | F7: 전체 적 데미지 | F8: 전체 적 즉사
     public class SpawnTester : MonoBehaviour
     {
         [SerializeField] private EnemyDataSO enemyData;
         [SerializeField] private float spawnRadius = 8f;
-        [SerializeField] private KeyCode spawnKey = KeyCode.F5;
-        [SerializeField] private KeyCode spawnBurstKey = KeyCode.F6;
         [SerializeField] private int burstCount = 5;
+        [SerializeField] private float debugDamage = 20f;
 
         private void Update()
         {
@@ -34,6 +35,12 @@ namespace Vamsurlike.Stage
                 for (int i = 0; i < burstCount; i++)
                     SpawnOne();
             }
+
+            if (keyboard.f7Key.wasPressedThisFrame)
+                DamageAllEnemies(debugDamage);
+
+            if (keyboard.f8Key.wasPressedThisFrame)
+                DamageAllEnemies(float.MaxValue);
         }
 
         private void SpawnOne()
@@ -57,6 +64,19 @@ namespace Vamsurlike.Stage
             Vector2 circle = Random.insideUnitCircle.normalized * spawnRadius;
             Vector3 pos = transform.position + new Vector3(circle.x, 0f, circle.y);
             EnemySpawnManager.Instance.SpawnEnemy(enemyData, pos);
+        }
+
+        private void DamageAllEnemies(float amount)
+        {
+            if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer)
+            {
+                Debug.LogWarning("[SpawnTester] 서버에서만 데미지 가능합니다.");
+                return;
+            }
+            var enemies = FindObjectsByType<EnemyNetworkBase>(FindObjectsSortMode.None);
+            foreach (var e in enemies)
+                e.TakeDamage(amount);
+            Debug.Log($"[SpawnTester] 데미지 {amount} → {enemies.Length}마리");
         }
 
         [ContextMenu("Spawn One")]

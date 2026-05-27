@@ -132,9 +132,10 @@ GameObject:
   - component: {fileID: 1838895349042537222}
   - component: {fileID: -8557425961131920496}
   - component: {fileID: -2201681554412157061}
+  - component: {fileID: 8121751851826498011}
   - component: {fileID: 3261745909377420729}
   - component: {fileID: 2888426881609934237}
-  - component: {fileID: 8121751851826498011}
+  - component: {fileID: -7891265019497339697}
   m_Layer: 0
   m_Name: Enemy_A
   m_TagString: Untagged
@@ -205,33 +206,6 @@ MonoBehaviour:
   AutoObjectParentSync: 1
   SyncOwnerTransformWhenParented: 1
   AllowOwnerToParent: 0
---- !u!114 &3261745909377420729
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1464790703812295833}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5c5bbcdd59f3984b80dd7a6e33c040c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Enemy.EnemyNetworkBase
-  ShowTopMostFoldoutHeaderGroup: 1
-  data: {fileID: 0}
---- !u!114 &2888426881609934237
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1464790703812295833}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4b6191383ade7114a998de8033193b0e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Enemy.EnemyAI
-  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!114 &8121751851826498011
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -278,6 +252,49 @@ MonoBehaviour:
   SwitchTransformSpaceWhenParented: 0
   Interpolate: 1
   SlerpPosition: 0
+--- !u!114 &3261745909377420729
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1464790703812295833}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5c5bbcdd59f3984b80dd7a6e33c040c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Enemy.EnemyNetworkBase
+  ShowTopMostFoldoutHeaderGroup: 1
+  data: {fileID: 0}
+  sourcePrefab: {fileID: 1464790703812295833}
+--- !u!114 &2888426881609934237
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1464790703812295833}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b6191383ade7114a998de8033193b0e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Enemy.EnemyAI
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &-7891265019497339697
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1464790703812295833}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b271c1291f8c1f429490b655644259c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Network.NetworkVisibilityController
+  ShowTopMostFoldoutHeaderGroup: 1
+  visibilityRange: 50
+  updateInterval: 0.5
 --- !u!1 &1973686553820295930
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,6 +1,7 @@
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
+using Vamsurlike.Data;
 using Vamsurlike.Player;
 
 namespace Vamsurlike.Enemy
@@ -26,14 +27,16 @@ namespace Vamsurlike.Enemy
         public override void OnNetworkSpawn()
         {
             if (!IsServer) { Agent.enabled = false; enabled = false; return; }
-
-            if (Base.Data != null)
-            {
-                Agent.speed           = Base.Data.moveSpeed;
-                Agent.stoppingDistance = Mathf.Max(0.1f, Base.Data.attackRange * 0.8f);
-            }
-
+            // Data는 EnemyNetworkBase.Initialize 후 ApplyData로 주입됨 — 여기서 읽지 않음
             ChangeState(new EnemyIdleState());
+        }
+
+        // EnemyNetworkBase.Initialize 직후 서버에서 호출
+        internal void ApplyData(EnemyDataSO data)
+        {
+            if (data == null) return;
+            Agent.speed            = data.moveSpeed;
+            Agent.stoppingDistance = Mathf.Max(0.1f, data.attackRange * 0.8f);
         }
 
         private void Update()

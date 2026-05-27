@@ -34,16 +34,27 @@ namespace Vamsurlike.Network
             if (NavMesh.SamplePosition(position, out NavMeshHit hit, 5f, NavMesh.AllAreas))
                 position = hit.position;
 
-            var instance = Instantiate(data.prefab, position, Quaternion.identity);
-            if (!instance.TryGetComponent<NetworkObject>(out var networkObject))
+            NetworkObject networkObject;
+            if (PoolManager.Instance != null)
             {
-                Debug.LogError($"[{nameof(EnemySpawnManager)}] {data.enemyName} prefab에 NetworkObject가 없습니다.", instance);
-                Destroy(instance);
-                return;
+                networkObject = PoolManager.Instance.GetNetworkObject(data.prefab, position, Quaternion.identity);
+            }
+            else
+            {
+                var go = Instantiate(data.prefab, position, Quaternion.identity);
+                if (!go.TryGetComponent(out networkObject))
+                {
+                    Debug.LogError($"[{nameof(EnemySpawnManager)}] {data.enemyName} prefab에 NetworkObject가 없습니다.", go);
+                    Destroy(go);
+                    return;
+                }
             }
 
+            if (networkObject == null) return;
+
             networkObject.Spawn(true);
-            instance.GetComponent<EnemyNetworkBase>()?.Initialize(data);
+            if (networkObject.TryGetComponent<EnemyNetworkBase>(out var enemyBase))
+                enemyBase.Initialize(data);
             Debug.Log($"[{nameof(EnemySpawnManager)}] {data.enemyName} 스폰 완료. position={position}");
         }
 

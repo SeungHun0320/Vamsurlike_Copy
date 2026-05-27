@@ -136,6 +136,7 @@ GameObject:
   - component: {fileID: 873381294}
   - component: {fileID: 873381301}
   - component: {fileID: 873381302}
+  - component: {fileID: 873381303}
   m_Layer: 0
   m_Name: NetworkManager
   m_TagString: Untagged
@@ -310,6 +311,26 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c169684adec54344ca4dcd864c4aaba8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Network.EnemySpawnManager
+--- !u!114 &873381303
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 873381293}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d1e38d626dd3f924a8c97aaf461e445d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Network.PoolManager
+  goConfigs: []
+  networkConfigs:
+  - prefab: {fileID: 1464790703812295833, guid: e14d4019c80e13a4ebca15d899545a3a, type: 3}
+    warmupCount: 20
+  - prefab: {fileID: 6973261090502386799, guid: 20e7fc33d3343924788a92d1faf1308a, type: 3}
+    warmupCount: 20
+  - prefab: {fileID: 3916538926206676985, guid: 95fda721b55515747810e5105ecea51c, type: 3}
+    warmupCount: 20
 --- !u!1 &992708771
 GameObject:
   m_ObjectHideFlags: 0

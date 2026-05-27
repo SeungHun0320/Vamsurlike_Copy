@@ -27,8 +27,9 @@ namespace Vamsurlike.Stage
             Instance = this;
         }
 
-        private void OnDestroy()
+        public override void OnDestroy()
         {
+            base.OnDestroy();
             if (Instance == this) Instance = null;
         }
 
@@ -46,12 +47,21 @@ namespace Vamsurlike.Stage
         {
             if (!IsServer) return false;
             if (!activeOrbs.TryGetValue(orbId, out var orb)) return false;
+            if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)) return false;
+
+            // 서버 권한 거리 검증: 플레이어 스탯의 픽업 반경 기준 + 네트워크 지연 보상(×2)
+            if (client.PlayerObject != null)
+            {
+                var stats = client.PlayerObject.GetComponent<PlayerNetworkStats>();
+                float pickupRadius = stats != null && stats.PickupRadius.Value > 0f
+                    ? stats.PickupRadius.Value : 2f;
+                float maxSqrDist = (pickupRadius * 2f) * (pickupRadius * 2f);
+                if (Vector3.SqrMagnitude(client.PlayerObject.transform.position - orb.Pos) > maxSqrDist)
+                    return false;
+            }
 
             activeOrbs.Remove(orbId);
-
-            if (NetworkManager.ConnectedClients.TryGetValue(clientId, out var client))
-                client.PlayerObject?.GetComponent<PlayerNetworkStats>()?.AddXP(orb.Xp);
-
+            client.PlayerObject?.GetComponent<PlayerNetworkStats>()?.AddXP(orb.Xp);
             DestroyOrbVisualClientRpc(orbId);
             return true;
         }

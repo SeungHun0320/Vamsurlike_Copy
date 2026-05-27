@@ -30,6 +30,11 @@ namespace Vamsurlike.Player
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
 
+        public NetworkVariable<float> PickupRadius { get; } = new(
+            2f,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
+
         public bool IsAlive => HP.Value > 0f;
 
         public override void OnNetworkSpawn()
@@ -45,10 +50,11 @@ namespace Vamsurlike.Player
             float maxHP = data != null ? data.baseHP : fallbackMaxHP;
             float moveSpeed = data != null ? data.baseMoveSpeed : fallbackMoveSpeed;
 
-            MaxHP.Value = Mathf.Max(1f, maxHP);
-            HP.Value = MaxHP.Value;
+            MaxHP.Value     = Mathf.Max(1f, maxHP);
+            HP.Value        = MaxHP.Value;
             MoveSpeed.Value = Mathf.Max(0f, moveSpeed);
-            XP.Value = 0;
+            XP.Value        = 0;
+            PickupRadius.Value = data != null ? data.basePickupRadius : 2f;
         }
 
         public void TakeDamage(float amount)

@@ -417,6 +417,7 @@ GameObject:
   - component: {fileID: 2524775257812534708}
   - component: {fileID: 4704022576865482609}
   - component: {fileID: 4068285843582478324}
+  - component: {fileID: 5028191962685312863}
   m_Layer: 6
   m_Name: NetworkedPlayer
   m_TagString: Player
@@ -610,6 +611,19 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   cameraName: CM_FollowCam
   activePriority: 20
+--- !u!114 &5028191962685312863
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3346994395623583896}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 567d3f3837dca3743b32f8f181d4fe59, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Player.PlayerPickupController
+  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &3716566736859526982
 GameObject:
   m_ObjectHideFlags: 0

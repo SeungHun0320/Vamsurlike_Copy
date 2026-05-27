@@ -8,10 +8,14 @@ namespace Vamsurlike.Player
     [RequireComponent(typeof(PlayerNetworkStats))]
     public class PlayerPickupController : NetworkBehaviour
     {
-        [SerializeField] private float pickupRadius = 2f;
-
+        private PlayerNetworkStats stats;
         private float checkTimer;
         private const float CheckInterval = 0.1f;
+
+        private void Awake()
+        {
+            stats = GetComponent<PlayerNetworkStats>();
+        }
 
         private void Update()
         {
@@ -28,7 +32,9 @@ namespace Vamsurlike.Player
         {
             if (XPOrbManager.Instance == null) return;
 
-            List<ulong> nearby = XPOrbManager.Instance.GetNearbyOrbIds(transform.position, pickupRadius);
+            float radius = stats != null && stats.PickupRadius.Value > 0f
+                ? stats.PickupRadius.Value : 2f;
+            List<ulong> nearby = XPOrbManager.Instance.GetNearbyOrbIds(transform.position, radius);
             foreach (ulong id in nearby)
                 RequestPickupServerRpc(id);
         }

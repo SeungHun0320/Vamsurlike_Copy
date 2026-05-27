@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 76bf3e6a14c2ec6478374affd2102cb6, type: 3}
+  m_Name: WaveData_01
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Stage.WaveDataSO
+  waveDuration: 20
+  entries:
+  - enemyData: {fileID: 11400000, guid: 0c0ecaacbbf42954db3a12cd3b7fab16, type: 2}
+    count: 5
+    spawnInterval: 0.6
+  - enemyData: {fileID: 11400000, guid: f9e28cacf7b8ed04eb3f091537a8bcd4, type: 2}
+    count: 4
+    spawnInterval: 0.4
+  - enemyData: {fileID: 11400000, guid: 1e87419dddc6b854a9de8b91d5ead860, type: 2}
+    count: 2
+    spawnInterval: 1
