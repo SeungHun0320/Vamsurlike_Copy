@@ -37,8 +37,28 @@ namespace Vamsurlike.Enemy
 
         public void TakeDamage(float amount)
         {
-            if (!IsServer || !IsAlive || amount <= 0f) return;
+            if (!IsServer)
+            {
+                Debug.LogWarning($"[{nameof(EnemyNetworkBase)}] TakeDamage ignored on client. enemy={name}, amount={amount}");
+                return;
+            }
+
+            if (!IsAlive)
+            {
+                Debug.Log($"[{nameof(EnemyNetworkBase)}] TakeDamage ignored because enemy is dead. enemy={name}, amount={amount}, hp={HP.Value}");
+                return;
+            }
+
+            if (amount <= 0f)
+            {
+                Debug.LogWarning($"[{nameof(EnemyNetworkBase)}] TakeDamage ignored because amount is invalid. enemy={name}, amount={amount}, hp={HP.Value}");
+                return;
+            }
+
+            float beforeHP = HP.Value;
             HP.Value = Mathf.Max(0f, HP.Value - amount);
+            Debug.Log($"[{nameof(EnemyNetworkBase)}] {name} TakeDamage {amount}: {beforeHP} -> {HP.Value}");
+
             if (HP.Value <= 0f)
                 HandleDeath();
         }

@@ -331,6 +331,8 @@ MonoBehaviour:
     warmupCount: 20
   - prefab: {fileID: 3916538926206676985, guid: 95fda721b55515747810e5105ecea51c, type: 3}
     warmupCount: 20
+  - prefab: {fileID: 4756532345730749531, guid: d2ea673924e42cb43b7bdd7a34a25601, type: 3}
+    warmupCount: 50
 --- !u!1 &992708771
 GameObject:
   m_ObjectHideFlags: 0
