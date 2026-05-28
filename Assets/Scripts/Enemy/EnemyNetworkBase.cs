@@ -2,7 +2,8 @@ using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Data;
 using Vamsurlike.Network;
-using Vamsurlike.Stage; // DropManager
+using Vamsurlike.Stage;
+using Vamsurlike.UI;
 
 namespace Vamsurlike.Enemy
 {
@@ -17,19 +18,22 @@ namespace Vamsurlike.Enemy
 
         public bool IsAlive => HP.Value > 0f;
         public EnemyDataSO Data => data;
+        public float ScaledAttackPower { get; private set; }
 
         public override void OnNetworkSpawn()
         {
-            if (IsServer)
-                HP.Value = data != null ? data.hp : 100f;
+            if (!IsServer) return;
+            HP.Value = data != null ? data.hp : 100f;
+            EnemyRegistry.Register(this);
         }
 
         // EnemySpawnManager.SpawnEnemy에서 Spawn() 직후 호출
-        public void Initialize(EnemyDataSO enemyData)
+        public void Initialize(EnemyDataSO enemyData, float hpMultiplier = 1f, float damageMultiplier = 1f)
         {
             if (!IsServer) return;
             data = enemyData;
-            HP.Value = data.hp;
+            HP.Value          = Mathf.Max(1f, data.hp * Mathf.Max(1f, hpMultiplier));
+            ScaledAttackPower = data.attackPower * Mathf.Max(1f, damageMultiplier);
             // OnNetworkSpawn보다 뒤에 호출되므로 EnemyAI에 데이터를 직접 주입
             if (TryGetComponent<EnemyAI>(out var ai))
                 ai.ApplyData(data);
@@ -55,9 +59,18 @@ namespace Vamsurlike.Enemy
                 return;
             }
 
+            // GAME_PLAN 공식: FinalDamage = amount * (1 + attackMul) * (1 - defenseRate)
+            // attackMul은 Phase 5 PassiveStatHandler 구현 전까지 0
+            float defense     = Mathf.Max(0f, data != null ? data.defense : 0f);
+            float defenseRate = defense / (defense + 100f);
+            float finalDamage = Mathf.Max(1f, amount * (1f - defenseRate));
+
             float beforeHP = HP.Value;
-            HP.Value = Mathf.Max(0f, HP.Value - amount);
-            Debug.Log($"[{nameof(EnemyNetworkBase)}] {name} TakeDamage {amount}: {beforeHP} -> {HP.Value}");
+            HP.Value = Mathf.Max(0f, HP.Value - finalDamage);
+            Debug.Log($"[{nameof(EnemyNetworkBase)}] {name} TakeDamage raw={amount} final={finalDamage:F1} def={defense}: {beforeHP} -> {HP.Value}");
+
+            float offset = data != null ? data.floatingTextHeightOffset : 2f;
+            ShowDamageClientRpc(finalDamage, transform.position + Vector3.up * offset);
 
             if (HP.Value <= 0f)
                 HandleDeath();
@@ -66,24 +79,30 @@ namespace Vamsurlike.Enemy
         protected virtual void HandleDeath()
         {
             PlayDeathVFXClientRpc();
-            DropManager.Instance?.OnEnemyDied(data, transform.position);
+            if (StageRuntime.Instance != null && StageRuntime.Instance.Drops != null)
+                StageRuntime.Instance.Drops.OnEnemyDied(data, transform.position);
             NetworkObject.Despawn(false);
         }
 
         public override void OnNetworkDespawn()
         {
             base.OnNetworkDespawn();
-            // 서버: Despawn(false) 시 PrefabHandler.Destroy 미호출 → 여기서 반환
-            // 클라이언트: PrefabHandler.Destroy가 반환 담당 — 중복 push 방지
             if (!IsServer) return;
+            EnemyRegistry.Unregister(this);
             if (data != null && data.prefab != null && PoolManager.Instance != null)
                 PoolManager.Instance.ReturnNetworkObject(data.prefab, NetworkObject);
         }
 
         [ClientRpc]
+        private void ShowDamageClientRpc(float damage, Vector3 worldPosition)
+        {
+            FloatingTextManager.Instance?.ShowDamage(damage, worldPosition);
+        }
+
+        [ClientRpc]
         private void PlayDeathVFXClientRpc()
         {
-            // Phase 4에서 VFX 연결
+            // Phase 8에서 VFX 연결
         }
     }
 }

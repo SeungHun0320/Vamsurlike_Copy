@@ -67,17 +67,17 @@ namespace Vamsurlike.Stage
         }
 
         // 클라이언트 전용: PlayerPickupController가 거리 체크 시 사용
-        public List<ulong> GetNearbyOrbIds(Vector3 position, float radius)
+        // 호출자가 results를 소유 — 캐시 노출/중첩 호출 안전
+        public void FillNearbyOrbIds(Vector3 position, float radius, List<ulong> results)
         {
-            var result = new List<ulong>();
+            results.Clear();
             float sqrRadius = radius * radius;
             foreach (var (id, go) in orbVisuals)
             {
                 if (go == null) continue;
                 if (Vector3.SqrMagnitude(go.transform.position - position) <= sqrRadius)
-                    result.Add(id);
+                    results.Add(id);
             }
-            return result;
         }
 
         [ClientRpc]

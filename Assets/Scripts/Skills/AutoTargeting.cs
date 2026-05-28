@@ -7,6 +7,9 @@ namespace Vamsurlike.Skills
 {
     public static class AutoTargeting
     {
+        private static readonly int EnemyLayerMask = 1 << 7; // Layer 7: Enemy
+        private static readonly Collider[] overlapBuffer = new Collider[256];
+
         public static EnemyNetworkBase FindNearestEnemy(
             Vector3 origin,
             float range,
@@ -15,21 +18,21 @@ namespace Vamsurlike.Skills
             if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer)
                 return null;
 
-            float sqrRange = range * range;
-            float bestSqrDistance = float.MaxValue;
+            int count = Physics.OverlapSphereNonAlloc(origin, range, overlapBuffer, EnemyLayerMask);
+            float bestSqrDist = float.MaxValue;
             EnemyNetworkBase best = null;
 
-            foreach (var networkObject in NetworkManager.Singleton.SpawnManager.SpawnedObjectsList)
+            for (int i = 0; i < count; i++)
             {
-                if (networkObject == null) continue;
-                if (!networkObject.TryGetComponent<EnemyNetworkBase>(out var enemy)) continue;
+                if (!overlapBuffer[i].TryGetComponent<EnemyNetworkBase>(out var enemy)) continue;
                 if (!enemy.IsAlive) continue;
-                if (ignoredNetworkObjectIds != null && ignoredNetworkObjectIds.Contains(networkObject.NetworkObjectId)) continue;
+                if (ignoredNetworkObjectIds != null &&
+                    ignoredNetworkObjectIds.Contains(enemy.NetworkObjectId)) continue;
 
-                float sqrDistance = SqrDistanceXZ(enemy.transform.position, origin);
-                if (sqrDistance > sqrRange || sqrDistance >= bestSqrDistance) continue;
+                float sqrDist = SqrDistanceXZ(enemy.transform.position, origin);
+                if (sqrDist >= bestSqrDist) continue;
 
-                bestSqrDistance = sqrDistance;
+                bestSqrDist = sqrDist;
                 best = enemy;
             }
 
@@ -44,17 +47,12 @@ namespace Vamsurlike.Skills
             if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer)
                 return 0;
 
-            float sqrRange = range * range;
+            int count = Physics.OverlapSphereNonAlloc(origin, range, overlapBuffer, EnemyLayerMask);
 
-            foreach (var networkObject in NetworkManager.Singleton.SpawnManager.SpawnedObjectsList)
+            for (int i = 0; i < count; i++)
             {
-                if (networkObject == null) continue;
-                if (!networkObject.TryGetComponent<EnemyNetworkBase>(out var enemy)) continue;
+                if (!overlapBuffer[i].TryGetComponent<EnemyNetworkBase>(out var enemy)) continue;
                 if (!enemy.IsAlive) continue;
-
-                float sqrDistance = SqrDistanceXZ(enemy.transform.position, origin);
-                if (sqrDistance > sqrRange) continue;
-
                 results.Add(enemy);
             }
 
@@ -63,9 +61,9 @@ namespace Vamsurlike.Skills
 
         private static float SqrDistanceXZ(Vector3 a, Vector3 b)
         {
-            float x = a.x - b.x;
-            float z = a.z - b.z;
-            return x * x + z * z;
+            float dx = a.x - b.x;
+            float dz = a.z - b.z;
+            return dx * dx + dz * dz;
         }
     }
 }

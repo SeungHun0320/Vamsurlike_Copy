@@ -1,0 +1,59 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b4a51447856db045ae04069e1460781, type: 3}
+  m_Name: SD_DamageAura
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Data.SkillDataSO
+  skillName: Damage Aura
+  icon: {fileID: 0}
+  castType: 1
+  isManual: 0
+  projectilePrefab: {fileID: 0}
+  maxLevel: 2
+  levels:
+  - cooldown: 0.8
+    damage: 6
+    range: 6
+    projectileSpeed: 1
+    projectileLifetime: 1
+    projectileHitRadius: 0.5
+    projectileCount: 1
+    spreadAngle: 0
+    pierceCount: 0
+    duration: 0
+    tickInterval: 0.8
+    areaRadius: 6
+    orbitalCount: 1
+    orbitalRadius: 2
+    orbitalRotationSpeed: 180
+    orbitalHitRadius: 0.65
+    waveCount: 1
+    waveDelay: 0.15
+    rotationPerWave: 30
+  - cooldown: 0.65
+    damage: 9
+    range: 7
+    projectileSpeed: 1
+    projectileLifetime: 1
+    projectileHitRadius: 0.5
+    projectileCount: 1
+    spreadAngle: 0
+    pierceCount: 0
+    duration: 0
+    tickInterval: 0.65
+    areaRadius: 7
+    orbitalCount: 1
+    orbitalRadius: 2
+    orbitalRotationSpeed: 180
+    orbitalHitRadius: 0.65
+    waveCount: 1
+    waveDelay: 0.15
+    rotationPerWave: 30

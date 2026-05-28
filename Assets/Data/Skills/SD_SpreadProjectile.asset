@@ -10,34 +10,34 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6b4a51447856db045ae04069e1460781, type: 3}
-  m_Name: SkillData_PierceProjectile
+  m_Name: SD_SpreadProjectile
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Data.SkillDataSO
-  skillName: Pierce Projectile
+  skillName: Spread Projectile
   icon: {fileID: 0}
   castType: 0
   isManual: 0
   projectilePrefab: {fileID: 4756532345730749531, guid: d2ea673924e42cb43b7bdd7a34a25601, type: 3}
   maxLevel: 2
   levels:
-  - cooldown: 1
-    damage: 18
-    range: 14
-    projectileSpeed: 15
-    projectileLifetime: 2.8
-    projectileHitRadius: 0.7
-    projectileCount: 1
-    spreadAngle: 0
-    pierceCount: 2
+  - cooldown: 1.2
+    damage: 10
+    range: 12
+    projectileSpeed: 13
+    projectileLifetime: 2.5
+    projectileHitRadius: 0.65
+    projectileCount: 3
+    spreadAngle: 30
+    pierceCount: 0
     areaRadius: 0
     tickInterval: 1
-  - cooldown: 0.95
-    damage: 22
-    range: 15
-    projectileSpeed: 16
-    projectileLifetime: 3
-    projectileHitRadius: 0.75
-    projectileCount: 1
-    spreadAngle: 0
-    pierceCount: 4
+  - cooldown: 1.1
+    damage: 12
+    range: 13
+    projectileSpeed: 14
+    projectileLifetime: 2.7
+    projectileHitRadius: 0.7
+    projectileCount: 5
+    spreadAngle: 45
+    pierceCount: 0
     areaRadius: 0
     tickInterval: 1

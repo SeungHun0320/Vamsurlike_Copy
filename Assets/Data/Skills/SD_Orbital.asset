@@ -1,0 +1,78 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b4a51447856db045ae04069e1460781, type: 3}
+  m_Name: SD_Orbital
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Data.SkillDataSO
+  skillName: Orbital Blades
+  icon: {fileID: 0}
+  castType: 2
+  isManual: 0
+  projectilePrefab: {fileID: 0}
+  maxLevel: 3
+  levels:
+  - cooldown: 5
+    damage: 7
+    range: 4
+    projectileSpeed: 1
+    projectileLifetime: 1
+    projectileHitRadius: 0.5
+    projectileCount: 1
+    spreadAngle: 0
+    pierceCount: 0
+    duration: 0
+    tickInterval: 0.3
+    areaRadius: 0
+    orbitalCount: 1
+    orbitalRadius: 5
+    orbitalRotationSpeed: 180
+    orbitalHitRadius: 2
+    waveCount: 1
+    waveDelay: 0.15
+    rotationPerWave: 30
+  - cooldown: 5
+    damage: 8
+    range: 4
+    projectileSpeed: 1
+    projectileLifetime: 1
+    projectileHitRadius: 0.5
+    projectileCount: 1
+    spreadAngle: 0
+    pierceCount: 0
+    duration: 0
+    tickInterval: 0.3
+    areaRadius: 0
+    orbitalCount: 2
+    orbitalRadius: 5
+    orbitalRotationSpeed: 210
+    orbitalHitRadius: 2
+    waveCount: 1
+    waveDelay: 0.15
+    rotationPerWave: 30
+  - cooldown: 5
+    damage: 10
+    range: 4.5
+    projectileSpeed: 1
+    projectileLifetime: 1
+    projectileHitRadius: 0.5
+    projectileCount: 1
+    spreadAngle: 0
+    pierceCount: 0
+    duration: 0.03
+    tickInterval: 0.3
+    areaRadius: 0
+    orbitalCount: 3
+    orbitalRadius: 2.5
+    orbitalRotationSpeed: 240
+    orbitalHitRadius: 2
+    waveCount: 1
+    waveDelay: 0.15
+    rotationPerWave: 30

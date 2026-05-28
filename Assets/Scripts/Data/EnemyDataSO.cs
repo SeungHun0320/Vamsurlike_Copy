@@ -12,10 +12,13 @@ namespace Vamsurlike.Data
         public float hp             = 50f;
         public float moveSpeed      = 3f;
         public float attackPower    = 10f;
-        public float defense        = 0f;
+        [Min(0f)] public float defense = 0f;
         public float attackRange    = 1.5f;
         public float attackInterval = 1f;
         public int   xpDrop         = 10;
+
+        [Header("UI")]
+        public float floatingTextHeightOffset = 2f;
 
         [Header("Flags")]
         public bool isElite;

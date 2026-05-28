@@ -12,9 +12,9 @@ GameObject:
   - component: {fileID: 5623835580230735641}
   - component: {fileID: 2929315506289501162}
   - component: {fileID: 6318342146336581807}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: BasicProjectile
-  m_TagString: Untagged
+  m_TagString: Projectile
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -131,9 +131,9 @@ GameObject:
   - component: {fileID: 1357409392515715303}
   - component: {fileID: 6560570215970101068}
   - component: {fileID: 4572749538694807259}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: Mesh Object
-  m_TagString: Untagged
+  m_TagString: Projectile
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0

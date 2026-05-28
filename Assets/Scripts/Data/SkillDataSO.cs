@@ -5,7 +5,9 @@ namespace Vamsurlike.Data
     public enum SkillCastType
     {
         Projectile,
-        AreaAura
+        AreaAura,
+        Orbital,
+        Ultimate
     }
 
     [System.Serializable]
@@ -24,9 +26,23 @@ namespace Vamsurlike.Data
         [Min(0f)] public float spreadAngle = 0f;
         [Min(0)] public int pierceCount = 0;
 
+        [Header("Persistent (Aura / Orbital)")]
+        [Min(0f)] public float duration = 0f;       // 0 = 항상 활성
+        [Min(0.01f)] public float tickInterval = 1f; // 활성 중 데미지 간격
+
         [Header("Area")]
         [Min(0f)] public float areaRadius = 0f;
-        [Min(0.01f)] public float tickInterval = 1f;
+
+        [Header("Orbital")]
+        [Min(1)] public int orbitalCount = 1;
+        [Min(0.1f)] public float orbitalRadius = 2f;
+        [Min(0f)] public float orbitalRotationSpeed = 180f;
+        [Min(0.05f)] public float orbitalHitRadius = 0.65f;
+
+        [Header("Ultimate")]
+        [Min(1)] public int waveCount = 1;
+        [Min(0f)] public float waveDelay = 0.15f;
+        [Min(0f)] public float rotationPerWave = 30f;
     }
 
     [CreateAssetMenu(fileName = "SkillData", menuName = "Vamsurlike/Data/Skill")]

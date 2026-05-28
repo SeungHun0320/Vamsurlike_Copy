@@ -20,4 +20,10 @@ MonoBehaviour:
   baseAttackPower: 10
   baseDefense: 0
   basePickupRadius: 2
-  startingSkills: []
+  startingSkills:
+  - {fileID: 11400000, guid: 9a3d2b8ba7a4d204e9be05cb38e3905c, type: 2}
+  - {fileID: 11400000, guid: e603e60704790f640b25324af560590d, type: 2}
+  - {fileID: 11400000, guid: d524e4c633a57894fadeb5e9940f4cd5, type: 2}
+  - {fileID: 11400000, guid: 7cbf607b28960c84d859ef9c01110a2c, type: 2}
+  - {fileID: 11400000, guid: 7af840a663adfec4d848ee4c5241a8b3, type: 2}
+  - {fileID: 11400000, guid: 32b7110446a0d8641b0f165e5744725a, type: 2}

@@ -325,14 +325,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Network.PoolManager
   goConfigs: []
   networkConfigs:
+  - prefab: {fileID: 4756532345730749531, guid: d2ea673924e42cb43b7bdd7a34a25601, type: 3}
+    warmupCount: 50
+  deferredNetworkConfigs:
   - prefab: {fileID: 1464790703812295833, guid: e14d4019c80e13a4ebca15d899545a3a, type: 3}
     warmupCount: 20
   - prefab: {fileID: 6973261090502386799, guid: 20e7fc33d3343924788a92d1faf1308a, type: 3}
     warmupCount: 20
   - prefab: {fileID: 3916538926206676985, guid: 95fda721b55515747810e5105ecea51c, type: 3}
     warmupCount: 20
-  - prefab: {fileID: 4756532345730749531, guid: d2ea673924e42cb43b7bdd7a34a25601, type: 3}
-    warmupCount: 50
 --- !u!1 &992708771
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,5 +1,6 @@
 using Unity.Netcode;
 using UnityEngine;
+using Vamsurlike.Network;
 
 namespace Vamsurlike.Stage
 {
@@ -10,10 +11,11 @@ namespace Vamsurlike.Stage
         public static StageRuntime Instance { get; private set; }
 
         [SerializeField] private WaveController waveController;
-        [SerializeField] private DropManager    dropManager;
+        [SerializeField] private DropManager   dropManager;
 
-        public WaveController Wave  => waveController;
-        public DropManager    Drops => dropManager;
+        public WaveController    Wave  => waveController;
+        public DropManager       Drops => dropManager;
+        public EnemySpawnManager Spawn => EnemySpawnManager.Instance; // Bootstrap 싱글톤 래핑
 
         private void Awake()
         {
@@ -21,13 +23,25 @@ namespace Vamsurlike.Stage
             Instance = this;
         }
 
+        public float ElapsedTime { get; private set; }
+
         public override void OnNetworkSpawn()
         {
             if (!IsServer) { enabled = false; return; }
+            PoolManager.Instance?.WarmupDeferredPools();
+            waveController?.Initialize(Spawn);
+            waveController?.Begin();
         }
 
-        private void OnDestroy()
+        private void Update()
         {
+            if (!IsServer) return;
+            ElapsedTime += Time.deltaTime;
+        }
+
+        public override void OnDestroy()
+        {
+            base.OnDestroy();
             if (Instance == this) Instance = null;
         }
     }

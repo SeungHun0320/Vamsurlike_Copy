@@ -28,7 +28,7 @@ namespace Vamsurlike.Enemy
         {
             if (!IsServer) { Agent.enabled = false; enabled = false; return; }
             // Data는 EnemyNetworkBase.Initialize 후 ApplyData로 주입됨 — 여기서 읽지 않음
-            ChangeState(new EnemyIdleState());
+            ChangeState(EnemyStates.Idle);
         }
 
         // EnemyNetworkBase.Initialize 직후 서버에서 호출
@@ -90,6 +90,14 @@ namespace Vamsurlike.Enemy
         void Exit(EnemyAI ai);
     }
 
+    // ─── State 싱글턴 (무상태 — GC 방지) ──────────────────────────────────────
+
+    internal static class EnemyStates
+    {
+        internal static readonly EnemyIdleState  Idle  = new();
+        internal static readonly EnemyChaseState Chase = new();
+    }
+
     // ─── Idle ──────────────────────────────────────────────────────────────────
 
     internal sealed class EnemyIdleState : IEnemyState
@@ -101,7 +109,7 @@ namespace Vamsurlike.Enemy
 
         public void Update(EnemyAI ai)
         {
-            if (ai.Target != null) ai.ChangeState(new EnemyChaseState());
+            if (ai.Target != null) ai.ChangeState(EnemyStates.Chase);
         }
 
         public void Exit(EnemyAI ai) { }
@@ -115,12 +123,12 @@ namespace Vamsurlike.Enemy
 
         public void Update(EnemyAI ai)
         {
-            if (ai.Target == null) { ai.ChangeState(new EnemyIdleState()); return; }
+            if (ai.Target == null) { ai.ChangeState(EnemyStates.Idle); return; }
 
             float dist = Vector3.Distance(ai.transform.position, ai.Target.position);
             if (ai.Base.Data != null && dist <= ai.Base.Data.attackRange)
             {
-                ai.ChangeState(new EnemyAttackState());
+                ai.ChangeState(new EnemyAttackState()); // Attack은 cooldown 상태 보유 → new 유지
                 return;
             }
 
@@ -145,12 +153,12 @@ namespace Vamsurlike.Enemy
 
         public void Update(EnemyAI ai)
         {
-            if (ai.Target == null) { ai.ChangeState(new EnemyIdleState()); return; }
+            if (ai.Target == null) { ai.ChangeState(EnemyStates.Idle); return; }
 
             float dist = Vector3.Distance(ai.transform.position, ai.Target.position);
             if (ai.Base.Data == null || dist > ai.Base.Data.attackRange)
             {
-                ai.ChangeState(new EnemyChaseState());
+                ai.ChangeState(EnemyStates.Chase);
                 return;
             }
 
@@ -158,7 +166,7 @@ namespace Vamsurlike.Enemy
             if (cooldown > 0f) return;
 
             if (ai.Target.TryGetComponent<PlayerNetworkStats>(out var stats))
-                stats.TakeDamage(ai.Base.Data.attackPower);
+                stats.TakeDamage(ai.Base.ScaledAttackPower);
             cooldown = ai.Base.Data.attackInterval;
         }
 

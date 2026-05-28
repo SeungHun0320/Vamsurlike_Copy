@@ -419,6 +419,10 @@ GameObject:
   - component: {fileID: 4068285843582478324}
   - component: {fileID: 5028191962685312863}
   - component: {fileID: 4342171377839567156}
+  - component: {fileID: 6762558574061010795}
+  - component: {fileID: 2927437339032325398}
+  - component: {fileID: 827259218347296016}
+  - component: {fileID: 5842462787964463976}
   m_Layer: 6
   m_Name: NetworkedPlayer
   m_TagString: Player
@@ -638,11 +642,68 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Skills.SkillManager
   ShowTopMostFoldoutHeaderGroup: 1
-  startingSkills:
-  - {fileID: 11400000, guid: 9a3d2b8ba7a4d204e9be05cb38e3905c, type: 2}
+  characterData: {fileID: 11400000, guid: 964b173f302986044b98b8a08fae49d7, type: 2}
   projectileSpawnPoint: {fileID: 0}
   spawnForwardOffset: 0.8
   failedCastRetryDelay: 0.1
+--- !u!114 &6762558574061010795
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3346994395623583896}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8330adf3a82430b43b196f2473774dea, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Skills.ProjectileNetworkSkill
+  ShowTopMostFoldoutHeaderGroup: 1
+  noTargetLogInterval: 2
+--- !u!114 &2927437339032325398
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3346994395623583896}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dfce48c4252bf2047b33ff2d8ed02357, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Skills.AuraNetworkSkill
+  ShowTopMostFoldoutHeaderGroup: 1
+  noTargetLogInterval: 2
+--- !u!114 &827259218347296016
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3346994395623583896}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 47a43c37dedbe4642a50b8de1dbe08ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Skills.OrbitalNetworkSkill
+  ShowTopMostFoldoutHeaderGroup: 1
+  noTargetLogInterval: 2
+  orbitalVisualPrefab: {fileID: 7209417620919649187, guid: 9378fd5e85aa92a42bf1b911ce5a3b9d, type: 3}
+  orbitalHeightOffset: 1
+--- !u!114 &5842462787964463976
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3346994395623583896}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42a7e5570dfe69b419da9dc4933f2204, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Skills.UltimateNetworkSkill
+  ShowTopMostFoldoutHeaderGroup: 1
+  noTargetLogInterval: 2
 --- !u!1 &3716566736859526982
 GameObject:
   m_ObjectHideFlags: 0

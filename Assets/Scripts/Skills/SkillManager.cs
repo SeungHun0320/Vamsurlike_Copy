@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Data;
-using Vamsurlike.Enemy;
-using Vamsurlike.Network;
 
 namespace Vamsurlike.Skills
 {
@@ -16,23 +14,38 @@ namespace Vamsurlike.Skills
         {
             public SkillDataSO skill;
             [Min(1)] public int level = 1;
+
+            // Projectile / Ultimate
             public float cooldownTimer;
+
+            // Aura / Orbital (persistent)
+            public bool isActive = true;   // 활성 상태 (duration=0이면 항상 true)
+            public float durationTimer;    // 남은 지속시간
+            public float tickTimer;        // 다음 틱까지 남은 시간
 
             public OwnedSkill(SkillDataSO skill, int level)
             {
-                this.skill = skill;
-                this.level = Mathf.Max(1, level);
+                this.skill    = skill;
+                this.level    = Mathf.Max(1, level);
+                isActive      = true;
+                tickTimer     = 0f;   // 즉시 첫 틱
+                durationTimer = -1f;  // sentinel: 첫 UpdatePersistentSkill에서 levelData.duration으로 초기화
             }
         }
 
-        [SerializeField] private SkillDataSO[] startingSkills;
+        [SerializeField] private CharacterDataSO characterData;
         [SerializeField] private Transform projectileSpawnPoint;
         [SerializeField] private float spawnForwardOffset = 0.8f;
         [SerializeField] private float failedCastRetryDelay = 0.1f;
 
         private readonly List<OwnedSkill> ownedSkills = new();
-        private readonly List<EnemyNetworkBase> auraTargets = new();
+        private readonly List<SkillBase> skillExecutors = new();
         private float nextNoTargetLogTime;
+
+        private void Awake()
+        {
+            CacheSkillExecutors();
+        }
 
         public override void OnNetworkSpawn()
         {
@@ -44,10 +57,14 @@ namespace Vamsurlike.Skills
             }
 
             InitializeStartingSkills();
+            CacheSkillExecutors();
             Debug.Log($"[{nameof(SkillManager)}] Spawned on server. owner={OwnerClientId}, object={name}, skillCount={ownedSkills.Count}");
 
             if (ownedSkills.Count == 0)
                 Debug.LogWarning($"[{nameof(SkillManager)}] No starting skills assigned. object={name}");
+
+            if (skillExecutors.Count == 0)
+                Debug.LogWarning($"[{nameof(SkillManager)}] No skill executors found. Add {nameof(ProjectileNetworkSkill)}, {nameof(AuraNetworkSkill)}, {nameof(OrbitalNetworkSkill)}, or another {nameof(SkillBase)} component. object={name}");
         }
 
         private void Update()
@@ -56,8 +73,8 @@ namespace Vamsurlike.Skills
 
             for (int i = 0; i < ownedSkills.Count; i++)
             {
-                OwnedSkill ownedSkill = ownedSkills[i];
-                if (ownedSkill.skill == null)
+                OwnedSkill owned = ownedSkills[i];
+                if (owned.skill == null)
                 {
                     if (Time.time >= nextNoTargetLogTime)
                     {
@@ -67,14 +84,74 @@ namespace Vamsurlike.Skills
                     continue;
                 }
 
-                ownedSkill.cooldownTimer -= Time.deltaTime;
-                if (ownedSkill.cooldownTimer > 0f) continue;
-
-                SkillLevelData levelData = ownedSkill.skill.GetLevelData(ownedSkill.level);
-                ownedSkill.cooldownTimer = TryCast(ownedSkill, levelData)
-                    ? levelData != null ? levelData.cooldown : 1f
-                    : failedCastRetryDelay;
+                if (IsPersistent(owned.skill))
+                    UpdatePersistentSkill(owned);
+                else
+                    UpdateCooldownSkill(owned);
             }
+        }
+
+        // Aura / Orbital: tickInterval마다 데미지, duration 후 cooldown 대기
+        private void UpdatePersistentSkill(OwnedSkill owned)
+        {
+            SkillLevelData levelData = owned.skill.GetLevelData(owned.level);
+            if (levelData == null) return;
+
+            if (owned.isActive)
+            {
+                // sentinel: 첫 프레임에 duration 초기화
+                if (owned.durationTimer < 0f)
+                    owned.durationTimer = levelData.duration;
+
+                owned.tickTimer -= Time.deltaTime;
+                if (owned.tickTimer <= 0f)
+                {
+                    TryCast(owned, levelData);
+                    owned.tickTimer = levelData.tickInterval;
+                }
+
+                // duration=0 이면 항상 활성
+                if (levelData.duration > 0f)
+                {
+                    owned.durationTimer -= Time.deltaTime;
+                    if (owned.durationTimer <= 0f)
+                    {
+                        owned.isActive = false;
+                        owned.cooldownTimer = levelData.cooldown;
+                        Debug.Log($"[{nameof(SkillManager)}] Persistent skill ended. skill={owned.skill.name}, cooldown={levelData.cooldown}s");
+                    }
+                }
+            }
+            else
+            {
+                owned.cooldownTimer -= Time.deltaTime;
+                if (owned.cooldownTimer <= 0f)
+                {
+                    owned.isActive     = true;
+                    owned.durationTimer = levelData.duration;
+                    owned.tickTimer    = 0f;
+                    Debug.Log($"[{nameof(SkillManager)}] Persistent skill activated. skill={owned.skill.name}, duration={levelData.duration}s");
+                }
+            }
+        }
+
+        // Projectile / Ultimate: cooldown 후 발동
+        private void UpdateCooldownSkill(OwnedSkill owned)
+        {
+            owned.cooldownTimer -= Time.deltaTime;
+            if (owned.skill.isManual) return;
+            if (owned.cooldownTimer > 0f) return;
+
+            SkillLevelData levelData = owned.skill.GetLevelData(owned.level);
+            owned.cooldownTimer = TryCast(owned, levelData)
+                ? levelData != null ? levelData.cooldown : 1f
+                : failedCastRetryDelay;
+        }
+
+        private bool IsPersistent(SkillDataSO skill)
+        {
+            SkillBase executor = FindExecutor(skill);
+            return executor != null && executor.IsPersistentExecution;
         }
 
         public bool LearnSkill(SkillDataSO skill)
@@ -102,6 +179,27 @@ namespace Vamsurlike.Skills
             return true;
         }
 
+        [ServerRpc]
+        public void ActivateFirstManualSkillServerRpc()
+        {
+            for (int i = 0; i < ownedSkills.Count; i++)
+            {
+                OwnedSkill owned = ownedSkills[i];
+                if (owned.skill == null || !owned.skill.isManual) continue;
+                if (owned.cooldownTimer > 0f)
+                {
+                    Debug.Log($"[{nameof(SkillManager)}] Manual skill on cooldown. skill={owned.skill.name}, remaining={owned.cooldownTimer:F2}s");
+                    return;
+                }
+
+                SkillLevelData levelData = owned.skill.GetLevelData(owned.level);
+                owned.cooldownTimer = TryCast(owned, levelData)
+                    ? levelData != null ? levelData.cooldown : 5f
+                    : failedCastRetryDelay;
+                return;
+            }
+        }
+
         public int GetSkillLevel(SkillDataSO skill)
         {
             return TryGetOwnedSkill(skill, out var ownedSkill) ? ownedSkill.level : 0;
@@ -110,6 +208,7 @@ namespace Vamsurlike.Skills
         private void InitializeStartingSkills()
         {
             ownedSkills.Clear();
+            SkillDataSO[] startingSkills = characterData != null ? characterData.startingSkills : null;
             if (startingSkills == null) return;
 
             for (int i = 0; i < startingSkills.Length; i++)
@@ -117,7 +216,7 @@ namespace Vamsurlike.Skills
                 SkillDataSO skill = startingSkills[i];
                 if (skill == null)
                 {
-                    Debug.LogWarning($"[{nameof(SkillManager)}] startingSkills[{i}] is null. object={name}");
+                    Debug.LogWarning($"[{nameof(SkillManager)}] characterData.startingSkills[{i}] is null. object={name}");
                     continue;
                 }
 
@@ -149,115 +248,49 @@ namespace Vamsurlike.Skills
             SkillDataSO skill = ownedSkill.skill;
             if (skill == null || levelData == null) return false;
 
-            return skill.castType switch
-            {
-                SkillCastType.Projectile => TryCastProjectile(ownedSkill, levelData),
-                SkillCastType.AreaAura => TryCastAreaAura(ownedSkill, levelData),
-                _ => false
-            };
-        }
-
-        private bool TryCastProjectile(OwnedSkill ownedSkill, SkillLevelData levelData)
-        {
-            SkillDataSO skill = ownedSkill.skill;
-            if (skill.projectilePrefab == null)
-            {
-                Debug.LogWarning($"[{nameof(SkillManager)}] Projectile skill has no projectile prefab. skill={skill.name}");
-                return false;
-            }
-
-            EnemyNetworkBase target = AutoTargeting.FindNearestEnemy(transform.position, levelData.range);
-            if (target == null)
+            SkillBase executor = FindExecutor(skill);
+            if (executor == null)
             {
                 if (Time.time >= nextNoTargetLogTime)
                 {
-                    Debug.Log($"[{nameof(SkillManager)}] No enemy target in range. skill={skill.name}, range={levelData.range}, position={transform.position}");
+                    Debug.LogWarning($"[{nameof(SkillManager)}] No executor found for skill. skill={skill.name}, castType={skill.castType}, object={name}");
                     nextNoTargetLogTime = Time.time + 2f;
                 }
                 return false;
             }
 
-            Vector3 spawnPosition = projectileSpawnPoint != null
-                ? projectileSpawnPoint.position
-                : transform.position + Vector3.up * 0.8f;
+            var context = new SkillCastContext(
+                this,
+                skill,
+                levelData,
+                ownedSkill.level,
+                OwnerClientId,
+                transform,
+                projectileSpawnPoint,
+                spawnForwardOffset);
 
-            Vector3 direction = target.transform.position - spawnPosition;
-            direction.y = 0f;
-            if (direction.sqrMagnitude < 0.0001f)
-                direction = transform.forward;
+            return executor.TryExecute(context);
+        }
 
-            Vector3 baseDirection = direction.normalized;
-            spawnPosition += baseDirection * spawnForwardOffset;
+        private void CacheSkillExecutors()
+        {
+            skillExecutors.Clear();
+            GetComponents(skillExecutors);
+        }
 
-            int projectileCount = Mathf.Max(1, levelData.projectileCount);
-            float spreadAngle = Mathf.Max(0f, levelData.spreadAngle);
-            int spawnedCount = 0;
+        private SkillBase FindExecutor(SkillDataSO skill)
+        {
+            if (skillExecutors.Count == 0)
+                CacheSkillExecutors();
 
-            for (int i = 0; i < projectileCount; i++)
+            for (int i = 0; i < skillExecutors.Count; i++)
             {
-                Vector3 shotDirection = GetSpreadDirection(baseDirection, i, projectileCount, spreadAngle);
-                if (SpawnProjectile(skill, levelData, spawnPosition, shotDirection))
-                    spawnedCount++;
+                SkillBase executor = skillExecutors[i];
+                if (executor != null && executor.CanExecute(skill))
+                    return executor;
             }
 
-            if (spawnedCount == 0) return false;
-
-            Debug.Log($"[{nameof(SkillManager)}] Fired projectile. skill={skill.name}, level={ownedSkill.level}, target={target.name}, damage={levelData.damage}, count={spawnedCount}, spawn={spawnPosition}");
-            return true;
-        }
-
-        private bool SpawnProjectile(SkillDataSO skill, SkillLevelData levelData, Vector3 spawnPosition, Vector3 direction)
-        {
-            Quaternion spawnRotation = Quaternion.LookRotation(direction, Vector3.up);
-            if (skill.projectilePrefab.TryGetComponent<NetworkProjectile>(out var projectilePrefab))
-                spawnRotation = projectilePrefab.GetProjectileRotation(direction);
-
-            NetworkObject projectileObject = PoolManager.Instance != null
-                ? PoolManager.Instance.GetNetworkObject(skill.projectilePrefab, spawnPosition, spawnRotation)
-                : Instantiate(skill.projectilePrefab, spawnPosition, spawnRotation).GetComponent<NetworkObject>();
-
-            if (projectileObject == null) return false;
-            if (projectileObject.TryGetComponent<NetworkProjectile>(out var projectile))
-                projectile.Initialize(skill.projectilePrefab, OwnerClientId, spawnPosition, direction, levelData);
-            else
-                Debug.LogWarning($"[{nameof(SkillManager)}] Spawned projectile has no {nameof(NetworkProjectile)} component. prefab={skill.projectilePrefab.name}");
-
-            projectileObject.Spawn(true);
-            return true;
-        }
-
-        private static Vector3 GetSpreadDirection(Vector3 baseDirection, int index, int count, float spreadAngle)
-        {
-            if (count <= 1 || spreadAngle <= 0f)
-                return baseDirection;
-
-            float angleStep = count > 1 ? spreadAngle / (count - 1) : 0f;
-            float startAngle = -spreadAngle * 0.5f;
-            float angle = startAngle + angleStep * index;
-            return Quaternion.AngleAxis(angle, Vector3.up) * baseDirection;
-        }
-
-        private bool TryCastAreaAura(OwnedSkill ownedSkill, SkillLevelData levelData)
-        {
-            SkillDataSO skill = ownedSkill.skill;
-            float radius = levelData.areaRadius > 0f ? levelData.areaRadius : levelData.range;
-            int targetCount = AutoTargeting.FindEnemiesInRange(transform.position, radius, auraTargets);
-
-            if (targetCount == 0)
-            {
-                if (Time.time >= nextNoTargetLogTime)
-                {
-                    Debug.Log($"[{nameof(SkillManager)}] No aura targets in range. skill={skill.name}, radius={radius}, position={transform.position}");
-                    nextNoTargetLogTime = Time.time + 2f;
-                }
-                return false;
-            }
-
-            for (int i = 0; i < auraTargets.Count; i++)
-                auraTargets[i].TakeDamage(levelData.damage);
-
-            Debug.Log($"[{nameof(SkillManager)}] Aura tick. skill={skill.name}, level={ownedSkill.level}, damage={levelData.damage}, radius={radius}, targets={targetCount}");
-            return true;
+            return null;
         }
     }
 }

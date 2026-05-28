@@ -22,7 +22,7 @@ namespace Vamsurlike.Network
             if (Instance == this) Instance = null;
         }
 
-        public void SpawnEnemy(EnemyDataSO data, Vector3 position)
+        public void SpawnEnemy(EnemyDataSO data, Vector3 position, float hpMultiplier = 1f, float damageMultiplier = 1f)
         {
             if (!IsServerActive()) return;
             if (data?.prefab == null)
@@ -54,7 +54,7 @@ namespace Vamsurlike.Network
 
             networkObject.Spawn(true);
             if (networkObject.TryGetComponent<EnemyNetworkBase>(out var enemyBase))
-                enemyBase.Initialize(data);
+                enemyBase.Initialize(data, hpMultiplier, damageMultiplier);
             Debug.Log($"[{nameof(EnemySpawnManager)}] {data.enemyName} 스폰 완료. position={position}");
         }
 

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEditor;
@@ -16,6 +16,7 @@ public static class SetupPhase4ProjectileSkill
     private const string SpreadProjectileSkillDataPath = "Assets/Data/Skills/SkillData_SpreadProjectile.asset";
     private const string PierceProjectileSkillDataPath = "Assets/Data/Skills/SkillData_PierceProjectile.asset";
     private const string DamageAuraSkillDataPath = "Assets/Data/Skills/SkillData_DamageAura.asset";
+    private const string OrbitalSkillDataPath = "Assets/Data/Skills/SkillData_Orbital.asset";
     private const string PlayerPrefabPath = "Assets/Prefabs/Player/NetworkedPlayer.prefab";
     private const string BootstrapScenePath = "Assets/Scenes/Bootstrap.unity";
     private const string NetworkPrefabsPath = "Assets/DefaultNetworkPrefabs.asset";
@@ -27,16 +28,16 @@ public static class SetupPhase4ProjectileSkill
         EnsureFolders();
         GameObject projectilePrefab = EnsureProjectilePrefab();
         SkillDataSO basicProjectile = EnsureBasicProjectileSkillData(projectilePrefab);
-        EnsureSpreadProjectileSkillData(projectilePrefab);
-        EnsurePierceProjectileSkillData(projectilePrefab);
         EnsureDamageAuraSkillData();
+        EnsureOrbitalSkillData();
         EnsurePlayerSkillManager(basicProjectile);
+        EnsurePlayerSkillExecutors();
         EnsureDefaultNetworkPrefab(projectilePrefab);
         EnsurePoolConfig(projectilePrefab);
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        Debug.Log("[SetupPhase4ProjectileSkill] 기본 총알 스킬 설정 완료");
+        Debug.Log("[SetupPhase4ProjectileSkill] 湲곕낯 珥앹븣 ?ㅽ궗 ?ㅼ젙 ?꾨즺");
     }
 
     private static void EnsureFolders()
@@ -133,7 +134,58 @@ public static class SetupPhase4ProjectileSkill
                     spreadAngle = 0f,
                     pierceCount = 0,
                     areaRadius = 0f,
-                    tickInterval = 1f
+                },
+                new SkillLevelData
+                {
+                    cooldown = 0.7f,
+                    damage = 16f,
+                    range = 12f,
+                    projectileSpeed = 14.5f,
+                    projectileLifetime = 2.6f,
+                    projectileHitRadius = 0.7f,
+                    projectileCount = 2,
+                    spreadAngle = 18f,
+                    pierceCount = 0,
+                    areaRadius = 0f,
+                },
+                new SkillLevelData
+                {
+                    cooldown = 0.65f,
+                    damage = 17f,
+                    range = 13f,
+                    projectileSpeed = 15f,
+                    projectileLifetime = 2.7f,
+                    projectileHitRadius = 0.72f,
+                    projectileCount = 3,
+                    spreadAngle = 30f,
+                    pierceCount = 0,
+                    areaRadius = 0f,
+                },
+                new SkillLevelData
+                {
+                    cooldown = 0.6f,
+                    damage = 19f,
+                    range = 14f,
+                    projectileSpeed = 15.5f,
+                    projectileLifetime = 2.9f,
+                    projectileHitRadius = 0.75f,
+                    projectileCount = 4,
+                    spreadAngle = 42f,
+                    pierceCount = 1,
+                    areaRadius = 0f,
+                },
+                new SkillLevelData
+                {
+                    cooldown = 0.55f,
+                    damage = 22f,
+                    range = 15f,
+                    projectileSpeed = 16f,
+                    projectileLifetime = 3.1f,
+                    projectileHitRadius = 0.8f,
+                    projectileCount = 5,
+                    spreadAngle = 55f,
+                    pierceCount = 2,
+                    areaRadius = 0f,
                 }
             });
     }
@@ -159,7 +211,6 @@ public static class SetupPhase4ProjectileSkill
                     spreadAngle = 30f,
                     pierceCount = 0,
                     areaRadius = 0f,
-                    tickInterval = 1f
                 },
                 new SkillLevelData
                 {
@@ -173,7 +224,6 @@ public static class SetupPhase4ProjectileSkill
                     spreadAngle = 45f,
                     pierceCount = 0,
                     areaRadius = 0f,
-                    tickInterval = 1f
                 }
             });
     }
@@ -199,7 +249,6 @@ public static class SetupPhase4ProjectileSkill
                     spreadAngle = 0f,
                     pierceCount = 2,
                     areaRadius = 0f,
-                    tickInterval = 1f
                 },
                 new SkillLevelData
                 {
@@ -213,7 +262,6 @@ public static class SetupPhase4ProjectileSkill
                     spreadAngle = 0f,
                     pierceCount = 4,
                     areaRadius = 0f,
-                    tickInterval = 1f
                 }
             });
     }
@@ -239,7 +287,6 @@ public static class SetupPhase4ProjectileSkill
                     spreadAngle = 0f,
                     pierceCount = 0,
                     areaRadius = 3f,
-                    tickInterval = 0.8f
                 },
                 new SkillLevelData
                 {
@@ -253,7 +300,69 @@ public static class SetupPhase4ProjectileSkill
                     spreadAngle = 0f,
                     pierceCount = 0,
                     areaRadius = 3.5f,
-                    tickInterval = 0.65f
+                }
+            });
+    }
+
+    private static SkillDataSO EnsureOrbitalSkillData()
+    {
+        return EnsureSkillData(
+            OrbitalSkillDataPath,
+            "Orbital Blades",
+            SkillCastType.Orbital,
+            null,
+            new[]
+            {
+                new SkillLevelData
+                {
+                    cooldown = 0.45f,
+                    damage = 7f,
+                    range = 4f,
+                    projectileSpeed = 1f,
+                    projectileLifetime = 1f,
+                    projectileHitRadius = 0.5f,
+                    projectileCount = 1,
+                    spreadAngle = 0f,
+                    pierceCount = 0,
+                    areaRadius = 0f,
+                    orbitalCount = 1,
+                    orbitalRadius = 2.2f,
+                    orbitalRotationSpeed = 180f,
+                    orbitalHitRadius = 0.7f
+                },
+                new SkillLevelData
+                {
+                    cooldown = 0.4f,
+                    damage = 8f,
+                    range = 4f,
+                    projectileSpeed = 1f,
+                    projectileLifetime = 1f,
+                    projectileHitRadius = 0.5f,
+                    projectileCount = 1,
+                    spreadAngle = 0f,
+                    pierceCount = 0,
+                    areaRadius = 0f,
+                    orbitalCount = 2,
+                    orbitalRadius = 2.35f,
+                    orbitalRotationSpeed = 210f,
+                    orbitalHitRadius = 0.72f
+                },
+                new SkillLevelData
+                {
+                    cooldown = 0.35f,
+                    damage = 10f,
+                    range = 4.5f,
+                    projectileSpeed = 1f,
+                    projectileLifetime = 1f,
+                    projectileHitRadius = 0.5f,
+                    projectileCount = 1,
+                    spreadAngle = 0f,
+                    pierceCount = 0,
+                    areaRadius = 0f,
+                    orbitalCount = 3,
+                    orbitalRadius = 2.5f,
+                    orbitalRotationSpeed = 240f,
+                    orbitalHitRadius = 0.75f
                 }
             });
     }
@@ -307,12 +416,34 @@ public static class SetupPhase4ProjectileSkill
         }
     }
 
+    private static void EnsurePlayerSkillExecutors()
+    {
+        var root = PrefabUtility.LoadPrefabContents(PlayerPrefabPath);
+        try
+        {
+            if (root.GetComponent<ProjectileNetworkSkill>() == null)
+                root.AddComponent<ProjectileNetworkSkill>();
+
+            if (root.GetComponent<AuraNetworkSkill>() == null)
+                root.AddComponent<AuraNetworkSkill>();
+
+            if (root.GetComponent<OrbitalNetworkSkill>() == null)
+                root.AddComponent<OrbitalNetworkSkill>();
+
+            PrefabUtility.SaveAsPrefabAsset(root, PlayerPrefabPath);
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
     private static void EnsureDefaultNetworkPrefab(GameObject projectilePrefab)
     {
         var networkPrefabs = AssetDatabase.LoadAssetAtPath<NetworkPrefabsList>(NetworkPrefabsPath);
         if (networkPrefabs == null)
         {
-            Debug.LogWarning($"[SetupPhase4ProjectileSkill] NetworkPrefabsList를 찾을 수 없습니다: {NetworkPrefabsPath}");
+            Debug.LogWarning($"[SetupPhase4ProjectileSkill] NetworkPrefabsList瑜?李얠쓣 ???놁뒿?덈떎: {NetworkPrefabsPath}");
             return;
         }
 
@@ -378,5 +509,97 @@ public static class SetupPhase4ProjectileSkill
                 return true;
         }
         return false;
+    }
+
+    // ??????????????????????????????????????????????????????????????????????????
+    // Bullet Storm 沅곴레湲??ㅼ젙
+    // ??????????????????????????????????????????????????????????????????????????
+
+    private const string BulletStormSkillDataPath = "Assets/Data/Skills/SkillData_BulletStorm.asset";
+
+    [MenuItem("Tools/Vamsurlike/Setup Bullet Storm Skill")]
+    public static void SetupBulletStorm()
+    {
+        var projectilePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ProjectilePrefabPath);
+        if (projectilePrefab == null)
+        {
+            Debug.LogError("[SetupBulletStorm] BasicProjectile prefab not found. Run 'Setup Phase 4 Projectile Skill' first.");
+            return;
+        }
+
+        // 1. SkillDataSO ?앹꽦
+        var bulletStorm = AssetDatabase.LoadAssetAtPath<SkillDataSO>(BulletStormSkillDataPath);
+        if (bulletStorm == null)
+        {
+            bulletStorm = ScriptableObject.CreateInstance<SkillDataSO>();
+            AssetDatabase.CreateAsset(bulletStorm, BulletStormSkillDataPath);
+        }
+
+        bulletStorm.skillName       = "Bullet Storm";
+        bulletStorm.castType        = SkillCastType.Ultimate;
+        bulletStorm.isManual        = true;
+        bulletStorm.maxLevel        = 3;
+        bulletStorm.projectilePrefab = projectilePrefab;
+        bulletStorm.levels = new SkillLevelData[]
+        {
+            new SkillLevelData   // Lv 1: 3wave x 8bullets
+            {
+                cooldown = 20f, damage = 15f, range = 20f,
+                projectileCount = 8, projectileSpeed = 14f,
+                projectileLifetime = 2.5f, projectileHitRadius = 0.4f,
+                waveCount = 3, waveDelay = 0.15f, rotationPerWave = 30f,
+            },
+            new SkillLevelData   // Lv 2: 4wave x 12bullets
+            {
+                cooldown = 18f, damage = 20f, range = 20f,
+                projectileCount = 12, projectileSpeed = 15f,
+                projectileLifetime = 2.5f, projectileHitRadius = 0.4f,
+                waveCount = 4, waveDelay = 0.12f, rotationPerWave = 25f,
+            },
+            new SkillLevelData   // Lv 3: 5wave x 16bullets
+            {
+                cooldown = 15f, damage = 28f, range = 20f,
+                projectileCount = 16, projectileSpeed = 16f,
+                projectileLifetime = 2.5f, projectileHitRadius = 0.4f,
+                waveCount = 5, waveDelay = 0.10f, rotationPerWave = 22.5f,
+            },
+        };
+        EditorUtility.SetDirty(bulletStorm);
+
+        // 2. ?뚮젅?댁뼱 ?꾨━?뱀뿉 UltimateNetworkSkill 異붽? + startingSkills ?깅줉
+        var root = PrefabUtility.LoadPrefabContents(PlayerPrefabPath);
+        try
+        {
+            if (root.GetComponent<UltimateNetworkSkill>() == null)
+                root.AddComponent<UltimateNetworkSkill>();
+
+            var manager    = root.GetComponent<SkillManager>();
+            var mgrSO      = new SerializedObject(manager);
+            var skillsProp = mgrSO.FindProperty("startingSkills");
+
+            bool alreadyAdded = false;
+            for (int i = 0; i < skillsProp.arraySize; i++)
+            {
+                if (skillsProp.GetArrayElementAtIndex(i).objectReferenceValue == bulletStorm)
+                { alreadyAdded = true; break; }
+            }
+
+            if (!alreadyAdded)
+            {
+                skillsProp.arraySize++;
+                skillsProp.GetArrayElementAtIndex(skillsProp.arraySize - 1).objectReferenceValue = bulletStorm;
+                mgrSO.ApplyModifiedProperties();
+            }
+
+            PrefabUtility.SaveAsPrefabAsset(root, PlayerPrefabPath);
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        Debug.Log("[SetupBulletStorm] Bullet Storm 沅곴레湲??ㅼ젙 ?꾨즺");
     }
 }

@@ -10,34 +10,34 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6b4a51447856db045ae04069e1460781, type: 3}
-  m_Name: SkillData_DamageAura
+  m_Name: SD_PierceProjectile
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Data.SkillDataSO
-  skillName: Damage Aura
+  skillName: Pierce Projectile
   icon: {fileID: 0}
-  castType: 1
+  castType: 0
   isManual: 0
-  projectilePrefab: {fileID: 0}
+  projectilePrefab: {fileID: 4756532345730749531, guid: d2ea673924e42cb43b7bdd7a34a25601, type: 3}
   maxLevel: 2
   levels:
-  - cooldown: 0.8
-    damage: 6
-    range: 3
-    projectileSpeed: 1
-    projectileLifetime: 1
-    projectileHitRadius: 0.5
+  - cooldown: 1
+    damage: 18
+    range: 14
+    projectileSpeed: 15
+    projectileLifetime: 2.8
+    projectileHitRadius: 0.7
     projectileCount: 1
     spreadAngle: 0
-    pierceCount: 0
-    areaRadius: 3
-    tickInterval: 0.8
-  - cooldown: 0.65
-    damage: 9
-    range: 3.5
-    projectileSpeed: 1
-    projectileLifetime: 1
-    projectileHitRadius: 0.5
+    pierceCount: 2
+    areaRadius: 0
+    tickInterval: 1
+  - cooldown: 0.95
+    damage: 22
+    range: 15
+    projectileSpeed: 16
+    projectileLifetime: 3
+    projectileHitRadius: 0.75
     projectileCount: 1
     spreadAngle: 0
-    pierceCount: 0
-    areaRadius: 3.5
-    tickInterval: 0.65
+    pierceCount: 4
+    areaRadius: 0
+    tickInterval: 1

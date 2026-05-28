@@ -21,5 +21,6 @@ MonoBehaviour:
   attackRange: 1.5
   attackInterval: 1
   xpDrop: 10
+  floatingTextHeightOffset: 4
   isElite: 0
   isBoss: 0

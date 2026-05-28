@@ -9,9 +9,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6158717206152946573}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Bone_Foot_R
-  m_TagString: Untagged
+  m_TagString: Enemy
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -42,9 +42,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8830682557087882726}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Mesh Object
-  m_TagString: Untagged
+  m_TagString: Enemy
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -76,9 +76,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2196384165752580295}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Bone_Body
-  m_TagString: Untagged
+  m_TagString: Enemy
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -111,9 +111,9 @@ GameObject:
   - component: {fileID: 765807311541735346}
   - component: {fileID: 9138080416655323896}
   - component: {fileID: 2599600657602642473}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Body
-  m_TagString: Untagged
+  m_TagString: Enemy
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -199,9 +199,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4324000056730842311}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Bone_Body_end
-  m_TagString: Untagged
+  m_TagString: Enemy
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -232,9 +232,9 @@ GameObject:
   - component: {fileID: 4339809208383390786}
   - component: {fileID: 3535968238521306923}
   - component: {fileID: 485653004447296788}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: LeftFoot
-  m_TagString: Untagged
+  m_TagString: Enemy
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -320,9 +320,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 7870225513015508873}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Bone_Foot_L_end
-  m_TagString: Untagged
+  m_TagString: Enemy
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -351,9 +351,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4047493397077219792}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Bone_R
-  m_TagString: Untagged
+  m_TagString: Enemy
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -383,9 +383,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3368843931485535138}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Bone_Foot_L
-  m_TagString: Untagged
+  m_TagString: Enemy
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -418,9 +418,9 @@ GameObject:
   - component: {fileID: 927200973563665472}
   - component: {fileID: 7063139492665859746}
   - component: {fileID: 4026507777640220509}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: RightFoot
-  m_TagString: Untagged
+  m_TagString: Enemy
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -506,9 +506,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4236328763087581967}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Bone_Foot_R_end
-  m_TagString: Untagged
+  m_TagString: Enemy
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -543,9 +543,10 @@ GameObject:
   - component: {fileID: 5522385289997801471}
   - component: {fileID: 5170033284682644562}
   - component: {fileID: 1392935498535670886}
-  m_Layer: 0
+  - component: {fileID: 4834926203873638575}
+  m_Layer: 7
   m_Name: Enemy B
-  m_TagString: Untagged
+  m_TagString: Enemy
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -673,7 +674,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Enemy.EnemyNetworkBase
   ShowTopMostFoldoutHeaderGroup: 1
   data: {fileID: 0}
-  sourcePrefab: {fileID: 6973261090502386799}
 --- !u!114 &5170033284682644562
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -702,6 +702,29 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   visibilityRange: 50
   updateInterval: 0.5
+--- !u!136 &4834926203873638575
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6973261090502386799}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.5
+  m_Height: 1.8
+  m_Direction: 1
+  m_Center: {x: 0, y: 0.9, z: 0}
 --- !u!1 &7206775927963309277
 GameObject:
   m_ObjectHideFlags: 0
@@ -711,9 +734,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5286518376204548692}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Bone_L
-  m_TagString: Untagged
+  m_TagString: Enemy
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0

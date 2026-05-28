@@ -11,6 +11,7 @@ namespace Vamsurlike.Player
         private PlayerNetworkStats stats;
         private float checkTimer;
         private const float CheckInterval = 0.1f;
+        private readonly List<ulong> nearbyOrbs = new();
 
         private void Awake()
         {
@@ -34,8 +35,8 @@ namespace Vamsurlike.Player
 
             float radius = stats != null && stats.PickupRadius.Value > 0f
                 ? stats.PickupRadius.Value : 2f;
-            List<ulong> nearby = XPOrbManager.Instance.GetNearbyOrbIds(transform.position, radius);
-            foreach (ulong id in nearby)
+            XPOrbManager.Instance.FillNearbyOrbIds(transform.position, radius, nearbyOrbs);
+            foreach (ulong id in nearbyOrbs)
                 RequestPickupServerRpc(id);
         }
 

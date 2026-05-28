@@ -30,7 +30,8 @@ namespace Vamsurlike.Player
 
         private void FixedUpdate()
         {
-            if (!IsServer || characterController == null) return;
+            if (!IsServer || characterController == null) 
+                return;
             if (stats != null && !stats.IsAlive)
             {
                 moveInput = Vector2.zero;

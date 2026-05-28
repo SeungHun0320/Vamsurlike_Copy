@@ -5,21 +5,37 @@ using UnityEngine.InputSystem;
 namespace Vamsurlike.Player
 {
     [RequireComponent(typeof(PlayerNetworkController))]
+    [RequireComponent(typeof(Skills.SkillManager))]
     public class PlayerNetworkInput : NetworkBehaviour
     {
         private PlayerNetworkController controller;
+        private Skills.SkillManager skillManager;
+        private Vector2 lastSentDir;
 
         private void Awake()
         {
             controller = GetComponent<PlayerNetworkController>();
+            skillManager = GetComponent<Skills.SkillManager>();
+        }
+
+        private void Update()
+        {
+            if (!IsOwner) return;
+
+            Keyboard keyboard = Keyboard.current;
+            if (keyboard != null && keyboard.spaceKey.wasPressedThisFrame && skillManager != null)
+                skillManager.ActivateFirstManualSkillServerRpc();
         }
 
         private void FixedUpdate()
         {
             if (!IsOwner || controller == null) return;
 
-            Vector2 raw = ReadMoveInput();
+            Vector2 raw      = ReadMoveInput();
             Vector2 worldDir = ToCameraRelative(raw);
+
+            if (worldDir == lastSentDir) return;
+            lastSentDir = worldDir;
             controller.SubmitMoveInputServerRpc(worldDir);
         }
 

@@ -27,7 +27,8 @@ namespace Vamsurlike.Network
         }
 
         [SerializeField] private GOPoolConfig[]      goConfigs;
-        [SerializeField] private NetworkPoolConfig[] networkConfigs;
+        [SerializeField] private NetworkPoolConfig[] networkConfigs;         // Bootstrap 시 즉시 예열 (NavMesh 불필요 — Projectile 등)
+        [SerializeField] private NetworkPoolConfig[] deferredNetworkConfigs; // Stage 로드 후 예열 (NavMeshAgent 포함 — Enemy 등)
 
         private readonly Dictionary<GameObject, Queue<GameObject>>    goPools          = new();
         private readonly Dictionary<GameObject, Stack<NetworkObject>> netPools         = new();
@@ -73,6 +74,21 @@ namespace Vamsurlike.Network
         {
             foreach (var cfg in networkConfigs)
                 RegisterNetworkPrefab(cfg.prefab, cfg.warmupCount);
+
+            // deferredNetworkConfigs는 PrefabHandler만 등록, 예열은 WarmupDeferredPools()로 별도 호출
+            if (deferredNetworkConfigs != null)
+                foreach (var cfg in deferredNetworkConfigs)
+                    RegisterNetworkPrefab(cfg.prefab, warmupCount: 0);
+        }
+
+        // Stage 씬 로드 후 NavMesh 준비된 시점에 StageRuntime이 호출
+        public void WarmupDeferredPools()
+        {
+            if (deferredNetworkConfigs == null ||
+                NetworkManager.Singleton == null ||
+                !NetworkManager.Singleton.IsServer) return;
+            foreach (var cfg in deferredNetworkConfigs)
+                WarmupNetworkPool(cfg.prefab, cfg.warmupCount);
         }
 
         // ─── 일반 GO 풀 ────────────────────────────────────────────────────────
@@ -100,7 +116,7 @@ namespace Vamsurlike.Network
         // ─── NetworkObject 풀 ──────────────────────────────────────────────────
 
         // 런타임 추가 등록 (스테이지 로드 시 호출 가능)
-        // warmupCount: 현재 미사용 — Despawn(false) 재사용으로 풀이 런타임에 유기적으로 채워짐
+        // 서버에서 호출되면 warmupCount만큼 비활성 인스턴스를 즉시 풀에 채움
         public void RegisterNetworkPrefab(GameObject prefab, int warmupCount = 0)
         {
             if (prefab == null || NetworkManager.Singleton == null) return;
@@ -112,6 +128,27 @@ namespace Vamsurlike.Network
 
             NetworkManager.Singleton.PrefabHandler.AddHandler(
                 prefab, new NetPrefabHandler(prefab, this));
+
+            // 서버에서만 예열: Instantiate만 하고 풀에 적재 (네트워크 트래픽 없음)
+            if (warmupCount > 0 && NetworkManager.Singleton.IsServer)
+                WarmupNetworkPool(prefab, warmupCount);
+        }
+
+        private void WarmupNetworkPool(GameObject prefab, int count)
+        {
+            if (!netPools.TryGetValue(prefab, out var stack))
+                netPools[prefab] = stack = new Stack<NetworkObject>();
+
+            for (int i = 0; i < count; i++)
+            {
+                var go = Instantiate(prefab, transform); // PoolManager 하위로 배치
+                go.SetActive(false);
+                if (go.TryGetComponent<NetworkObject>(out var obj))
+                    stack.Push(obj);
+                else
+                    Destroy(go);
+            }
+            Debug.Log($"[PoolManager] Warmed up {count}x {prefab.name}");
         }
 
         public NetworkObject GetNetworkObject(GameObject prefab, Vector3 pos, Quaternion rot)
