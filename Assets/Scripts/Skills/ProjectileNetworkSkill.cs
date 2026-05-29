@@ -52,21 +52,22 @@ namespace Vamsurlike.Skills
             float spreadAngle = Mathf.Max(0f, levelData.spreadAngle);
             int spawnedCount = 0;
 
+            float finalDamage = context.FinalDamage;
             for (int i = 0; i < projectileCount; i++)
             {
                 Vector3 shotDirection = GetSpreadDirection(baseDirection, i, projectileCount, spreadAngle);
-                if (SpawnProjectile(skill, levelData, context.OwnerClientId, spawnPosition, shotDirection))
+                if (SpawnProjectile(skill, levelData, finalDamage, context.OwnerClientId, spawnPosition, shotDirection))
                     spawnedCount++;
             }
 
             if (spawnedCount == 0)
                 return false;
 
-            Debug.Log($"[{nameof(ProjectileNetworkSkill)}] Fired projectile. skill={skill.name}, level={context.Level}, target={target.name}, damage={levelData.damage}, count={spawnedCount}, spawn={spawnPosition}");
+            Debug.Log($"[{nameof(ProjectileNetworkSkill)}] Fired projectile. skill={skill.name}, level={context.Level}, target={target.name}, damage={finalDamage}(x{context.AttackMultiplier}), count={spawnedCount}, spawn={spawnPosition}");
             return true;
         }
 
-        private bool SpawnProjectile(SkillDataSO skill, SkillLevelData levelData, ulong ownerClientId, Vector3 spawnPosition, Vector3 direction)
+        private bool SpawnProjectile(SkillDataSO skill, SkillLevelData levelData, float finalDamage, ulong ownerClientId, Vector3 spawnPosition, Vector3 direction)
         {
             Quaternion spawnRotation = Quaternion.LookRotation(direction, Vector3.up);
             if (skill.projectilePrefab.TryGetComponent<NetworkProjectile>(out var projectilePrefab))
@@ -80,7 +81,7 @@ namespace Vamsurlike.Skills
                 return false;
 
             if (projectileObject.TryGetComponent<NetworkProjectile>(out var projectile))
-                projectile.Initialize(skill.projectilePrefab, ownerClientId, spawnPosition, direction, levelData);
+                projectile.Initialize(skill.projectilePrefab, ownerClientId, spawnPosition, direction, levelData, finalDamage);
             else
                 Debug.LogWarning($"[{nameof(ProjectileNetworkSkill)}] Spawned projectile has no {nameof(NetworkProjectile)} component. prefab={skill.projectilePrefab.name}");
 

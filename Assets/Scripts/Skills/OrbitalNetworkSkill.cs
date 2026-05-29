@@ -81,11 +81,12 @@ namespace Vamsurlike.Skills
                 Vector3 orbPos = GetOrbitalPosition(context.CasterTransform.position, orbitalRadius, rotationSpeed, i, orbitalCount);
                 int targetCount = AutoTargeting.FindEnemiesInRange(orbPos, hitRadius, targets);
 
+                float damage = context.FinalDamage;
                 for (int j = 0; j < targetCount; j++)
                 {
                     EnemyNetworkBase target = targets[j];
                     if (target == null || !hitEnemyIds.Add(target.NetworkObjectId)) continue;
-                    target.TakeDamage(levelData.damage);
+                    target.TakeDamage(damage);
                     damagedCount++;
                 }
             }
@@ -97,7 +98,7 @@ namespace Vamsurlike.Skills
                 return false;
             }
 
-            Debug.Log($"[{nameof(OrbitalNetworkSkill)}] Orbital tick. skill={skill.name}, level={context.Level}, damage={levelData.damage}, orbCount={orbitalCount}, damaged={damagedCount}");
+            Debug.Log($"[{nameof(OrbitalNetworkSkill)}] Orbital tick. skill={skill.name}, level={context.Level}, damage={context.FinalDamage}(x{context.AttackMultiplier}), orbCount={orbitalCount}, damaged={damagedCount}");
             return true;
         }
 

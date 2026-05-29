@@ -5,17 +5,24 @@ using Vamsurlike.Network;
 namespace Vamsurlike.Stage
 {
     // Stage 씬에 배치. 서버 전용 시스템 Composition Root.
-    // Phase 7: NetworkVariable<GameState>, 보스 페이즈, 클리어/패배 연결
     public class StageRuntime : NetworkBehaviour
     {
         public static StageRuntime Instance { get; private set; }
 
         [SerializeField] private WaveController waveController;
-        [SerializeField] private DropManager   dropManager;
+        [SerializeField] private DropManager    dropManager;
 
         public WaveController    Wave  => waveController;
         public DropManager       Drops => dropManager;
-        public EnemySpawnManager Spawn => EnemySpawnManager.Instance; // Bootstrap 싱글톤 래핑
+        public EnemySpawnManager Spawn => EnemySpawnManager.Instance;
+
+        // 모든 클라이언트가 읽고, 서버만 쓴다.
+        public NetworkVariable<GameState> CurrentState { get; } = new(
+            GameState.Playing,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
+
+        public float ElapsedTime { get; private set; }
 
         private void Awake()
         {
@@ -23,20 +30,47 @@ namespace Vamsurlike.Stage
             Instance = this;
         }
 
-        public float ElapsedTime { get; private set; }
-
         public override void OnNetworkSpawn()
         {
-            if (!IsServer) { enabled = false; return; }
-            PoolManager.Instance?.WarmupDeferredPools();
+            CurrentState.OnValueChanged += OnGameStateChanged;
+
+            // 늦게 참가한 클라이언트가 이미 LevelingUp 상태일 때 timeScale을 즉시 적용
+            OnGameStateChanged(CurrentState.Value, CurrentState.Value);
+
+            if (!IsServer) return;
+
+            if (PoolManager.Instance != null) PoolManager.Instance.WarmupDeferredPools();
+
             waveController?.Initialize(Spawn);
             waveController?.Begin();
+        }
+
+        public override void OnNetworkDespawn()
+        {
+            CurrentState.OnValueChanged -= OnGameStateChanged;
+            Time.timeScale = 1f;
+            base.OnNetworkDespawn();
         }
 
         private void Update()
         {
             if (!IsServer) return;
+            if (CurrentState.Value != GameState.Playing) return;
             ElapsedTime += Time.deltaTime;
+        }
+
+        // 서버 전용: LevelUpManager 등 다른 시스템에서 상태 전환 요청
+        public void SetGameState(GameState newState)
+        {
+            if (!IsServer) return;
+            CurrentState.Value = newState;
+        }
+
+        private void OnGameStateChanged(GameState prev, GameState next)
+        {
+            // LevelingUp 진입 시 전체 일시정지, 복귀 시 재개
+            // UI 애니메이션은 Time.unscaledDeltaTime 사용
+            Time.timeScale = next == GameState.LevelingUp ? 0f : 1f;
         }
 
         public override void OnDestroy()

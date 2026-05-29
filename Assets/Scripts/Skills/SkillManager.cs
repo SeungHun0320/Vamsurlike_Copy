@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Data;
+using Vamsurlike.Player;
+using Vamsurlike.Stage;
+using Vamsurlike.Upgrades;
 
 namespace Vamsurlike.Skills
 {
@@ -38,6 +41,9 @@ namespace Vamsurlike.Skills
         [SerializeField] private float spawnForwardOffset = 0.8f;
         [SerializeField] private float failedCastRetryDelay = 0.1f;
 
+        private PassiveStatHandler  passiveStatHandler;
+        private PlayerNetworkStats  playerStats;
+
         private readonly List<OwnedSkill> ownedSkills = new();
         private readonly List<SkillBase> skillExecutors = new();
         private float nextNoTargetLogTime;
@@ -56,6 +62,8 @@ namespace Vamsurlike.Skills
                 return;
             }
 
+            passiveStatHandler = GetComponent<PassiveStatHandler>();
+            playerStats        = GetComponent<PlayerNetworkStats>();
             InitializeStartingSkills();
             CacheSkillExecutors();
             Debug.Log($"[{nameof(SkillManager)}] Spawned on server. owner={OwnerClientId}, object={name}, skillCount={ownedSkills.Count}");
@@ -70,6 +78,8 @@ namespace Vamsurlike.Skills
         private void Update()
         {
             if (!IsServer) return;
+            if (playerStats != null && !playerStats.IsAlive) return;
+            if (StageRuntime.Instance == null || StageRuntime.Instance.CurrentState.Value != GameState.Playing) return;
 
             for (int i = 0; i < ownedSkills.Count; i++)
             {
@@ -182,6 +192,9 @@ namespace Vamsurlike.Skills
         [ServerRpc]
         public void ActivateFirstManualSkillServerRpc()
         {
+            if(StageRuntime.Instance?.CurrentState.Value != GameState.Playing)
+                return;
+
             for (int i = 0; i < ownedSkills.Count; i++)
             {
                 OwnedSkill owned = ownedSkills[i];
@@ -259,6 +272,10 @@ namespace Vamsurlike.Skills
                 return false;
             }
 
+            float attackMultiplier = passiveStatHandler != null
+                ? passiveStatHandler.AttackMultiplier.Value
+                : 1f;
+
             var context = new SkillCastContext(
                 this,
                 skill,
@@ -267,7 +284,8 @@ namespace Vamsurlike.Skills
                 OwnerClientId,
                 transform,
                 projectileSpawnPoint,
-                spawnForwardOffset);
+                spawnForwardOffset,
+                attackMultiplier);
 
             return executor.TryExecute(context);
         }

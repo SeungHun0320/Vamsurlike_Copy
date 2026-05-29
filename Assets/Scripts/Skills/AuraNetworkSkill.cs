@@ -31,10 +31,11 @@ namespace Vamsurlike.Skills
                 return false;
             }
 
+            float damage = context.FinalDamage;
             for (int i = 0; i < targets.Count; i++)
-                targets[i].TakeDamage(levelData.damage);
+                targets[i].TakeDamage(damage);
 
-            Debug.Log($"[{nameof(AuraNetworkSkill)}] Aura tick. skill={skill.name}, level={context.Level}, damage={levelData.damage}, radius={radius}, targets={targetCount}");
+            Debug.Log($"[{nameof(AuraNetworkSkill)}] Aura tick. skill={skill.name}, level={context.Level}, damage={damage}(x{context.AttackMultiplier}), radius={radius}, targets={targetCount}");
             return true;
         }
     }

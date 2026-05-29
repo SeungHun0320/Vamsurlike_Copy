@@ -25,11 +25,6 @@ namespace Vamsurlike.Player
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
 
-        public NetworkVariable<int> XP { get; } = new(
-            0,
-            NetworkVariableReadPermission.Everyone,
-            NetworkVariableWritePermission.Server);
-
         public NetworkVariable<float> PickupRadius { get; } = new(
             2f,
             NetworkVariableReadPermission.Everyone,
@@ -47,13 +42,12 @@ namespace Vamsurlike.Player
         {
             if (!IsServer) return;
 
-            float maxHP = data != null ? data.baseHP : fallbackMaxHP;
-            float moveSpeed = data != null ? data.baseMoveSpeed : fallbackMoveSpeed;
+            float maxHP      = data != null ? data.baseHP        : fallbackMaxHP;
+            float moveSpeed  = data != null ? data.baseMoveSpeed : fallbackMoveSpeed;
 
-            MaxHP.Value     = Mathf.Max(1f, maxHP);
-            HP.Value        = MaxHP.Value;
-            MoveSpeed.Value = Mathf.Max(0f, moveSpeed);
-            XP.Value        = 0;
+            MaxHP.Value        = Mathf.Max(1f, maxHP);
+            HP.Value           = MaxHP.Value;
+            MoveSpeed.Value    = Mathf.Max(0f, moveSpeed);
             PickupRadius.Value = data != null ? data.basePickupRadius : 2f;
         }
 
@@ -72,13 +66,6 @@ namespace Vamsurlike.Player
             if (amount <= 0f || !IsAlive) return;
 
             HP.Value = Mathf.Min(MaxHP.Value, HP.Value + amount);
-        }
-
-        public void AddXP(int amount)
-        {
-            if (!IsServer || amount <= 0) return;
-            XP.Value += amount;
-            Debug.Log($"[{nameof(PlayerNetworkStats)}] clientId {OwnerClientId} XP +{amount} → {XP.Value}");
         }
     }
 }

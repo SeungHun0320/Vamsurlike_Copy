@@ -1,4 +1,5 @@
 using UnityEngine;
+using Vamsurlike.Network;
 
 namespace Vamsurlike.UI
 {
@@ -31,8 +32,22 @@ namespace Vamsurlike.UI
             }
 
             Color color = damage >= criticalThreshold ? criticalColor : damageColor;
-            FloatingText text = Instantiate(floatingTextPrefab, worldPosition, Quaternion.identity);
-            text.Initialize(damage, worldPosition, color);
+            GameObject prefab = floatingTextPrefab.gameObject;
+            GameObject go = PoolManager.Instance != null
+                ? PoolManager.Instance.GetGO(prefab, worldPosition, Quaternion.identity)
+                : Instantiate(prefab, worldPosition, Quaternion.identity);
+
+            if (!go.TryGetComponent<FloatingText>(out var text))
+            {
+                Debug.LogWarning($"[{nameof(FloatingTextManager)}] Spawned prefab has no {nameof(FloatingText)} component.");
+                if (PoolManager.Instance != null)
+                    PoolManager.Instance.ReturnGO(prefab, go);
+                else
+                    Destroy(go);
+                return;
+            }
+
+            text.Initialize(damage, worldPosition, color, prefab);
         }
     }
 }

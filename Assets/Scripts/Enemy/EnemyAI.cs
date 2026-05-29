@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.AI;
 using Vamsurlike.Data;
 using Vamsurlike.Player;
+using Vamsurlike.Stage;
 
 namespace Vamsurlike.Enemy
 {
@@ -42,6 +43,7 @@ namespace Vamsurlike.Enemy
         private void Update()
         {
             if (!IsServer || !Base.IsAlive) return;
+            if (StageRuntime.Instance == null || StageRuntime.Instance.CurrentState.Value != GameState.Playing) return;
 
             targetUpdateTimer -= Time.deltaTime;
             if (targetUpdateTimer <= 0f)

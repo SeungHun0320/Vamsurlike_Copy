@@ -36,14 +36,19 @@ namespace Vamsurlike.Network
 
         private void Awake()
         {
-            if (Instance != null) { Destroy(this); return; }
+            if (Instance != null) 
+                { Destroy(this); return; }
             Instance = this;
         }
 
         private void Start()
         {
-            foreach (var cfg in goConfigs)
-                WarmupGO(cfg.prefab, cfg.warmupCount);
+            if (goConfigs != null)
+                foreach (var cfg in goConfigs)
+                {
+                    if (cfg == null || cfg.prefab == null) continue;
+                    WarmupGO(cfg.prefab, cfg.warmupCount);
+                }
 
             if (NetworkManager.Singleton != null)
             {
@@ -72,13 +77,20 @@ namespace Vamsurlike.Network
 
         private void OnNetworkStarted()
         {
-            foreach (var cfg in networkConfigs)
-                RegisterNetworkPrefab(cfg.prefab, cfg.warmupCount);
+            if (networkConfigs != null)
+                foreach (var cfg in networkConfigs)
+                {
+                    if (cfg == null || cfg.prefab == null) continue;
+                    RegisterNetworkPrefab(cfg.prefab, cfg.warmupCount);
+                }
 
             // deferredNetworkConfigs는 PrefabHandler만 등록, 예열은 WarmupDeferredPools()로 별도 호출
             if (deferredNetworkConfigs != null)
                 foreach (var cfg in deferredNetworkConfigs)
+                {
+                    if (cfg == null || cfg.prefab == null) continue;
                     RegisterNetworkPrefab(cfg.prefab, warmupCount: 0);
+                }
         }
 
         // Stage 씬 로드 후 NavMesh 준비된 시점에 StageRuntime이 호출
@@ -88,13 +100,17 @@ namespace Vamsurlike.Network
                 NetworkManager.Singleton == null ||
                 !NetworkManager.Singleton.IsServer) return;
             foreach (var cfg in deferredNetworkConfigs)
+            {
+                if (cfg == null || cfg.prefab == null) continue;
                 WarmupNetworkPool(cfg.prefab, cfg.warmupCount);
+            }
         }
 
         // ─── 일반 GO 풀 ────────────────────────────────────────────────────────
 
         public GameObject GetGO(GameObject prefab, Vector3 pos, Quaternion rot)
         {
+            if (prefab == null) return null;
             if (goPools.TryGetValue(prefab, out var queue) && queue.Count > 0)
             {
                 var go = queue.Dequeue();
@@ -107,6 +123,9 @@ namespace Vamsurlike.Network
 
         public void ReturnGO(GameObject prefab, GameObject go)
         {
+            if(prefab == null || go == null)    
+                return;
+
             go.SetActive(false);
             if (!goPools.TryGetValue(prefab, out var queue))
                 goPools[prefab] = queue = new Queue<GameObject>();
@@ -136,23 +155,40 @@ namespace Vamsurlike.Network
 
         private void WarmupNetworkPool(GameObject prefab, int count)
         {
+            if (prefab == null || count <= 0) return;
+
             if (!netPools.TryGetValue(prefab, out var stack))
                 netPools[prefab] = stack = new Stack<NetworkObject>();
 
-            for (int i = 0; i < count; i++)
+            // active prefab을 Instantiate하면 Awake/OnEnable이 즉시 실행돼
+            // NavMeshAgent가 NavMesh 등록을 시도하며 에러가 발생한다.
+            // 임시로 비활성화해서 컴포넌트 초기화를 풀에서 꺼낼 때까지 미룬다.
+            bool wasActive = prefab.activeSelf;
+            if (wasActive) prefab.SetActive(false);
+
+            try
             {
-                var go = Instantiate(prefab, transform); // PoolManager 하위로 배치
-                go.SetActive(false);
-                if (go.TryGetComponent<NetworkObject>(out var obj))
-                    stack.Push(obj);
-                else
-                    Destroy(go);
+                for (int i = 0; i < count; i++)
+                {
+                    var go = Instantiate(prefab, transform);
+                    if (go.TryGetComponent<NetworkObject>(out var obj))
+                        stack.Push(obj);
+                    else
+                        Destroy(go);
+                }
             }
+            finally
+            {
+                // 예외 발생 시에도 prefab 원본 활성 상태 반드시 복구
+                if (wasActive) prefab.SetActive(true);
+            }
+
             Debug.Log($"[PoolManager] Warmed up {count}x {prefab.name}");
         }
 
         public NetworkObject GetNetworkObject(GameObject prefab, Vector3 pos, Quaternion rot)
         {
+            if (prefab == null) return null;
             if (netPools.TryGetValue(prefab, out var stack))
             {
                 while (stack.Count > 0)
@@ -169,7 +205,7 @@ namespace Vamsurlike.Network
 
         public void ReturnNetworkObject(GameObject prefab, NetworkObject obj)
         {
-            if (obj == null) return;
+            if (prefab == null || obj == null) return;
             obj.gameObject.SetActive(false);
             if (!netPools.TryGetValue(prefab, out var stack))
                 netPools[prefab] = stack = new Stack<NetworkObject>();

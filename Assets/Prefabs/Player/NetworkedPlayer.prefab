@@ -423,6 +423,7 @@ GameObject:
   - component: {fileID: 2927437339032325398}
   - component: {fileID: 827259218347296016}
   - component: {fileID: 5842462787964463976}
+  - component: {fileID: 3868694679171841}
   m_Layer: 6
   m_Name: NetworkedPlayer
   m_TagString: Player
@@ -704,6 +705,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Skills.UltimateNetworkSkill
   ShowTopMostFoldoutHeaderGroup: 1
   noTargetLogInterval: 2
+--- !u!114 &3868694679171841
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3346994395623583896}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4eb60bcc995491b4e88b91839b020d4d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Upgrades.PassiveStatHandler
+  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &3716566736859526982
 GameObject:
   m_ObjectHideFlags: 0

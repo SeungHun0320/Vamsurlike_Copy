@@ -30,6 +30,7 @@ namespace Vamsurlike.Skills
             StartCoroutine(FireWavesCoroutine(
                 skill.projectilePrefab,
                 levelData,
+                context.FinalDamage,
                 context.OwnerClientId,
                 context.CasterTransform,
                 skill.name));
@@ -40,34 +41,39 @@ namespace Vamsurlike.Skills
         private IEnumerator FireWavesCoroutine(
             GameObject projectilePrefab,
             SkillLevelData levelData,
+            float finalDamage,
             ulong ownerClientId,
             Transform casterTransform,
             string skillName)
         {
-            int waveCount      = Mathf.Max(1, levelData.waveCount);
-            int bulletsPerWave = Mathf.Max(1, levelData.projectileCount);
-            float waveDelay    = Mathf.Max(0f, levelData.waveDelay);
-            float rotPerWave   = levelData.rotationPerWave;
-            float angleStep    = 360f / bulletsPerWave;
+            int   waveCount      = Mathf.Max(1, levelData.waveCount);
+            int   bulletsPerWave = Mathf.Max(1, levelData.projectileCount);
+            float waveDelay      = Mathf.Max(0f, levelData.waveDelay);
+            float rotPerWave     = levelData.rotationPerWave;
+            float angleStep      = 360f / bulletsPerWave;
 
-            Debug.Log($"[{nameof(UltimateNetworkSkill)}] BulletStorm start. skill={skillName}, waves={waveCount}, bullets/wave={bulletsPerWave}");
+            Debug.Log($"[{nameof(UltimateNetworkSkill)}] BulletStorm start. skill={skillName}, waves={waveCount}, bullets/wave={bulletsPerWave}, delay={waveDelay}s, damage={finalDamage}");
 
             for (int wave = 0; wave < waveCount; wave++)
             {
-                if (casterTransform == null) yield break;
-
-                Vector3 origin    = casterTransform.position + Vector3.up * DefaultSpawnHeight;
-                float waveAngle   = rotPerWave * wave;
+                float waveAngle = rotPerWave * wave;
 
                 for (int i = 0; i < bulletsPerWave; i++)
                 {
-                    float angle = angleStep * i + waveAngle;
-                    Vector3 dir = Quaternion.AngleAxis(angle, Vector3.up) * Vector3.forward;
-                    SpawnBullet(projectilePrefab, levelData, ownerClientId, origin, dir);
-                }
+                    if (casterTransform == null) 
+                        yield break;
 
-                if (wave < waveCount - 1)
-                    yield return new WaitForSeconds(waveDelay);
+                    // 매 총알마다 origin 갱신 — 발사 중 이동 시에도 추적
+                    Vector3 origin = casterTransform.position + Vector3.up * DefaultSpawnHeight;
+                    float   angle  = angleStep * i + waveAngle;
+                    Vector3 dir    = Quaternion.AngleAxis(angle, Vector3.up) * Vector3.forward;
+                    SpawnBullet(projectilePrefab, levelData, finalDamage, ownerClientId, origin, dir);
+
+                    // 마지막 총알 이후에는 대기 없음
+                    bool isLast = (wave == waveCount - 1) && (i == bulletsPerWave - 1);
+                    if (!isLast && waveDelay > 0f)
+                        yield return new WaitForSeconds(waveDelay);
+                }
             }
 
             if (casterTransform != null)
@@ -79,6 +85,7 @@ namespace Vamsurlike.Skills
         private void SpawnBullet(
             GameObject prefab,
             SkillLevelData levelData,
+            float finalDamage,
             ulong ownerClientId,
             Vector3 position,
             Vector3 direction)
@@ -95,7 +102,7 @@ namespace Vamsurlike.Skills
             if (obj == null) return;
 
             if (obj.TryGetComponent<NetworkProjectile>(out var projectile))
-                projectile.Initialize(prefab, ownerClientId, position, direction, levelData);
+                projectile.Initialize(prefab, ownerClientId, position, direction, levelData, finalDamage);
             else
                 Debug.LogWarning($"[{nameof(UltimateNetworkSkill)}] Spawned object has no NetworkProjectile. prefab={prefab.name}");
 

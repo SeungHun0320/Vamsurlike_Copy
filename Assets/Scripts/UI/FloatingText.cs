@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using Vamsurlike.Network;
 
 namespace Vamsurlike.UI
 {
@@ -13,14 +14,17 @@ namespace Vamsurlike.UI
 
         private float elapsed;
         private Color baseColor;
+        private GameObject poolPrefab;
 
-        public void Initialize(float damage, Vector3 worldPosition, Color? color = null)
+        public void Initialize(float damage, Vector3 worldPosition, Color? color = null, GameObject sourcePrefab = null)
         {
             transform.position = worldPosition + Vector3.up * 0.5f;
             textMesh.text = Mathf.RoundToInt(damage).ToString();
             baseColor = color ?? Color.white;
             textMesh.color = baseColor;
             elapsed = 0f;
+            poolPrefab = sourcePrefab;
+            transform.localScale = Vector3.one * scaleCurve.Evaluate(0f);
             gameObject.SetActive(true);
         }
 
@@ -42,7 +46,18 @@ namespace Vamsurlike.UI
             transform.localScale = Vector3.one * scale;
 
             if (elapsed >= lifetime)
-                Destroy(gameObject);
+                Release();
+        }
+
+        private void Release()
+        {
+            if (poolPrefab != null && PoolManager.Instance != null)
+            {
+                PoolManager.Instance.ReturnGO(poolPrefab, gameObject);
+                return;
+            }
+
+            Destroy(gameObject);
         }
     }
 }

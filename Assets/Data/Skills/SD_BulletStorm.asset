@@ -22,54 +22,57 @@ MonoBehaviour:
   - cooldown: 20
     damage: 15
     range: 20
-    projectileSpeed: 14
+    projectileSpeed: 20
     projectileLifetime: 2.5
-    projectileHitRadius: 0.4
-    projectileCount: 8
+    projectileHitRadius: 1
+    projectileCount: 15
     spreadAngle: 0
     pierceCount: 0
-    areaRadius: 0
+    duration: 0
     tickInterval: 1
+    areaRadius: 0
+    orbitalCount: 1
+    orbitalRadius: 2
+    orbitalRotationSpeed: 180
+    orbitalHitRadius: 0.65
+    waveCount: 2
+    waveDelay: 0.1
+    rotationPerWave: 15
+  - cooldown: 18
+    damage: 20
+    range: 20
+    projectileSpeed: 20
+    projectileLifetime: 2.5
+    projectileHitRadius: 1
+    projectileCount: 20
+    spreadAngle: 0
+    pierceCount: 0
+    duration: 0
+    tickInterval: 1
+    areaRadius: 0
     orbitalCount: 1
     orbitalRadius: 2
     orbitalRotationSpeed: 180
     orbitalHitRadius: 0.65
     waveCount: 3
-    waveDelay: 0.15
-    rotationPerWave: 30
-  - cooldown: 18
-    damage: 20
+    waveDelay: 0.05
+    rotationPerWave: 12.5
+  - cooldown: 15
+    damage: 28
     range: 20
-    projectileSpeed: 15
+    projectileSpeed: 20
     projectileLifetime: 2.5
-    projectileHitRadius: 0.4
-    projectileCount: 12
+    projectileHitRadius: 1
+    projectileCount: 30
     spreadAngle: 0
     pierceCount: 0
-    areaRadius: 0
+    duration: 0
     tickInterval: 1
+    areaRadius: 0
     orbitalCount: 1
     orbitalRadius: 2
     orbitalRotationSpeed: 180
     orbitalHitRadius: 0.65
     waveCount: 4
-    waveDelay: 0.12
-    rotationPerWave: 25
-  - cooldown: 15
-    damage: 28
-    range: 20
-    projectileSpeed: 16
-    projectileLifetime: 2.5
-    projectileHitRadius: 0.4
-    projectileCount: 16
-    spreadAngle: 0
-    pierceCount: 0
-    areaRadius: 0
-    tickInterval: 1
-    orbitalCount: 1
-    orbitalRadius: 2
-    orbitalRotationSpeed: 180
-    orbitalHitRadius: 0.65
-    waveCount: 5
-    waveDelay: 0.1
-    rotationPerWave: 22.5
+    waveDelay: 0.02
+    rotationPerWave: 10

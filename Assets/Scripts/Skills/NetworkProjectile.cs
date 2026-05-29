@@ -4,6 +4,7 @@ using UnityEngine;
 using Vamsurlike.Data;
 using Vamsurlike.Enemy;
 using Vamsurlike.Network;
+using Vamsurlike.Stage;
 
 namespace Vamsurlike.Skills
 {
@@ -27,7 +28,8 @@ namespace Vamsurlike.Skills
             ulong owner,
             Vector3 spawnPosition,
             Vector3 fireDirection,
-            SkillLevelData levelData)
+            SkillLevelData levelData,
+            float finalDamage = -1f) // -1 = levelData.damage 그대로 사용
         {
             if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
             if (levelData == null) return;
@@ -35,7 +37,7 @@ namespace Vamsurlike.Skills
             sourcePrefab = projectilePrefab;
             direction = fireDirection.sqrMagnitude > 0.0001f ? fireDirection.normalized : Vector3.forward;
             speed = levelData.projectileSpeed;
-            damage = levelData.damage;
+            damage = finalDamage >= 0f ? finalDamage : levelData.damage;
             hitRadius = levelData.projectileHitRadius;
             remainingLifetime = levelData.projectileLifetime;
             pierceRemaining = Mathf.Max(0, levelData.pierceCount);
@@ -55,6 +57,7 @@ namespace Vamsurlike.Skills
         private void Update()
         {
             if (!IsServer || !hasInitialized) return;
+            if (StageRuntime.Instance == null || StageRuntime.Instance.CurrentState.Value != GameState.Playing) return;
 
             float deltaTime = Time.deltaTime;
             transform.position += direction * (speed * deltaTime);

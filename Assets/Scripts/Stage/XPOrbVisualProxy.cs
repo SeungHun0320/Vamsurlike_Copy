@@ -12,5 +12,10 @@ namespace Vamsurlike.Stage
         {
             OrbId = orbId;
         }
+
+        public void Clear()
+        {
+            OrbId = 0;
+        }
     }
 }

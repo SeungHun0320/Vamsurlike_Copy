@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using Vamsurlike.Network;
 using Vamsurlike.Player;
 
 namespace Vamsurlike.Stage
@@ -61,7 +62,7 @@ namespace Vamsurlike.Stage
             }
 
             activeOrbs.Remove(orbId);
-            client.PlayerObject?.GetComponent<PlayerNetworkStats>()?.AddXP(orb.Xp);
+            SharedLevelSystem.Instance?.AddXP(orb.Xp);
             DestroyOrbVisualClientRpc(orbId);
             return true;
         }
@@ -84,8 +85,13 @@ namespace Vamsurlike.Stage
         private void SpawnOrbVisualClientRpc(ulong id, Vector3 position)
         {
             if (orbVisualPrefab == null) return;
-            var go = Instantiate(orbVisualPrefab, position, Quaternion.identity);
-            var proxy = go.AddComponent<XPOrbVisualProxy>();
+            var go = PoolManager.Instance != null
+                ? PoolManager.Instance.GetGO(orbVisualPrefab, position, Quaternion.identity)
+                : Instantiate(orbVisualPrefab, position, Quaternion.identity);
+
+            if (!go.TryGetComponent<XPOrbVisualProxy>(out var proxy))
+                proxy = go.AddComponent<XPOrbVisualProxy>();
+
             proxy.Initialize(id);
             orbVisuals[id] = go;
         }
@@ -95,7 +101,15 @@ namespace Vamsurlike.Stage
         {
             if (!orbVisuals.TryGetValue(id, out var go)) return;
             orbVisuals.Remove(id);
-            if (go != null) Destroy(go);
+            if (go == null) return;
+
+            if (go.TryGetComponent<XPOrbVisualProxy>(out var proxy))
+                proxy.Clear();
+
+            if (PoolManager.Instance != null)
+                PoolManager.Instance.ReturnGO(orbVisualPrefab, go);
+            else
+                Destroy(go);
         }
 
         private readonly struct XPOrbEntry
