@@ -1,161 +1,184 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using Vamsurlike.Data;
 
-[CustomEditor(typeof(SkillDataSO))]
-[CanEditMultipleObjects]
-public class SkillDataSOEditor : Editor
+namespace Vamsurlike.Editor
 {
-    private SerializedProperty skillName;
-    private SerializedProperty icon;
-    private SerializedProperty castType;
-    private SerializedProperty isManual;
-    private SerializedProperty projectilePrefab;
-    private SerializedProperty maxLevel;
-    private SerializedProperty levels;
-
-    private void OnEnable()
+    [CustomEditor(typeof(SkillDataSO))]
+    public class SkillDataSOEditor : UnityEditor.Editor
     {
-        skillName = serializedObject.FindProperty("skillName");
-        icon = serializedObject.FindProperty("icon");
-        castType = serializedObject.FindProperty("castType");
-        isManual = serializedObject.FindProperty("isManual");
-        projectilePrefab = serializedObject.FindProperty("projectilePrefab");
-        maxLevel = serializedObject.FindProperty("maxLevel");
-        levels = serializedObject.FindProperty("levels");
-    }
+        private static readonly Dictionary<string, bool> Foldouts = new();
 
-    public override void OnInspectorGUI()
-    {
-        serializedObject.Update();
+        private SerializedProperty skillName;
+        private SerializedProperty icon;
+        private SerializedProperty castType;
+        private SerializedProperty isManual;
+        private SerializedProperty projectilePrefab;
+        private SerializedProperty maxLevel;
+        private SerializedProperty levels;
 
-        EditorGUILayout.PropertyField(skillName);
-        EditorGUILayout.PropertyField(icon);
-        EditorGUILayout.PropertyField(castType);
-        EditorGUILayout.PropertyField(isManual);
-
-        if (castType.hasMultipleDifferentValues)
+        private void OnEnable()
         {
-            EditorGUILayout.HelpBox("Select SkillData assets with the same Cast Type to edit type-specific fields.", MessageType.Info);
+            skillName = serializedObject.FindProperty(nameof(SkillDataSO.skillName));
+            icon = serializedObject.FindProperty(nameof(SkillDataSO.icon));
+            castType = serializedObject.FindProperty(nameof(SkillDataSO.castType));
+            isManual = serializedObject.FindProperty(nameof(SkillDataSO.isManual));
+            projectilePrefab = serializedObject.FindProperty(nameof(SkillDataSO.projectilePrefab));
+            maxLevel = serializedObject.FindProperty(nameof(SkillDataSO.maxLevel));
+            levels = serializedObject.FindProperty(nameof(SkillDataSO.levels));
+        }
+
+        public override void OnInspectorGUI()
+        {
+            serializedObject.Update();
+
+            EditorGUILayout.PropertyField(skillName);
+            EditorGUILayout.PropertyField(icon);
+            EditorGUILayout.PropertyField(castType);
+            EditorGUILayout.PropertyField(isManual);
+
+            SkillCastType type = (SkillCastType)castType.enumValueIndex;
+            if (UsesProjectilePrefab(type))
+                EditorGUILayout.PropertyField(projectilePrefab);
+
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.PropertyField(maxLevel);
+            DrawLevels(type);
+
             serializedObject.ApplyModifiedProperties();
-            return;
         }
 
-        SkillCastType selectedCastType = (SkillCastType)castType.enumValueIndex;
-        if (selectedCastType == SkillCastType.Projectile)
-            EditorGUILayout.PropertyField(projectilePrefab);
-
-        EditorGUILayout.Space();
-        EditorGUILayout.PropertyField(maxLevel);
-        DrawLevels(selectedCastType);
-
-        serializedObject.ApplyModifiedProperties();
-    }
-
-    private void DrawLevels(SkillCastType selectedCastType)
-    {
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Levels", EditorStyles.boldLabel);
-
-        int newSize = Mathf.Max(1, EditorGUILayout.IntField("Size", levels.arraySize));
-        if (newSize != levels.arraySize)
-            levels.arraySize = newSize;
-
-        for (int i = 0; i < levels.arraySize; i++)
+        private void DrawLevels(SkillCastType type)
         {
-            SerializedProperty level = levels.GetArrayElementAtIndex(i);
+            int size = Mathf.Max(0, EditorGUILayout.IntField("Levels Size", levels.arraySize));
+            if (size != levels.arraySize)
+                levels.arraySize = size;
 
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            level.isExpanded = EditorGUILayout.Foldout(level.isExpanded, $"Level {i + 1}", true);
-            if (level.isExpanded)
-                DrawLevel(level, selectedCastType);
-            EditorGUILayout.EndVertical();
+            EditorGUI.indentLevel++;
+            for (int i = 0; i < levels.arraySize; i++)
+            {
+                SerializedProperty level = levels.GetArrayElementAtIndex(i);
+                string key = level.propertyPath;
+                if (!Foldouts.ContainsKey(key))
+                    Foldouts[key] = true;
+
+                Foldouts[key] = EditorGUILayout.Foldout(Foldouts[key], $"Level {i + 1}", true);
+                if (!Foldouts[key]) continue;
+
+                EditorGUI.indentLevel++;
+                DrawLevelFields(level, type);
+                EditorGUI.indentLevel--;
+            }
+            EditorGUI.indentLevel--;
         }
-    }
 
-    private static void DrawLevel(SerializedProperty level, SkillCastType selectedCastType)
-    {
-        DrawCommonFields(level);
-
-        switch (selectedCastType)
+        private static void DrawLevelFields(SerializedProperty level, SkillCastType type)
         {
-            case SkillCastType.Projectile:
-                DrawProjectileFields(level);
-                break;
-            case SkillCastType.AreaAura:
-                DrawPersistentFields(level);
-                DrawAreaFields(level);
-                break;
-            case SkillCastType.Orbital:
-                DrawPersistentFields(level);
-                DrawOrbitalFields(level);
-                break;
-            case SkillCastType.Ultimate:
-                DrawUltimateFields(level);
-                break;
+            DrawSection("Common");
+            DrawField(level, "cooldown");
+            DrawField(level, "damage");
+
+            if (UsesRange(type))
+                DrawField(level, "range");
+
+            switch (type)
+            {
+                case SkillCastType.Projectile:
+                    DrawProjectileSection(level, includeCountAndSpread: true, includePierce: true);
+                    break;
+
+                case SkillCastType.AreaAura:
+                    DrawPersistentSection(level);
+                    DrawSection("Area");
+                    DrawField(level, "areaRadius");
+                    break;
+
+                case SkillCastType.Orbital:
+                    DrawPersistentSection(level);
+                    DrawSection("Orbital");
+                    DrawField(level, "orbitalCount");
+                    DrawField(level, "orbitalRadius");
+                    DrawField(level, "orbitalRotationSpeed");
+                    DrawField(level, "orbitalHitRadius");
+                    break;
+
+                case SkillCastType.Ultimate:
+                    DrawProjectileSection(level, includeCountAndSpread: true, includePierce: true);
+                    DrawSection("Ultimate");
+                    DrawField(level, "waveCount");
+                    DrawField(level, "waveDelay");
+                    DrawField(level, "rotationPerWave");
+                    break;
+
+                case SkillCastType.Grenade:
+                    DrawSection("Grenade");
+                    DrawField(level, "grenadeRange");
+                    DrawField(level, "grenadeArcHeight");
+                    DrawField(level, "splashRadius");
+                    break;
+
+                case SkillCastType.ScatterShot:
+                    DrawProjectileSection(level, includeCountAndSpread: false, includePierce: true);
+                    DrawSection("Scatter Shot");
+                    DrawField(level, "scatterBulletCount");
+                    DrawField(level, "scatterAngle");
+                    DrawField(level, "burstDuration");
+                    break;
+
+                case SkillCastType.Melee:
+                    DrawSection("Melee");
+                    DrawField(level, "meleeArcAngle");
+                    DrawField(level, "meleeRange");
+                    break;
+            }
         }
-    }
 
-    private static void DrawCommonFields(SerializedProperty level)
-    {
-        EditorGUILayout.LabelField("Common", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("cooldown"));
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("damage"));
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("range"));
-    }
+        private static void DrawProjectileSection(SerializedProperty level, bool includeCountAndSpread, bool includePierce)
+        {
+            DrawSection("Projectile");
+            DrawField(level, "projectileSpeed");
+            DrawField(level, "projectileLifetime");
+            DrawField(level, "projectileHitRadius");
 
-    private static void DrawProjectileFields(SerializedProperty level)
-    {
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Projectile", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("projectileSpeed"));
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("projectileLifetime"));
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("projectileHitRadius"));
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("projectileCount"));
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("spreadAngle"));
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("pierceCount"));
-    }
+            if (includeCountAndSpread)
+            {
+                DrawField(level, "projectileCount");
+                DrawField(level, "spreadAngle");
+            }
 
-    private static void DrawPersistentFields(SerializedProperty level)
-    {
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Persistent", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("tickInterval"));
-        var durationProp = level.FindPropertyRelative("duration");
-        EditorGUILayout.PropertyField(durationProp);
-        if (durationProp.floatValue > 0f)
-            EditorGUILayout.HelpBox($"Active {durationProp.floatValue}s -> Cooldown (Common.cooldown)s cycle", MessageType.None);
-        else
-            EditorGUILayout.HelpBox("duration=0 : Always active (cooldown unused)", MessageType.None);
-    }
+            if (includePierce)
+                DrawField(level, "pierceCount");
+        }
 
-    private static void DrawAreaFields(SerializedProperty level)
-    {
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Area", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("areaRadius"));
-    }
+        private static void DrawPersistentSection(SerializedProperty level)
+        {
+            DrawSection("Persistent");
+            DrawField(level, "duration");
+            DrawField(level, "tickInterval");
+        }
 
-    private static void DrawOrbitalFields(SerializedProperty level)
-    {
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Orbital", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("orbitalCount"));
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("orbitalRadius"));
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("orbitalRotationSpeed"));
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("orbitalHitRadius"));
-    }
+        private static void DrawField(SerializedProperty owner, string propertyName)
+        {
+            SerializedProperty property = owner.FindPropertyRelative(propertyName);
+            if (property != null)
+                EditorGUILayout.PropertyField(property);
+        }
 
-    private static void DrawUltimateFields(SerializedProperty level)
-    {
-        EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Ultimate", EditorStyles.boldLabel);
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("projectileCount"));
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("projectileSpeed"));
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("projectileLifetime"));
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("projectileHitRadius"));
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("waveCount"));
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("waveDelay"));
-        EditorGUILayout.PropertyField(level.FindPropertyRelative("rotationPerWave"));
+        private static void DrawSection(string label)
+        {
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
+        }
+
+        private static bool UsesProjectilePrefab(SkillCastType type) =>
+            type == SkillCastType.Projectile ||
+            type == SkillCastType.ScatterShot ||
+            type == SkillCastType.Ultimate;
+
+        private static bool UsesRange(SkillCastType type) =>
+            type == SkillCastType.Projectile ||
+            type == SkillCastType.AreaAura ||
+            type == SkillCastType.ScatterShot;
     }
 }

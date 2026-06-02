@@ -1,33 +1,31 @@
-using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Data;
 
 namespace Vamsurlike.Skills
 {
-    public abstract class SkillBase : NetworkBehaviour, ISkillExecutable
+    // 순수 C# 추상 클래스 — NetworkBehaviour 없음. RPC/Coroutine은 context.Manager 경유.
+    public abstract class SkillBase : ISkillExecutor
     {
-        [SerializeField] private float noTargetLogInterval = 2f;
-
         private float nextNoTargetLogTime;
 
-        protected abstract SkillCastType SupportedCastType { get; }
+        private const float NoTargetLogInterval = 2f;
 
-        // 지속형 스킬(Aura/Orbital)은 true로 오버라이드 — SkillManager가 tickInterval/duration 방식으로 실행
+        public abstract SkillCastType SupportedCastType { get; }
         public virtual bool IsPersistentExecution => false;
 
-        public bool CanExecute(SkillDataSO skill)
-        {
-            return skill != null && skill.castType == SupportedCastType;
-        }
-
+        public bool CanExecute(SkillDataSO skill) => skill != null && skill.castType == SupportedCastType;
         public abstract bool TryExecute(in SkillCastContext context);
+
+        // SkillManager.Update()가 매 프레임 호출 — 클라이언트 비주얼 갱신용 (기본 no-op)
+        public virtual void OnUpdate(Transform ownerTransform) { }
+
+        // SkillManager.OnNetworkDespawn()이 호출 — 비주얼 정리용 (기본 no-op)
+        public virtual void OnDespawn() { }
 
         protected bool ShouldLogNoTarget()
         {
-            if (Time.time < nextNoTargetLogTime)
-                return false;
-
-            nextNoTargetLogTime = Time.time + noTargetLogInterval;
+            if (Time.time < nextNoTargetLogTime) return false;
+            nextNoTargetLogTime = Time.time + NoTargetLogInterval;
             return true;
         }
     }

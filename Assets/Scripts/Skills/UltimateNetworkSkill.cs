@@ -6,11 +6,11 @@ using Vamsurlike.Network;
 
 namespace Vamsurlike.Skills
 {
-    public class UltimateNetworkSkill : SkillBase
+    public sealed class UltimateSkill : SkillBase
     {
         private const float DefaultSpawnHeight = 0.8f;
 
-        protected override SkillCastType SupportedCastType => SkillCastType.Ultimate;
+        public override SkillCastType SupportedCastType => SkillCastType.Ultimate;
 
         public override bool TryExecute(in SkillCastContext context)
         {
@@ -22,54 +22,42 @@ namespace Vamsurlike.Skills
 
             if (skill.projectilePrefab == null)
             {
-                Debug.LogWarning($"[{nameof(UltimateNetworkSkill)}] projectilePrefab is not assigned. skill={skill.name}");
+                Debug.LogWarning($"[{nameof(UltimateSkill)}] projectilePrefab 미할당. skill={skill.name}");
                 return false;
             }
 
             // in 파라미터는 코루틴에 캡처 불가 — 필요한 값만 추출
-            StartCoroutine(FireWavesCoroutine(
-                skill.projectilePrefab,
-                levelData,
-                context.FinalDamage,
-                context.OwnerClientId,
-                context.CasterTransform,
-                skill.name));
+            context.Manager.StartSkillCoroutine(FireWavesCoroutine(
+                skill.projectilePrefab, levelData, context.FinalDamage,
+                context.OwnerClientId, context.CasterTransform, skill.name, context.Manager));
 
             return true;
         }
 
-        private IEnumerator FireWavesCoroutine(
-            GameObject projectilePrefab,
-            SkillLevelData levelData,
-            float finalDamage,
-            ulong ownerClientId,
-            Transform casterTransform,
-            string skillName)
+        private static IEnumerator FireWavesCoroutine(
+            GameObject prefab, SkillLevelData levelData, float finalDamage,
+            ulong ownerClientId, Transform casterTransform, string skillName, SkillManager manager)
         {
-            int   waveCount      = Mathf.Max(1, levelData.waveCount);
-            int   bulletsPerWave = Mathf.Max(1, levelData.projectileCount);
-            float waveDelay      = Mathf.Max(0f, levelData.waveDelay);
-            float rotPerWave     = levelData.rotationPerWave;
-            float angleStep      = 360f / bulletsPerWave;
+            int waveCount = Mathf.Max(1, levelData.waveCount);
+            int bulletsPerWave = Mathf.Max(1, levelData.projectileCount);
+            float waveDelay = Mathf.Max(0f, levelData.waveDelay);
+            float rotPerWave = levelData.rotationPerWave;
+            float angleStep = 360f / bulletsPerWave;
 
-            Debug.Log($"[{nameof(UltimateNetworkSkill)}] BulletStorm start. skill={skillName}, waves={waveCount}, bullets/wave={bulletsPerWave}, delay={waveDelay}s, damage={finalDamage}");
+            Debug.Log($"[{nameof(UltimateSkill)}] BulletStorm 시작. skill={skillName}, waves={waveCount}, bullets/wave={bulletsPerWave}, delay={waveDelay}s, damage={finalDamage}");
 
             for (int wave = 0; wave < waveCount; wave++)
             {
                 float waveAngle = rotPerWave * wave;
-
                 for (int i = 0; i < bulletsPerWave; i++)
                 {
-                    if (casterTransform == null) 
-                        yield break;
+                    if (casterTransform == null) yield break;
 
-                    // 매 총알마다 origin 갱신 — 발사 중 이동 시에도 추적
                     Vector3 origin = casterTransform.position + Vector3.up * DefaultSpawnHeight;
-                    float   angle  = angleStep * i + waveAngle;
-                    Vector3 dir    = Quaternion.AngleAxis(angle, Vector3.up) * Vector3.forward;
-                    SpawnBullet(projectilePrefab, levelData, finalDamage, ownerClientId, origin, dir);
+                    float angle = angleStep * i + waveAngle;
+                    Vector3 dir = Quaternion.AngleAxis(angle, Vector3.up) * Vector3.forward;
+                    SpawnBullet(prefab, levelData, finalDamage, ownerClientId, origin, dir);
 
-                    // 마지막 총알 이후에는 대기 없음
                     bool isLast = (wave == waveCount - 1) && (i == bulletsPerWave - 1);
                     if (!isLast && waveDelay > 0f)
                         yield return new WaitForSeconds(waveDelay);
@@ -77,42 +65,30 @@ namespace Vamsurlike.Skills
             }
 
             if (casterTransform != null)
-                PlayUltimateVFXClientRpc(casterTransform.position);
+                manager.PlayUltimateVFXClientRpc(casterTransform.position);
 
-            Debug.Log($"[{nameof(UltimateNetworkSkill)}] BulletStorm complete. skill={skillName}");
+            Debug.Log($"[{nameof(UltimateSkill)}] BulletStorm 완료. skill={skillName}");
         }
 
-        private void SpawnBullet(
-            GameObject prefab,
-            SkillLevelData levelData,
-            float finalDamage,
-            ulong ownerClientId,
-            Vector3 position,
-            Vector3 direction)
+        private static void SpawnBullet(GameObject prefab, SkillLevelData levelData, float finalDamage,
+            ulong ownerClientId, Vector3 position, Vector3 direction)
         {
-            Quaternion rotation = Quaternion.LookRotation(direction, Vector3.up);
-
-            if (prefab.TryGetComponent<NetworkProjectile>(out var projTemplate))
-                rotation = projTemplate.GetProjectileRotation(direction);
+            Quaternion rot = Quaternion.LookRotation(direction, Vector3.up);
+            if (prefab.TryGetComponent<NetworkProjectile>(out var template))
+                rot = template.GetProjectileRotation(direction);
 
             NetworkObject obj = PoolManager.Instance != null
-                ? PoolManager.Instance.GetNetworkObject(prefab, position, rotation)
-                : Instantiate(prefab, position, rotation).GetComponent<NetworkObject>();
+                ? PoolManager.Instance.GetNetworkObject(prefab, position, rot)
+                : Object.Instantiate(prefab, position, rot).GetComponent<NetworkObject>();
 
             if (obj == null) return;
 
             if (obj.TryGetComponent<NetworkProjectile>(out var projectile))
                 projectile.Initialize(prefab, ownerClientId, position, direction, levelData, finalDamage);
             else
-                Debug.LogWarning($"[{nameof(UltimateNetworkSkill)}] Spawned object has no NetworkProjectile. prefab={prefab.name}");
+                Debug.LogWarning($"[{nameof(UltimateSkill)}] NetworkProjectile 없음. prefab={prefab.name}");
 
             obj.Spawn(true);
-        }
-
-        [ClientRpc]
-        private void PlayUltimateVFXClientRpc(Vector3 position)
-        {
-            // Phase 8: 궁극기 완료 VFX 연결
         }
     }
 }

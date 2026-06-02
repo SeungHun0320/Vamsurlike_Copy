@@ -1,5 +1,8 @@
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using Vamsurlike.Enemy;
 using Vamsurlike.Upgrades;
 
 namespace Vamsurlike.Stage
@@ -21,7 +24,14 @@ namespace Vamsurlike.Stage
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
 
+        [Header("Debug")]
+        [SerializeField] private bool enableDebugLevelUpKey       = true;
+        [SerializeField] private Key  debugLevelUpKey             = Key.L;
+        [SerializeField] private bool enableDebugKillVisibleKey   = true;
+        [SerializeField] private Key  debugKillVisibleEnemiesKey  = Key.K;
+
         private LevelUpManager levelUpManager;
+        private readonly List<ulong> visibleEnemyIds = new();
 
         private void Awake()
         {
@@ -36,6 +46,27 @@ namespace Vamsurlike.Stage
         {
             base.OnDestroy();
             if (Instance == this) Instance = null;
+        }
+
+        private void Update()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (!IsSpawned) return;
+
+            Keyboard keyboard = Keyboard.current;
+            if (keyboard == null) return;
+
+            if (enableDebugLevelUpKey && keyboard[debugLevelUpKey].wasPressedThisFrame)
+            {
+                if (IsServer)
+                    GrantDebugLevelUpXP();
+                else
+                    RequestDebugLevelUpRpc();
+            }
+
+            if (enableDebugKillVisibleKey && keyboard[debugKillVisibleEnemiesKey].wasPressedThisFrame)
+                KillVisibleEnemiesByDebugKey();
+#endif
         }
 
         // 서버 전용: XPOrbManager.TryPickup에서 호출
@@ -74,5 +105,115 @@ namespace Vamsurlike.Stage
         // XPRequired(level): level에서 level+1로 가는 데 필요한 XP
         public static int XPRequired(int level) =>
             Mathf.RoundToInt(10f * Mathf.Pow(level, 1.5f));
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+        private void RequestDebugLevelUpRpc()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            GrantDebugLevelUpXP();
+#endif
+        }
+
+        private void GrantDebugLevelUpXP()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (!IsServer) return;
+
+            if (StageRuntime.Instance == null || StageRuntime.Instance.CurrentState.Value != GameState.Playing)
+            {
+                Debug.LogWarning($"[{nameof(SharedLevelSystem)}] 디버그 레벨업은 Playing 상태에서만 가능합니다.");
+                return;
+            }
+
+            if (levelUpManager == null || !levelUpManager.HasValidCatalog())
+            {
+                Debug.LogError($"[{nameof(SharedLevelSystem)}] UpgradeCatalog 없음 또는 옵션 없음 — 디버그 레벨업 불가.");
+                return;
+            }
+
+            int xpNeeded = XPRequired(SharedLevel.Value);
+            int grantXP  = Mathf.Max(1, Mathf.CeilToInt(xpNeeded - SharedXP.Value));
+            Debug.Log($"[{nameof(SharedLevelSystem)}] 디버그 레벨업 키 입력 — XP +{grantXP}");
+            AddXP(grantXP);
+#endif
+        }
+
+        private void KillVisibleEnemiesByDebugKey()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (StageRuntime.Instance == null || StageRuntime.Instance.CurrentState.Value != GameState.Playing)
+            {
+                Debug.LogWarning($"[{nameof(SharedLevelSystem)}] 디버그 화면 처치는 Playing 상태에서만 가능합니다.");
+                return;
+            }
+
+            CollectVisibleEnemyIds(visibleEnemyIds);
+            if (visibleEnemyIds.Count == 0)
+            {
+                Debug.Log($"[{nameof(SharedLevelSystem)}] 화면 안에 처치할 적이 없습니다.");
+                return;
+            }
+
+            ulong[] ids = visibleEnemyIds.ToArray();
+            if (IsServer)
+                KillEnemiesByIds(ids);
+            else
+                RequestKillVisibleEnemiesRpc(ids);
+#endif
+        }
+
+        private static void CollectVisibleEnemyIds(List<ulong> results)
+        {
+            results.Clear();
+
+            Camera cam = Camera.main;
+            if (cam == null)
+            {
+                Debug.LogWarning($"[{nameof(SharedLevelSystem)}] MainCamera 없음 — 화면 적 처치 불가.");
+                return;
+            }
+
+            EnemyNetworkBase[] enemies = FindObjectsByType<EnemyNetworkBase>(FindObjectsSortMode.None);
+            for (int i = 0; i < enemies.Length; i++)
+            {
+                EnemyNetworkBase enemy = enemies[i];
+                if (enemy == null || !enemy.IsSpawned || !enemy.IsAlive) continue;
+
+                Vector3 viewport = cam.WorldToViewportPoint(enemy.transform.position);
+                if (viewport.z <= 0f) continue;
+                if (viewport.x < 0f || viewport.x > 1f || viewport.y < 0f || viewport.y > 1f) continue;
+
+                results.Add(enemy.NetworkObjectId);
+            }
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+        private void RequestKillVisibleEnemiesRpc(ulong[] enemyNetworkObjectIds)
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            KillEnemiesByIds(enemyNetworkObjectIds);
+#endif
+        }
+
+        private void KillEnemiesByIds(ulong[] enemyNetworkObjectIds)
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (!IsServer || enemyNetworkObjectIds == null) return;
+
+            int killed = 0;
+            for (int i = 0; i < enemyNetworkObjectIds.Length; i++)
+            {
+                ulong id = enemyNetworkObjectIds[i];
+                if (!NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(id, out var obj)) continue;
+                if (!obj.TryGetComponent<EnemyNetworkBase>(out var enemy)) continue;
+                if (!enemy.IsAlive) continue;
+
+                enemy.TakeDamage(9999999f);
+                killed++;
+            }
+
+            Debug.Log($"[{nameof(SharedLevelSystem)}] 디버그 화면 적 처치 — {killed}마리");
+#endif
+        }
     }
 }

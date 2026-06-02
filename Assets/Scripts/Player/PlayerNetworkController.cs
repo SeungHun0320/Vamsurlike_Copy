@@ -15,12 +15,15 @@ namespace Vamsurlike.Player
         [SerializeField] private float maxInputMagnitude = 1f;
 
         private CharacterController characterController;
-        private PlayerNetworkStats stats;
-        private Vector2 moveInput;
-        private float verticalVelocity;
+        private PlayerNetworkStats  stats;
+        private Vector2             moveInput;
+        private float               verticalVelocity;
 
-        public Vector2 MoveInput => moveInput;
-        public float MoveInputMagnitude => moveInput.magnitude;
+        public Vector2  MoveInput            => moveInput;
+        public float    MoveInputMagnitude   => moveInput.magnitude;
+
+        // MeleeNetworkSkill이 읽는 서버 전용 상태. 입력이 0이 돼도 마지막 이동 방향 유지.
+        public Vector3  LastNonZeroMoveDirection { get; private set; } = Vector3.forward;
 
         private void Awake()
         {
@@ -70,6 +73,7 @@ namespace Vamsurlike.Player
 
             if (planar.sqrMagnitude > 0.0001f)
             {
+                LastNonZeroMoveDirection = planar.normalized;
                 Quaternion target = Quaternion.LookRotation(planar, Vector3.up);
                 transform.rotation = Quaternion.RotateTowards(
                     transform.rotation,

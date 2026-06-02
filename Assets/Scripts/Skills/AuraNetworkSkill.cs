@@ -5,11 +5,11 @@ using Vamsurlike.Enemy;
 
 namespace Vamsurlike.Skills
 {
-    public class AuraNetworkSkill : SkillBase
+    public sealed class AuraSkill : SkillBase
     {
         private readonly List<EnemyNetworkBase> targets = new();
 
-        protected override SkillCastType SupportedCastType => SkillCastType.AreaAura;
+        public override SkillCastType SupportedCastType => SkillCastType.AreaAura;
         public override bool IsPersistentExecution => true;
 
         public override bool TryExecute(in SkillCastContext context)
@@ -21,13 +21,12 @@ namespace Vamsurlike.Skills
                 return false;
 
             float radius = levelData.areaRadius > 0f ? levelData.areaRadius : levelData.range;
-            int targetCount = AutoTargeting.FindEnemiesInRange(context.CasterTransform.position, radius, targets);
+            int count = AutoTargeting.FindEnemiesInRange(context.CasterTransform.position, radius, targets);
 
-            if (targetCount == 0)
+            if (count == 0)
             {
                 if (ShouldLogNoTarget())
-                    Debug.Log($"[{nameof(AuraNetworkSkill)}] No aura targets in range. skill={skill.name}, radius={radius}, position={context.CasterTransform.position}");
-
+                    Debug.Log($"[{nameof(AuraSkill)}] 범위 내 적 없음. skill={skill.name}, radius={radius}");
                 return false;
             }
 
@@ -35,7 +34,7 @@ namespace Vamsurlike.Skills
             for (int i = 0; i < targets.Count; i++)
                 targets[i].TakeDamage(damage);
 
-            Debug.Log($"[{nameof(AuraNetworkSkill)}] Aura tick. skill={skill.name}, level={context.Level}, damage={damage}(x{context.AttackMultiplier}), radius={radius}, targets={targetCount}");
+            Debug.Log($"[{nameof(AuraSkill)}] 틱. skill={skill.name}, level={context.Level}, damage={damage}(x{context.AttackMultiplier}), radius={radius}, targets={count}");
             return true;
         }
     }

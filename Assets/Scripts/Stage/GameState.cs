@@ -4,6 +4,7 @@ namespace Vamsurlike.Stage
     {
         Playing,
         LevelingUp,
+        ChestOpening,
         BossPhase,
         Clear,
         GameOver

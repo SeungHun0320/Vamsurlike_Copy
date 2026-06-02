@@ -68,9 +68,10 @@ namespace Vamsurlike.Stage
 
         private void OnGameStateChanged(GameState prev, GameState next)
         {
-            // LevelingUp 진입 시 전체 일시정지, 복귀 시 재개
+            // LevelingUp·ChestOpening 진입 시 전체 일시정지, 복귀 시 재개
             // UI 애니메이션은 Time.unscaledDeltaTime 사용
-            Time.timeScale = next == GameState.LevelingUp ? 0f : 1f;
+            bool shouldPause = next == GameState.LevelingUp || next == GameState.ChestOpening;
+            Time.timeScale = shouldPause ? 0f : 1f;
         }
 
         public override void OnDestroy()

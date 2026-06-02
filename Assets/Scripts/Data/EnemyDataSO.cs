@@ -17,6 +17,9 @@ namespace Vamsurlike.Data
         public float attackInterval = 1f;
         public int   xpDrop         = 10;
 
+        [Header("Drops")]
+        public DropTableSO dropTable;
+
         [Header("UI")]
         public float floatingTextHeightOffset = 2f;
 

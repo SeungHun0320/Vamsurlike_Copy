@@ -21,6 +21,7 @@ MonoBehaviour:
   attackRange: 1.5
   attackInterval: 1
   xpDrop: 10
+  dropTable: {fileID: 11400000, guid: 13c0353a0ab7756418d75acf751fb02d, type: 2}
   floatingTextHeightOffset: 4
   isElite: 0
   isBoss: 0

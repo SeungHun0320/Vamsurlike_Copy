@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Player;
+using Vamsurlike.Skills;
 using Vamsurlike.Stage;
 
 namespace Vamsurlike.Upgrades
@@ -23,7 +24,7 @@ namespace Vamsurlike.Upgrades
         // 클라이언트 이벤트: 레벨업이 완전히 완료(모두 선택)됐을 때
         public static event Action OnLevelUpCompleted;
 
-        // 중복 방지용 시드 기반 랜덤
+        // RULES.md: 시드 기반 System.Random 사용
         private readonly System.Random rng = new();
 
         private void Awake()
@@ -54,10 +55,10 @@ namespace Vamsurlike.Upgrades
         public bool HasValidCatalog()
         {
             var catalog = UpgradeCatalog.Instance;
-            if (catalog == null) 
+            if (catalog == null)
                 return false;
             foreach (var opt in catalog.options)
-                if (opt != null) 
+                if (opt != null)
                     return true;
             return false;
         }
@@ -79,7 +80,8 @@ namespace Vamsurlike.Upgrades
 
             foreach (ulong clientId in NetworkManager.ConnectedClientsIds)
             {
-                int[] indices = GenerateRandomOptions(catalog, 3);
+                // 플레이어별 보유 스킬에 맞는 옵션 풀로 필터링
+                int[] indices = GenerateOptionsForPlayer(catalog, 3, clientId);
                 playerOptions[clientId] = indices;
                 pendingChoices.Add(clientId);
 
@@ -148,12 +150,11 @@ namespace Vamsurlike.Upgrades
             StageRuntime.Instance?.SetGameState(GameState.Playing);
             NotifyLevelUpCompletedClientRpc();
 
-            // Fix: Playing 복귀 직후 누적 XP 재검사 — in-flight pickup이나 다중 레벨 도달 대비
+            // Playing 복귀 직후 누적 XP 재검사 — in-flight pickup이나 다중 레벨 도달 대비
             if (SharedLevelSystem.Instance != null)
                 SharedLevelSystem.Instance.CheckLevelUp();
         }
 
-        // 레벨업 선택 중 클라이언트 연결 끊김 처리
         private void HandleClientDisconnect(ulong clientId)
         {
             if (!pendingChoices.Contains(clientId)) return;
@@ -162,15 +163,57 @@ namespace Vamsurlike.Upgrades
             CheckAllDone();
         }
 
-        private int[] GenerateRandomOptions(UpgradeCatalog catalog, int count)
+        // 플레이어가 보유한 스킬에 맞게 필터링된 옵션 풀에서 count개를 선택
+        private int[] GenerateOptionsForPlayer(UpgradeCatalog catalog, int count, ulong clientId)
         {
-            // null 엔트리를 제외한 유효 인덱스만 풀에 넣는다
+            SkillManager skillManager = GetPlayerSkillManager(clientId);
+
             var pool = new List<int>(catalog.options.Length);
             for (int i = 0; i < catalog.options.Length; i++)
-                if (catalog.options[i] != null) pool.Add(i);
+            {
+                var opt = catalog.options[i];
+                if (opt == null) continue;
+
+                switch (opt.effectType)
+                {
+                    case UpgradeEffectType.SkillLevelUp:
+                        // 이미 보유 중이고 최대 레벨 미달인 경우만 표시
+                        if (opt.skillData == null) continue;
+                        if (skillManager != null)
+                        {
+                            int lvl = skillManager.GetSkillLevel(opt.skillData);
+                            if (lvl <= 0 || lvl >= opt.skillData.maxLevel) continue;
+                        }
+                        pool.Add(i);
+                        break;
+
+                    case UpgradeEffectType.NewSkill:
+                        // 미보유인 경우만 표시
+                        if (opt.skillData == null) continue;
+                        if (skillManager != null)
+                        {
+                            int lvl = skillManager.GetSkillLevel(opt.skillData);
+                            if (lvl > 0) continue;
+                        }
+                        pool.Add(i);
+                        break;
+
+                    default:
+                        // PassiveStat 계열은 항상 포함
+                        pool.Add(i);
+                        break;
+                }
+            }
+
+            // 필터링 후 풀이 비었으면 null 엔트리만 제외한 전체로 폴백
+            if (pool.Count == 0)
+            {
+                Debug.LogWarning($"[{nameof(LevelUpManager)}] clientId {clientId}: 필터링 후 옵션 없음 — 전체 카탈로그로 폴백");
+                for (int i = 0; i < catalog.options.Length; i++)
+                    if (catalog.options[i] != null) pool.Add(i);
+            }
 
             count = Mathf.Min(count, pool.Count);
-
             var result = new int[count];
             for (int i = 0; i < count; i++)
             {
@@ -179,6 +222,13 @@ namespace Vamsurlike.Upgrades
                 pool.RemoveAt(pick);
             }
             return result;
+        }
+
+        private SkillManager GetPlayerSkillManager(ulong clientId)
+        {
+            if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)) return null;
+            if (client.PlayerObject == null) return null;
+            return client.PlayerObject.GetComponent<SkillManager>();
         }
 
         // 서버 → 특정 클라이언트: 해당 플레이어의 업그레이드 옵션 인덱스 전달

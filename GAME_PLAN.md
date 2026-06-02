@@ -51,7 +51,7 @@
 | XP 드랍 | 서버 | 서버 데이터 목록 + 클라이언트 XPOrbVisualProxy (NetworkObject 아님) |
 | 아이템 드랍 | 서버 | NetworkedItemPickup (NetworkObject — 드랍 빈도 낮아 허용) |
 | 레벨업 옵션 | 서버 | 서버가 옵션 생성 → NGO 2.x: `[Rpc(SendTo.SpecificClients)]`, NGO 1.x: `ClientRpcParams`로 해당 clientId에만 전달 |
-| 게임 상태 | 서버 | Playing / LevelingUp / BossPhase / Clear / GameOver를 NetworkVariable로 동기화 |
+| 게임 상태 | 서버 | Playing / LevelingUp / ChestOpening / BossPhase / Clear / GameOver를 NetworkVariable로 동기화 |
 
 ### 3.2 연결 흐름
 
@@ -683,21 +683,159 @@ Done when: 모든 플레이어가 공유 XP로 동시에 레벨업하면, 게임
 
 ---
 
-### Phase 6. 아이템과 조합
+### Phase 6. 아이템 드랍 · 스킬 조합 · 신규 스킬
 
-Done when: 적이 아이템을 드랍하고 픽업 후 조합 가능 상태가 되면 CombinationUI가 뜨며 스킬이 진화한다.
+Done when: 적이 3종 아이템을 드랍하고, 상자 픽업 시 전원에게 스킬 선택 UI가 뜨며, 스킬이 만렙이고 CombineRecipeSO가 존재하면 진화 카드가 슬롯에 등장해 해당 플레이어의 스킬이 조합 스킬로 진화한다.
 
-- [ ] ItemDataSO, ItemLevelData, DropTableSO 구현
-- [ ] CombineRecipeSO 구현
-- [ ] NetworkedItemPickup 구현 (NetworkObject — 드랍 빈도 낮아 개별 동기화 허용)
-  - 서버 드랍 시 `NetworkObject.Spawn()`, 클라이언트 범위 진입 → `PlayerPickupController.RequestItemPickupServerRpc(ulong networkObjectId)` → 서버 검증 후 `Despawn()`
-- [ ] ItemManager 구현 (플레이어별 보유 아이템, 서버 관리)
-- [ ] CombinationSystem 구현 (서버 검증 후 스킬 진화)
-- [ ] CombinationUI 구현 (`ShowCombinationRpc` — NGO 2.x: `[Rpc(SendTo.SpecificClients)]`, NGO 1.x: `ClientRpcParams`로 해당 클라이언트에만 표시)
-- [ ] SummonSkill 구현
-- [ ] 아이템 6~8종, 조합식 3~4종 작성
+---
 
-예상 기간: 4~7일
+#### 아이템 3종
+
+| 아이템 | 효과 | 처리 방식 |
+|---|---|---|
+| 상자 (Chest) | **전원** 스킬 업그레이드 선택 창 3개 + 시간 정지 | `ChestOpening` 상태 전환 → 전원 선택 → 조합 조건 검사 → `Playing` 복귀 |
+| 체력 (HealthOrb) | 픽업한 플레이어 HP 즉시 회복 | 픽업 즉시 서버가 `PlayerNetworkStats.Heal(value)` |
+| 미사일 (Missile) | 서버 기준 큰 반경 내 전체 적에게 AoE 데미지 | 픽업 즉시 서버가 `EnemyRegistry` 또는 `Physics.OverlapSphere`(픽업 위치 기준 큰 반경) → 전 적 `TakeDamage(value)` |
+
+**공통 픽업 흐름** (모두 NetworkObject, 드랍 빈도 낮아 개별 동기화 허용):
+```text
+서버 드랍 → NetworkObject.Spawn()
+클라이언트 범위 진입 → PlayerPickupController.RequestItemPickupServerRpc(ulong networkObjectId)
+서버: 거리 검증 → ItemType별 효과 분기 → NetworkObject.Despawn()
+```
+
+**상자 픽업 흐름:**
+```text
+누구든 상자 픽업
+  → GameState → ChestOpening
+  → Time.timeScale = 0
+  → ChestRewardManager: 플레이어별 카드 생성
+      [카드 생성 규칙] CombineSystem.GetEvolutionCards(player) 먼저 실행
+        → 만렙 + CombineRecipeSO 존재 → 진화 카드 슬롯 선배치
+        → 남은 슬롯 → 일반 업그레이드 카탈로그에서 랜덤 채움
+      → 전체 플레이어에게 카드 인덱스 RPC 전송
+  → 전원 선택 완료 (pendingChoices 소진 + 이탈자 자동 제거)
+      → 진화 카드 선택 시: SkillManager.EvolveSkill(source, evolved)
+      → 일반 카드 선택 시: SkillManager.UpgradeSkill(skill)
+  → SharedLevelSystem.CheckLevelUp() 재검사   ← 선택 중 누적된 XP 처리
+  → GameState → Playing
+```
+
+> **ChestOpening은 LevelingUp과 별도 GameState로 확정.** 상태 의미가 달라 디버깅·로그 구분이 편하고, `StageRuntime.OnGameStateChanged`와 각 tick 가드에서 두 상태를 명확히 처리할 수 있다. Phase 7 `GameState` enum에 `ChestOpening` 추가 필요.
+
+> **ChestRewardManager는 LevelUpManager와 별도로 구현.** LevelUpManager는 공유 XP 레벨업 책임이 이미 있어 상자 흐름을 합치면 책임이 커진다. 구조가 거의 동일하므로 복사 후 분리하는 것이 유지보수에 유리하다.
+
+---
+
+#### 스킬 조합 시스템
+
+**핵심 규칙**: 조합 조건은 단 하나 — **해당 플레이어가 보유한 스킬이 만렙(`level >= maxLevel`)이고 유효한 `CombineRecipeSO`가 존재**하면 상자 UI의 카드 슬롯에 진화 카드로 출력된다.
+
+```text
+CombineRecipeSO
+  sourceSkill  : SkillDataSO   ← 진화 전 스킬
+  evolvedSkill : SkillDataSO   ← 진화 후 스킬 (기존 스킬 대체)
+```
+
+**상자 카드 생성 규칙** (서버, 플레이어별):
+```text
+1. 해당 플레이어의 OwnedSkill 순회
+     → level >= maxLevel && CombineRecipeSO 있음 → 진화 카드 후보에 추가
+2. 진화 카드 후보를 먼저 슬롯에 배치 (최대 3개)
+3. 남은 슬롯은 일반 업그레이드 카탈로그(UpgradeOptionSO)에서 랜덤으로 채움
+4. 총 3장을 클라이언트에 전송
+```
+
+예시:
+```
+보유: 기본 투사체 Lv3(만렙), 오라 Lv2, 궤도체 Lv1
+레시피: 기본 투사체 Lv3 → 관통 폭발탄
+
+카드 슬롯:
+  슬롯 1 → 관통 폭발탄(진화)   ← 만렙 + 레시피 자동 배치
+  슬롯 2 → 오라 레벨업          ← 일반 업그레이드
+  슬롯 3 → 이동속도 +1          ← 일반 업그레이드
+```
+
+**진화 선택 시 흐름:**
+```text
+플레이어가 진화 카드 선택 → SubmitChestChoiceServerRpc(choiceIndex)
+  → ChestRewardManager: 해당 선택이 진화 카드임을 확인
+  → SkillManager.EvolveSkill(sourceSkill, evolvedSkill)
+      → sourceSkill OwnedSkill 제거
+      → evolvedSkill OwnedSkill 추가 (level=1)
+  → ShowEvolutionNoticeClientRpc(clientId)   ← 해당 플레이어에게 진화 연출 알림
+```
+
+> 진화 카드는 선택 강제가 아니다. 플레이어가 원하면 다른 일반 업그레이드 카드를 골라 진화를 미룰 수 있다.
+
+---
+
+#### 신규 스킬 3종
+
+**새 SkillCastType 추가**: `Grenade`, `ScatterShot`, `Melee`
+
+| 스킬 | 타입 | 특성 |
+|---|---|---|
+| 수류탄 (Grenade) | `SkillCastType.Grenade` | 포물선 투척, 착지 시 스플래시 데미지. 투척 범위 내 랜덤 착탄 지점 |
+| 산탄 (ScatterShot) | `SkillCastType.ScatterShot` | 부채꼴 무작위 방향, 공격속도 빠름·대미지 약함. duration + cooldown 있음 |
+| 망치 (Hammer) | `SkillCastType.Melee` | 전방 근접 스플래시. 공격속도 느림·대미지 높음. `LastNonZeroMoveDirection` 기준 판정 |
+
+**SkillLevelData 신규 필드:**
+```text
+// Grenade
+float grenadeRange        // 착탄 가능 반경
+float grenadeArcHeight    // 포물선 높이
+float splashRadius        // 착지 스플래시 반경
+
+// ScatterShot
+int   scatterBulletCount  // 한 번에 발사 수
+float scatterAngle        // 부채꼴 각도 (랜덤 분산)
+float burstDuration       // 지속 발사 시간
+
+// Melee
+float meleeArcAngle       // 전방 판정 각도 (OverlapBox 또는 OverlapSphere)
+float meleeRange          // 판정 거리
+```
+
+> **망치 주의**: 멈춘 직후 `MoveInput`이 `Vector2.zero`가 되면 방향을 잃는다. `PlayerNetworkController`에 `LastNonZeroMoveDirection` 서버 상태를 추가해 망치 판정에 사용한다. 기본값은 `Vector3.forward`.
+
+---
+
+#### 구현 항목
+
+- [ ] `GameState` enum에 `ChestOpening` 추가 (Phase 7보다 먼저 추가)
+  - `StageRuntime.OnGameStateChanged`: `ChestOpening` 진입/복귀 시 `Time.timeScale = 0/1`
+  - 서버 gameplay tick 가드: `EnemyAI`, `SkillManager`, `NetworkProjectile` — `ChestOpening`도 차단
+- [ ] ItemDataSO 구현 (`ItemType` enum: Chest / HealthOrb / Missile, `float value`)
+- [ ] DropTableSO 구현 (아이템별 드랍 확률 테이블)
+  - `EnemyDataSO.dropTable` 필드에 연결 — 적 사망 시 `DropManager`가 해당 적의 `dropTable`을 참조해 드랍 결정
+- [ ] NetworkedItemPickup 구현 (NetworkObject)
+  - Chest: `ChestRewardManager.BeginChestReward()`
+  - HealthOrb: 픽업한 플레이어에게 `Heal(value)`
+  - Missile: `EnemyRegistry` 전체 또는 픽업 위치 기준 `Physics.OverlapSphere` 큰 반경 → `TakeDamage(value)`
+- [ ] DropManager에 아이템 드랍 연결 (`EnemyNetworkBase.HandleDeath` 경유)
+- [ ] ChestRewardManager 구현 (LevelUpManager와 별도, 구조 동일)
+  - `pendingChoices HashSet<ulong>` + `OnClientDisconnected` 이탈 처리
+  - **카드 직렬화**: `int[]`만으로는 일반 업그레이드 카탈로그 인덱스와 진화 레시피 인덱스를 구분할 수 없다. `ChestChoiceData { ChestChoiceType type; int index; }` 구조체를 정의해 NGO로 직렬화하고 RPC에 `ChestChoiceData[]`를 전달한다. (`ChestChoiceType`: `UpgradeOption` / `Evolution`)
+  - **카드 생성 시**: `CombineSystem.GetEvolutionCards(player)` → 만렙+레시피 진화 카드 선배치 → 빈 슬롯은 일반 업그레이드
+  - **선택 수신 시**: `ChestChoiceData.type`에 따라 → 진화: `SkillManager.EvolveSkill()`, 일반: `SkillManager.UpgradeSkill()`
+  - 전원 완료 후 → `SharedLevelSystem.CheckLevelUp()` → `GameState → Playing`
+- [ ] CombineRecipeSO 구현 (`sourceSkill` + `evolvedSkill` 두 필드만)
+- [ ] CombineSystem 구현 (서버 전용)
+  - `GetEvolutionCards(player)`: OwnedSkill 순회 → `level >= maxLevel` + `CombineRecipeSO` 존재 → 진화 카드 목록 반환 (카드 생성 전에 호출)
+  - `ShowEvolutionNoticeClientRpc` (해당 클라이언트에만, 진화 연출용)
+- [ ] `SkillManager.EvolveSkill(sourceSkill, evolvedSkill)` 추가
+- [ ] `PlayerNetworkController`에 `LastNonZeroMoveDirection` 서버 상태 추가
+- [ ] `SkillCastType`에 `Grenade`, `ScatterShot`, `Melee` 추가
+- [ ] `SkillLevelData`에 신규 필드 추가
+- [ ] GrenadeNetworkSkill 구현 (서버 포물선 계산 + 착지 스플래시)
+- [ ] ScatterShotNetworkSkill 구현 (랜덤 부채꼴 발사, duration/cooldown)
+- [ ] MeleeNetworkSkill 구현 (`LastNonZeroMoveDirection` 기반 OverlapBox)
+- [ ] 아이템 ScriptableObject 3종 작성
+- [ ] 조합 레시피 3~4종 작성
+
+예상 기간: 5~8일
 
 ---
 
@@ -707,7 +845,7 @@ Done when: Stage_01에서 5분 생존 후 보스가 등장하고, 보스 처치/
 
 - [ ] StageDataSO 구현
 - [ ] StageNetworkManager 구현
-  - `NetworkVariable<GameState>` Playing / LevelingUp / BossPhase / Clear / GameOver
+  - `NetworkVariable<GameState>` Playing / LevelingUp / ChestOpening / BossPhase / Clear / GameOver
   - 생존 타이머 서버에서만 실행
 - [ ] MapManager 구현
 - [ ] BossNetworkBase 구현 (EnemyNetworkBase 상속, 페이즈 전환 로직)
@@ -809,7 +947,7 @@ Phase 9: 로컬 서버 빌드 안정화 (Windows, Relay 코드 공유)
 3. **클라이언트는 표현만 한다.** VFX, SFX, 카메라, 로컬 UI는 클라이언트 몫이다.
 4. **IsServer / IsOwner 가드를 빠뜨리지 않는다.** 모든 NetworkBehaviour에 명시적으로 작성한다.
 5. **NGO RPC 문법은 Mirror와 다르다.** `[TargetRpc]`·`NetworkConnection`은 Mirror 용어다. NGO 2.x는 `[Rpc(SendTo.SpecificClients)]`, NGO 1.x는 `ClientRpcParams`를 사용한다.
-6. **Time.timeScale은 레벨업 전체 정지에만 허용한다.** 공유 XP 레벨업 시 모든 플레이어가 동시에 선택하므로 `GameState.LevelingUp` 진입/퇴장 시 서버와 전체 클라이언트에서 `Time.timeScale = 0/1` 처리한다. UI 애니메이션은 `unscaledDeltaTime` 사용. 그 외 개인 일시정지 용도로는 사용 금지.
+6. **Time.timeScale은 전원 참여 선택 화면(LevelingUp·ChestOpening)에만 허용한다.** 두 상태 모두 모든 플레이어가 동시에 멈추고 선택하므로, `GameState.LevelingUp` / `GameState.ChestOpening` 진입/퇴장 시 서버와 전체 클라이언트에서 `Time.timeScale = 0/1` 처리한다. UI 애니메이션은 `unscaledDeltaTime` 사용. 그 외 개인 일시정지 용도로는 사용 금지.
 7. **NetworkObject 수를 최소화한다.** XP 오브처럼 수백 개가 필요한 것은 서버 데이터 + 클라이언트 비주얼 프록시로 처리한다.
 8. **ScriptableObject로 데이터를 관리한다.** 수치는 코드가 아니라 Inspector에서 조정한다.
 9. **매 Phase 끝마다 멀티플레이 가능한 상태를 만든다.** Phase 완료 기준은 항상 2인 이상 동작 확인이다.

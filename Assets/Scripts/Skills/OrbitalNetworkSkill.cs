@@ -1,51 +1,38 @@
 using System.Collections.Generic;
-using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Data;
 using Vamsurlike.Enemy;
 
 namespace Vamsurlike.Skills
 {
-    public class OrbitalNetworkSkill : SkillBase
+    public sealed class OrbitalSkill : SkillBase
     {
-        [SerializeField] private GameObject orbitalVisualPrefab;
-        [SerializeField] private float orbitalHeightOffset = 0.9f;
+        private readonly GameObject visualPrefab;
+        private readonly float heightOffset;
 
         private readonly List<EnemyNetworkBase> targets = new();
         private readonly HashSet<ulong> hitEnemyIds = new();
 
-        // 서버: 비주얼 ClientRpc 중복 전송 방지
-        private bool  serverVisualBroadcast;
-        private int   serverVisualCount;
-        private float serverVisualRadius;
-        private float serverVisualRotationSpeed;
+        // 서버: ClientRpc 중복 전송 방지용 캐시
+        private bool serverBroadcastSent;
+        private int serverCount;
+        private float serverRadius;
+        private float serverRotSpeed;
 
-        // 클라이언트: 로컬 비주얼 오브젝트
+        // 클라이언트: 로컬 비주얼 상태
         private GameObject[] visualObjects;
         private bool visualsActive;
         private float visualRadius;
-        private float visualRotationSpeed;
+        private float visualRotSpeed;
 
-        protected override SkillCastType SupportedCastType => SkillCastType.Orbital;
+        public OrbitalSkill(GameObject visualPrefab, float heightOffset)
+        {
+            this.visualPrefab = visualPrefab;
+            this.heightOffset = heightOffset;
+        }
+
+        public override SkillCastType SupportedCastType => SkillCastType.Orbital;
         public override bool IsPersistentExecution => true;
-
-        public override void OnNetworkSpawn()
-        {
-            base.OnNetworkSpawn();
-            // 서버는 비주얼 불필요. 클라이언트는 ActivateOrbitalsClientRpc 수신 후 생성.
-        }
-
-        public override void OnNetworkDespawn()
-        {
-            base.OnNetworkDespawn();
-            DestroyVisuals();
-        }
-
-        private void Update()
-        {
-            if (!visualsActive || visualObjects == null) return;
-            UpdateVisualPositions();
-        }
 
         public override bool TryExecute(in SkillCastContext context)
         {
@@ -55,30 +42,30 @@ namespace Vamsurlike.Skills
             if (skill == null || levelData == null || context.CasterTransform == null)
                 return false;
 
-            int orbitalCount = Mathf.Max(1, levelData.orbitalCount);
-            float orbitalRadius = Mathf.Max(0.1f, levelData.orbitalRadius);
+            int count = Mathf.Max(1, levelData.orbitalCount);
+            float radius = Mathf.Max(0.1f, levelData.orbitalRadius);
             float hitRadius = Mathf.Max(0.05f, levelData.orbitalHitRadius);
-            float rotationSpeed = levelData.orbitalRotationSpeed;
+            float rotSpeed = levelData.orbitalRotationSpeed;
 
-            // count/radius/speed 중 하나라도 바뀌면 재전송
-            if (!serverVisualBroadcast
-                || serverVisualCount != orbitalCount
-                || !Mathf.Approximately(serverVisualRadius, orbitalRadius)
-                || !Mathf.Approximately(serverVisualRotationSpeed, rotationSpeed))
+            // count/radius/rotSpeed 중 하나라도 바뀌면 클라이언트에 재전송
+            if (!serverBroadcastSent
+                || serverCount != count
+                || !Mathf.Approximately(serverRadius, radius)
+                || !Mathf.Approximately(serverRotSpeed, rotSpeed))
             {
-                serverVisualBroadcast      = true;
-                serverVisualCount          = orbitalCount;
-                serverVisualRadius         = orbitalRadius;
-                serverVisualRotationSpeed  = rotationSpeed;
-                ActivateOrbitalsClientRpc(orbitalCount, orbitalRadius, rotationSpeed);
+                serverBroadcastSent = true;
+                serverCount = count;
+                serverRadius = radius;
+                serverRotSpeed = rotSpeed;
+                context.Manager.BroadcastOrbitalClientRpc(count, radius, rotSpeed);
             }
 
             int damagedCount = 0;
             hitEnemyIds.Clear();
 
-            for (int i = 0; i < orbitalCount; i++)
+            for (int i = 0; i < count; i++)
             {
-                Vector3 orbPos = GetOrbitalPosition(context.CasterTransform.position, orbitalRadius, rotationSpeed, i, orbitalCount);
+                Vector3 orbPos = GetOrbitalPosition(context.CasterTransform.position, radius, rotSpeed, i, count);
                 int targetCount = AutoTargeting.FindEnemiesInRange(orbPos, hitRadius, targets);
 
                 float damage = context.FinalDamage;
@@ -94,47 +81,54 @@ namespace Vamsurlike.Skills
             if (damagedCount == 0)
             {
                 if (ShouldLogNoTarget())
-                    Debug.Log($"[{nameof(OrbitalNetworkSkill)}] No orbital targets. skill={skill.name}, count={orbitalCount}, radius={orbitalRadius}, hitRadius={hitRadius}");
+                    Debug.Log($"[{nameof(OrbitalSkill)}] 궤도체 범위 내 적 없음. skill={skill.name}, count={count}, radius={radius}");
                 return false;
             }
 
-            Debug.Log($"[{nameof(OrbitalNetworkSkill)}] Orbital tick. skill={skill.name}, level={context.Level}, damage={context.FinalDamage}(x{context.AttackMultiplier}), orbCount={orbitalCount}, damaged={damagedCount}");
+            Debug.Log($"[{nameof(OrbitalSkill)}] 틱. skill={skill.name}, level={context.Level}, damage={context.FinalDamage}(x{context.AttackMultiplier}), orbCount={count}, damaged={damagedCount}");
             return true;
         }
 
-        [ClientRpc]
-        private void ActivateOrbitalsClientRpc(int count, float radius, float rotationSpeed)
+        // SkillManager.BroadcastOrbitalClientRpc가 모든 클라이언트에서 호출
+        public void OnClientOrbitalActivated(int count, float radius, float rotSpeed, Transform ownerTransform)
         {
-            if (orbitalVisualPrefab == null)
+            if (visualPrefab == null)
             {
-                Debug.LogWarning($"[{nameof(OrbitalNetworkSkill)}] orbitalVisualPrefab is not assigned. Skipping visuals.");
+                Debug.LogWarning($"[{nameof(OrbitalSkill)}] orbitalVisualPrefab 미할당.");
                 return;
             }
 
             DestroyVisuals();
-
             visualRadius = radius;
-            visualRotationSpeed = rotationSpeed;
+            visualRotSpeed = rotSpeed;
             visualObjects = new GameObject[count];
 
             for (int i = 0; i < count; i++)
             {
-                Vector3 pos = GetOrbitalPosition(transform.position + Vector3.up * orbitalHeightOffset, radius, rotationSpeed, i, count);
-                visualObjects[i] = Instantiate(orbitalVisualPrefab, pos, Quaternion.identity);
+                Vector3 pos = GetOrbitalPosition(
+                    ownerTransform.position + Vector3.up * heightOffset, radius, rotSpeed, i, count);
+                visualObjects[i] = Object.Instantiate(visualPrefab, pos, Quaternion.identity);
             }
 
             visualsActive = true;
         }
 
-        private void UpdateVisualPositions()
+        // SkillManager.Update()가 매 프레임 호출 — 클라이언트 비주얼 위치 갱신
+        public override void OnUpdate(Transform ownerTransform)
         {
+            if (!visualsActive || visualObjects == null) return;
+
             for (int i = 0; i < visualObjects.Length; i++)
             {
                 if (visualObjects[i] == null) continue;
                 visualObjects[i].transform.position = GetOrbitalPosition(
-                    transform.position + Vector3.up * orbitalHeightOffset, visualRadius, visualRotationSpeed, i, visualObjects.Length);
+                    ownerTransform.position + Vector3.up * heightOffset,
+                    visualRadius, visualRotSpeed, i, visualObjects.Length);
             }
         }
+
+        // SkillManager.OnNetworkDespawn()이 호출
+        public override void OnDespawn() => DestroyVisuals();
 
         private void DestroyVisuals()
         {
@@ -142,16 +136,15 @@ namespace Vamsurlike.Skills
             for (int i = 0; i < visualObjects.Length; i++)
             {
                 if (visualObjects[i] != null)
-                    Destroy(visualObjects[i]);
+                    Object.Destroy(visualObjects[i]);
             }
             visualObjects = null;
             visualsActive = false;
         }
 
-        private static Vector3 GetOrbitalPosition(Vector3 origin, float radius, float rotationSpeed, int index, int count)
+        private static Vector3 GetOrbitalPosition(Vector3 origin, float radius, float rotSpeed, int index, int count)
         {
-            float angleStep = 360f / count;
-            float angle = Time.time * rotationSpeed + angleStep * index;
+            float angle = Time.time * rotSpeed + 360f / count * index;
             Vector3 offset = Quaternion.AngleAxis(angle, Vector3.up) * Vector3.forward * radius;
             return origin + offset;
         }

@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5571398f89175c543ba5c7fc371d956a, type: 3}
+  m_Name: DropTable_Common
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Data.DropTableSO
+  entries:
+  - item: {fileID: 11400000, guid: 19b06f6caa77e9142a6aebb22b944364, type: 2}
+    chance: 0.08
+  - item: {fileID: 11400000, guid: 3fdc95bc044b14942892853539b8513a, type: 2}
+    chance: 0.03

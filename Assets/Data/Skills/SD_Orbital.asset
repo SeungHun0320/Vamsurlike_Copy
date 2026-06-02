@@ -16,7 +16,7 @@ MonoBehaviour:
   icon: {fileID: 0}
   castType: 2
   isManual: 0
-  projectilePrefab: {fileID: 0}
+  projectilePrefab: {fileID: 7209417620919649187, guid: 9378fd5e85aa92a42bf1b911ce5a3b9d, type: 3}
   maxLevel: 3
   levels:
   - cooldown: 5
@@ -38,6 +38,14 @@ MonoBehaviour:
     waveCount: 1
     waveDelay: 0.15
     rotationPerWave: 30
+    grenadeRange: 6
+    grenadeArcHeight: 3
+    splashRadius: 2.5
+    scatterBulletCount: 8
+    scatterAngle: 60
+    burstDuration: 2
+    meleeArcAngle: 120
+    meleeRange: 2.5
   - cooldown: 5
     damage: 8
     range: 4
@@ -57,6 +65,14 @@ MonoBehaviour:
     waveCount: 1
     waveDelay: 0.15
     rotationPerWave: 30
+    grenadeRange: 6
+    grenadeArcHeight: 3
+    splashRadius: 2.5
+    scatterBulletCount: 8
+    scatterAngle: 60
+    burstDuration: 2
+    meleeArcAngle: 120
+    meleeRange: 2.5
   - cooldown: 5
     damage: 10
     range: 4.5
@@ -76,3 +92,11 @@ MonoBehaviour:
     waveCount: 1
     waveDelay: 0.15
     rotationPerWave: 30
+    grenadeRange: 6
+    grenadeArcHeight: 3
+    splashRadius: 2.5
+    scatterBulletCount: 8
+    scatterAngle: 60
+    burstDuration: 2
+    meleeArcAngle: 120
+    meleeRange: 2.5
