@@ -13,6 +13,7 @@ namespace Vamsurlike.Items
     {
         [SerializeField] private ItemDataSO itemData;
         private GameObject sourcePrefab;
+        private bool        wasPoolSpawned;
 
         // 서버 전용 팩토리: DropManager에서 호출
         public static bool SpawnAt(ItemDataSO data, Vector3 position)
@@ -20,7 +21,8 @@ namespace Vamsurlike.Items
             if (data == null || data.pickupPrefab == null) return false;
             if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return false;
 
-            NetworkObject obj = PoolManager.Instance != null
+            bool usingPool = PoolManager.Instance != null;
+            NetworkObject obj = usingPool
                 ? PoolManager.Instance.GetNetworkObject(data.pickupPrefab, position, Quaternion.identity)
                 : Object.Instantiate(data.pickupPrefab, position, Quaternion.identity)
                         .GetComponent<NetworkObject>();
@@ -37,8 +39,9 @@ namespace Vamsurlike.Items
                 return false;
             }
 
-            pickup.itemData     = data;
-            pickup.sourcePrefab = data.pickupPrefab;
+            pickup.itemData       = data;
+            pickup.sourcePrefab   = data.pickupPrefab;
+            pickup.wasPoolSpawned = usingPool;
             obj.Spawn(true);
             return true;
         }
@@ -98,13 +101,14 @@ namespace Vamsurlike.Items
         private void DespawnToPool()
         {
             if (!IsSpawned) return;
-            NetworkObject.Despawn(false);
+            // 풀에서 꺼낸 경우 destroy=false로 반환 대기, 직접 생성한 경우 즉시 파괴
+            NetworkObject.Despawn(!wasPoolSpawned);
         }
 
         public override void OnNetworkDespawn()
         {
             base.OnNetworkDespawn();
-            if (!IsServer || sourcePrefab == null) return;
+            if (!IsServer || !wasPoolSpawned || sourcePrefab == null) return;
             if (PoolManager.Instance != null)
                 PoolManager.Instance.ReturnNetworkObject(sourcePrefab, NetworkObject);
         }

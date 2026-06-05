@@ -7,17 +7,20 @@ using Vamsurlike.Upgrades;
 
 namespace Vamsurlike.Items
 {
-    // Stage 씬의 NetworkObject로 배치. LevelUpManager와 별도 책임.
-    // 상자 픽업 → 전원 스킬 선택 → 진화/업그레이드 적용 → GameState → Playing
+    // Stage 씬의 NetworkObject로 배치.
+    // 상자 픽업 → 전원 스킬 카드 선택 UI → 적용 → Playing 복귀.
+    // 유효한 스킬 카드가 없으면 UI 없이 XP만 지급.
     public class ChestRewardManager : NetworkBehaviour
     {
         public static ChestRewardManager Instance { get; private set; }
 
-        private readonly Dictionary<ulong, ChestChoiceData[]> playerOptions  = new();
-        private readonly HashSet<ulong>                       pendingChoices  = new();
+        private readonly Dictionary<ulong, int[]> playerOptions = new();
+        private readonly HashSet<ulong>           pendingChoices = new();
 
-        public static event Action<ChestChoiceData[]> OnOptionsReceived;
-        public static event Action                    OnChestRewardCompleted;
+        public static event Action<int[]> OnOptionsReceived;
+        public static event Action        OnChestRewardCompleted;
+
+        [SerializeField] private int fallbackXP = 30;
 
         private readonly System.Random rng = new();
 
@@ -50,10 +53,15 @@ namespace Vamsurlike.Items
         {
             if (!IsServer) return;
 
-            var upgradeCatalog = UpgradeCatalog.Instance;
-            var recipeCatalog  = CombineRecipeCatalog.Instance;
+            // 재진입 가드
+            if (pendingChoices.Count > 0)
+            {
+                Debug.LogWarning($"[{nameof(ChestRewardManager)}] 상자 보상 진행 중 — 새 상자 요청 무시");
+                return;
+            }
 
-            if (upgradeCatalog == null)
+            var catalog = UpgradeCatalog.Instance;
+            if (catalog == null)
             {
                 Debug.LogError($"[{nameof(ChestRewardManager)}] UpgradeCatalog 없음 — 상자 건너뜀");
                 return;
@@ -62,21 +70,34 @@ namespace Vamsurlike.Items
             playerOptions.Clear();
             pendingChoices.Clear();
 
+            bool anyHasCards = false;
+
             foreach (ulong clientId in NetworkManager.ConnectedClientsIds)
             {
-                ChestChoiceData[] cards = GenerateCards(clientId, upgradeCatalog, recipeCatalog);
-                playerOptions[clientId] = cards;
-                pendingChoices.Add(clientId);
+                var skillManager = GetSkillManager(clientId);
+                int[] indices    = BuildSkillCardIndices(catalog, skillManager);
 
-                ShowChestOptionsClientRpc(cards, new ClientRpcParams
+                if (indices.Length == 0)
+                {
+                    // 이 플레이어는 유효 스킬 없음 → XP 지급 후 대기 목록에서 제외
+                    SharedLevelSystem.Instance?.AddXP(fallbackXP);
+                    Debug.Log($"[{nameof(ChestRewardManager)}] clientId {clientId} 스킬 없음 → XP +{fallbackXP}");
+                    continue;
+                }
+
+                playerOptions[clientId] = indices;
+                pendingChoices.Add(clientId);
+                anyHasCards = true;
+
+                ShowOptionsClientRpc(indices, new ClientRpcParams
                 {
                     Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
                 });
             }
 
-            if (pendingChoices.Count == 0)
+            if (!anyHasCards)
             {
-                Debug.LogWarning($"[{nameof(ChestRewardManager)}] 연결된 클라이언트 없음 — 상자 건너뜀");
+                Debug.Log($"[{nameof(ChestRewardManager)}] 전원 스킬 없음 — UI 생략");
                 return;
             }
 
@@ -84,7 +105,7 @@ namespace Vamsurlike.Items
         }
 
         [ServerRpc(RequireOwnership = false)]
-        public void SubmitChoiceServerRpc(int cardIndex, ServerRpcParams rpcParams = default)
+        public void SubmitChoiceServerRpc(int choiceIndex, ServerRpcParams rpcParams = default)
         {
             ulong clientId = rpcParams.Receive.SenderClientId;
 
@@ -94,127 +115,106 @@ namespace Vamsurlike.Items
                 return;
             }
 
-            if (!playerOptions.TryGetValue(clientId, out var cards)
-                || cardIndex < 0 || cardIndex >= cards.Length)
+            if (!playerOptions.TryGetValue(clientId, out int[] options) ||
+                choiceIndex < 0 || choiceIndex >= options.Length)
             {
-                Debug.LogWarning($"[{nameof(ChestRewardManager)}] clientId {clientId}: 유효하지 않은 카드 인덱스 {cardIndex}");
+                Debug.LogWarning($"[{nameof(ChestRewardManager)}] clientId {clientId}: 유효하지 않은 인덱스 {choiceIndex}");
                 return;
             }
 
             pendingChoices.Remove(clientId);
-            ApplyChoice(clientId, cards[cardIndex]);
+            ApplySkill(clientId, options[choiceIndex]);
             CheckAllDone();
         }
 
-        private void ApplyChoice(ulong clientId, ChestChoiceData choice)
+        private void ApplySkill(ulong clientId, int catalogIndex)
         {
+            var catalog = UpgradeCatalog.Instance;
+            if (catalog == null || !catalog.IsValidIndex(catalogIndex)) return;
             if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)) return;
             if (client.PlayerObject == null) return;
 
-            var skillManager = client.PlayerObject.GetComponent<Skills.SkillManager>();
-            if (skillManager == null)
-            {
-                Debug.LogWarning($"[{nameof(ChestRewardManager)}] clientId {clientId}: SkillManager 없음");
-                return;
-            }
-
-            switch (choice.type)
-            {
-                case ChestChoiceType.Evolution:
-                    if (!CombineSystem.TryEvolve(skillManager, choice.index))
-                        Debug.LogWarning($"[{nameof(ChestRewardManager)}] clientId {clientId}: 진화 실패 (recipeIndex={choice.index})");
-                    break;
-
-                case ChestChoiceType.UpgradeOption:
-                    var catalog = UpgradeCatalog.Instance;
-                    if (catalog != null && catalog.IsValidIndex(choice.index))
-                    {
-                        var handler = client.PlayerObject.GetComponent<Upgrades.PassiveStatHandler>();
-                        if (handler != null)
-                            handler.ApplyUpgrade(catalog.options[choice.index]);
-                    }
-                    break;
-            }
+            var handler = client.PlayerObject.GetComponent<PassiveStatHandler>();
+            if (handler != null)
+                handler.ApplyUpgrade(catalog.options[catalogIndex]);
+            else
+                Debug.LogWarning($"[{nameof(ChestRewardManager)}] clientId {clientId}: PassiveStatHandler 없음");
         }
 
         private void CheckAllDone()
         {
             if (pendingChoices.Count > 0) return;
-            FinalizChestReward();
-        }
 
-        private void FinalizChestReward()
-        {
             playerOptions.Clear();
             StageRuntime.Instance?.SetGameState(GameState.Playing);
-            NotifyChestCompletedClientRpc();
+            NotifyCompletedClientRpc();
 
-            // 상자 선택 중 누적된 XP 재검사
-            if (SharedLevelSystem.Instance != null)
-                SharedLevelSystem.Instance.CheckLevelUp();
+            SharedLevelSystem.Instance?.CheckLevelUp();
         }
 
         private void HandleClientDisconnect(ulong clientId)
         {
             if (!pendingChoices.Contains(clientId)) return;
             pendingChoices.Remove(clientId);
-            Debug.Log($"[{nameof(ChestRewardManager)}] clientId {clientId} 이탈 — pendingChoices에서 제거");
+            Debug.Log($"[{nameof(ChestRewardManager)}] clientId {clientId} 이탈 — 대기 제거");
             CheckAllDone();
         }
 
-        // 플레이어별 카드 생성: 진화 카드 선배치 → 빈 슬롯은 일반 업그레이드
-        private ChestChoiceData[] GenerateCards(ulong clientId, UpgradeCatalog upgradeCatalog,
-                                                CombineRecipeCatalog recipeCatalog)
-        {
-            var result = new List<ChestChoiceData>();
-
-            // 진화 카드 선배치
-            if (recipeCatalog != null
-                && NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)
-                && client.PlayerObject != null)
-            {
-                var skillManager = client.PlayerObject.GetComponent<Skills.SkillManager>();
-                if (skillManager != null)
-                    result.AddRange(CombineSystem.GetEvolutionCards(skillManager));
-            }
-
-            // 남은 슬롯(최대 3장) 일반 업그레이드로 채우기
-            int remaining = Mathf.Max(0, 3 - result.Count);
-            if (remaining > 0)
-            {
-                var upgradeIndices = GenerateRandomUpgradeIndices(upgradeCatalog, remaining);
-                foreach (int idx in upgradeIndices)
-                    result.Add(new ChestChoiceData(ChestChoiceType.UpgradeOption, idx));
-            }
-
-            return result.ToArray();
-        }
-
-        private List<int> GenerateRandomUpgradeIndices(UpgradeCatalog catalog, int count)
+        // 스킬 타입(NewSkill / SkillLevelUp)만 필터링해 최대 3장 반환
+        private int[] BuildSkillCardIndices(UpgradeCatalog catalog, Skills.SkillManager skillManager)
         {
             var pool = new List<int>(catalog.options.Length);
             for (int i = 0; i < catalog.options.Length; i++)
-                if (catalog.options[i] != null) pool.Add(i);
+            {
+                var opt = catalog.options[i];
+                if (opt == null) continue;
 
-            count = Mathf.Min(count, pool.Count);
-            var result = new List<int>(count);
+                switch (opt.effectType)
+                {
+                    case UpgradeEffectType.SkillLevelUp:
+                        if (opt.skillData == null) continue;
+                        if (skillManager != null)
+                        {
+                            int lvl = skillManager.GetSkillLevel(opt.skillData);
+                            if (lvl >= opt.skillData.maxLevel) continue; // 만렙만 제외, 미소유(0)는 포함
+                        }
+                        pool.Add(i);
+                        break;
+
+                    case UpgradeEffectType.NewSkill:
+                        if (opt.skillData == null) continue;
+                        if (skillManager != null && skillManager.GetSkillLevel(opt.skillData) > 0) continue;
+                        pool.Add(i);
+                        break;
+                }
+            }
+
+            int count  = Mathf.Min(3, pool.Count);
+            var result = new int[count];
             for (int i = 0; i < count; i++)
             {
-                int pick = rng.Next(pool.Count);
-                result.Add(pool[pick]);
+                int pick  = rng.Next(pool.Count);
+                result[i] = pool[pick];
                 pool.RemoveAt(pick);
             }
             return result;
         }
 
-        [ClientRpc]
-        private void ShowChestOptionsClientRpc(ChestChoiceData[] cards, ClientRpcParams rpcParams = default)
+        private Skills.SkillManager GetSkillManager(ulong clientId)
         {
-            OnOptionsReceived?.Invoke(cards);
+            if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)) return null;
+            if (client.PlayerObject == null) return null;
+            return client.PlayerObject.GetComponent<Skills.SkillManager>();
         }
 
         [ClientRpc]
-        private void NotifyChestCompletedClientRpc()
+        private void ShowOptionsClientRpc(int[] optionIndices, ClientRpcParams rpcParams = default)
+        {
+            OnOptionsReceived?.Invoke(optionIndices);
+        }
+
+        [ClientRpc]
+        private void NotifyCompletedClientRpc()
         {
             OnChestRewardCompleted?.Invoke();
         }

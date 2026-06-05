@@ -11,9 +11,13 @@ namespace Vamsurlike.Enemy
     [RequireComponent(typeof(EnemyNetworkBase))]
     public class EnemyAI : NetworkBehaviour
     {
-        internal NavMeshAgent Agent      { get; private set; }
+        private static readonly int SpeedHash  = Animator.StringToHash("Speed");
+        private static readonly int AttackHash = Animator.StringToHash("Attack");
+
+        internal NavMeshAgent     Agent  { get; private set; }
         internal EnemyNetworkBase Base   { get; private set; }
-        internal Transform Target        { get; private set; }
+        internal Animator         Anim   { get; private set; }
+        internal Transform        Target { get; private set; }
 
         private IEnemyState currentState;
         private float targetUpdateTimer;
@@ -23,16 +27,15 @@ namespace Vamsurlike.Enemy
         {
             Agent = GetComponent<NavMeshAgent>();
             Base  = GetComponent<EnemyNetworkBase>();
+            Anim  = GetComponentInChildren<Animator>();
         }
 
         public override void OnNetworkSpawn()
         {
             if (!IsServer) { Agent.enabled = false; enabled = false; return; }
-            // Data는 EnemyNetworkBase.Initialize 후 ApplyData로 주입됨 — 여기서 읽지 않음
             ChangeState(EnemyStates.Idle);
         }
 
-        // EnemyNetworkBase.Initialize 직후 서버에서 호출
         internal void ApplyData(EnemyDataSO data)
         {
             if (data == null) return;
@@ -53,6 +56,14 @@ namespace Vamsurlike.Enemy
             }
 
             currentState?.Update(this);
+
+            if (Anim != null)
+                Anim.SetFloat(SpeedHash, Agent.velocity.magnitude);
+        }
+
+        internal void TriggerAttackAnim()
+        {
+            if (Anim != null) Anim.SetTrigger(AttackHash);
         }
 
         internal void ChangeState(IEnemyState next)
@@ -64,7 +75,7 @@ namespace Vamsurlike.Enemy
 
         private void RefreshTarget()
         {
-            float     closest  = float.MaxValue;
+            float     closest       = float.MaxValue;
             Transform bestTransform = null;
 
             foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
@@ -130,7 +141,7 @@ namespace Vamsurlike.Enemy
             float dist = Vector3.Distance(ai.transform.position, ai.Target.position);
             if (ai.Base.Data != null && dist <= ai.Base.Data.attackRange)
             {
-                ai.ChangeState(new EnemyAttackState()); // Attack은 cooldown 상태 보유 → new 유지
+                ai.ChangeState(new EnemyAttackState());
                 return;
             }
 
@@ -166,6 +177,8 @@ namespace Vamsurlike.Enemy
 
             cooldown -= Time.deltaTime;
             if (cooldown > 0f) return;
+
+            ai.TriggerAttackAnim();
 
             if (ai.Target.TryGetComponent<PlayerNetworkStats>(out var stats))
                 stats.TakeDamage(ai.Base.ScaledAttackPower);

@@ -14,7 +14,8 @@ namespace Vamsurlike.Skills
             Transform casterTransform,
             Transform projectileSpawnPoint,
             float spawnForwardOffset,
-            float attackMultiplier = 1f)
+            float attackMultiplier = 1f,
+            float speedMultiplier  = 1f)
         {
             Manager = manager;
             Skill = skill;
@@ -25,6 +26,7 @@ namespace Vamsurlike.Skills
             ProjectileSpawnPoint = projectileSpawnPoint;
             SpawnForwardOffset = spawnForwardOffset;
             AttackMultiplier = Mathf.Max(0f, attackMultiplier);
+            SpeedMultiplier  = Mathf.Max(0f, speedMultiplier);
         }
 
         public SkillManager    Manager              { get; }
@@ -36,6 +38,7 @@ namespace Vamsurlike.Skills
         public Transform       ProjectileSpawnPoint { get; }
         public float           SpawnForwardOffset   { get; }
         public float           AttackMultiplier     { get; }
+        public float           SpeedMultiplier      { get; }
 
         // 패시브 공격력 배율이 적용된 최종 데미지
         public float FinalDamage => LevelData != null ? LevelData.damage * AttackMultiplier : 0f;

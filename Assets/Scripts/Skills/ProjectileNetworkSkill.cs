@@ -52,10 +52,11 @@ namespace Vamsurlike.Skills
             int spawnedCount = 0;
             float finalDamage = context.FinalDamage;
 
+            float speedMultiplier = context.SpeedMultiplier;
             for (int i = 0; i < count; i++)
             {
                 Vector3 dir = GetSpreadDirection(baseDir, i, count, spread);
-                if (SpawnProjectile(skill, levelData, finalDamage, context.OwnerClientId, spawnPos, dir))
+                if (SpawnProjectile(skill, levelData, finalDamage, context.OwnerClientId, spawnPos, dir, speedMultiplier))
                     spawnedCount++;
             }
 
@@ -66,7 +67,7 @@ namespace Vamsurlike.Skills
         }
 
         private static bool SpawnProjectile(SkillDataSO skill, SkillLevelData levelData, float finalDamage,
-            ulong ownerClientId, Vector3 pos, Vector3 dir)
+            ulong ownerClientId, Vector3 pos, Vector3 dir, float speedMultiplier = 1f)
         {
             Quaternion rot = Quaternion.LookRotation(dir, Vector3.up);
             if (skill.projectilePrefab.TryGetComponent<NetworkProjectile>(out var template))
@@ -79,7 +80,7 @@ namespace Vamsurlike.Skills
             if (obj == null) return false;
 
             if (obj.TryGetComponent<NetworkProjectile>(out var projectile))
-                projectile.Initialize(skill.projectilePrefab, ownerClientId, pos, dir, levelData, finalDamage);
+                projectile.Initialize(skill.projectilePrefab, ownerClientId, pos, dir, levelData, finalDamage, speedMultiplier);
             else
                 Debug.LogWarning($"[{nameof(ProjectileSkill)}] NetworkProjectile 없음. prefab={skill.projectilePrefab.name}");
 

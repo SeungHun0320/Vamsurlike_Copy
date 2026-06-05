@@ -15,18 +15,20 @@ namespace Vamsurlike.Editor
         private SerializedProperty castType;
         private SerializedProperty isManual;
         private SerializedProperty projectilePrefab;
+        private SerializedProperty vfxPrefab;
         private SerializedProperty maxLevel;
         private SerializedProperty levels;
 
         private void OnEnable()
         {
-            skillName = serializedObject.FindProperty(nameof(SkillDataSO.skillName));
-            icon = serializedObject.FindProperty(nameof(SkillDataSO.icon));
-            castType = serializedObject.FindProperty(nameof(SkillDataSO.castType));
-            isManual = serializedObject.FindProperty(nameof(SkillDataSO.isManual));
+            skillName        = serializedObject.FindProperty(nameof(SkillDataSO.skillName));
+            icon             = serializedObject.FindProperty(nameof(SkillDataSO.icon));
+            castType         = serializedObject.FindProperty(nameof(SkillDataSO.castType));
+            isManual         = serializedObject.FindProperty(nameof(SkillDataSO.isManual));
             projectilePrefab = serializedObject.FindProperty(nameof(SkillDataSO.projectilePrefab));
-            maxLevel = serializedObject.FindProperty(nameof(SkillDataSO.maxLevel));
-            levels = serializedObject.FindProperty(nameof(SkillDataSO.levels));
+            vfxPrefab        = serializedObject.FindProperty(nameof(SkillDataSO.vfxPrefab));
+            maxLevel         = serializedObject.FindProperty(nameof(SkillDataSO.maxLevel));
+            levels           = serializedObject.FindProperty(nameof(SkillDataSO.levels));
         }
 
         public override void OnInspectorGUI()
@@ -41,6 +43,8 @@ namespace Vamsurlike.Editor
             SkillCastType type = (SkillCastType)castType.enumValueIndex;
             if (UsesProjectilePrefab(type))
                 EditorGUILayout.PropertyField(projectilePrefab);
+            if (UsesVFXPrefab(type))
+                EditorGUILayout.PropertyField(vfxPrefab);
 
             EditorGUILayout.Space(6f);
             EditorGUILayout.PropertyField(maxLevel);
@@ -175,6 +179,10 @@ namespace Vamsurlike.Editor
             type == SkillCastType.Projectile ||
             type == SkillCastType.ScatterShot ||
             type == SkillCastType.Ultimate;
+
+        private static bool UsesVFXPrefab(SkillCastType type) =>
+            type == SkillCastType.Grenade ||
+            type == SkillCastType.Melee;
 
         private static bool UsesRange(SkillCastType type) =>
             type == SkillCastType.Projectile ||

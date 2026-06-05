@@ -29,14 +29,15 @@ namespace Vamsurlike.Skills
             Vector3 spawnPosition,
             Vector3 fireDirection,
             SkillLevelData levelData,
-            float finalDamage = -1f) // -1 = levelData.damage 그대로 사용
+            float finalDamage    = -1f,  // -1 = levelData.damage 그대로 사용
+            float speedMultiplier = 1f)  // 이동속도 배율 (MoveSpeed / baseMoveSpeed)
         {
             if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
             if (levelData == null) return;
 
             sourcePrefab = projectilePrefab;
             direction = fireDirection.sqrMagnitude > 0.0001f ? fireDirection.normalized : Vector3.forward;
-            speed = levelData.projectileSpeed;
+            speed = levelData.projectileSpeed * Mathf.Max(0.1f, speedMultiplier);
             damage = finalDamage >= 0f ? finalDamage : levelData.damage;
             hitRadius = levelData.projectileHitRadius;
             remainingLifetime = levelData.projectileLifetime;

@@ -2,7 +2,9 @@ using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Vamsurlike.Data;
 using Vamsurlike.Enemy;
+using Vamsurlike.Items;
 using Vamsurlike.Upgrades;
 
 namespace Vamsurlike.Stage
@@ -29,6 +31,9 @@ namespace Vamsurlike.Stage
         [SerializeField] private Key  debugLevelUpKey             = Key.L;
         [SerializeField] private bool enableDebugKillVisibleKey   = true;
         [SerializeField] private Key  debugKillVisibleEnemiesKey  = Key.K;
+        [SerializeField] private bool enableDebugSpawnItemKey     = true;
+        [SerializeField] private Key  debugSpawnItemKey           = Key.I;
+        [SerializeField] private ItemDataSO[] debugSpawnItems;
 
         private LevelUpManager levelUpManager;
         private readonly List<ulong> visibleEnemyIds = new();
@@ -66,6 +71,14 @@ namespace Vamsurlike.Stage
 
             if (enableDebugKillVisibleKey && keyboard[debugKillVisibleEnemiesKey].wasPressedThisFrame)
                 KillVisibleEnemiesByDebugKey();
+
+            if (enableDebugSpawnItemKey && keyboard[debugSpawnItemKey].wasPressedThisFrame)
+            {
+                if (IsServer)
+                    SpawnDebugItems();
+                else
+                    RequestSpawnDebugItemsRpc();
+            }
 #endif
         }
 
@@ -214,6 +227,45 @@ namespace Vamsurlike.Stage
 
             Debug.Log($"[{nameof(SharedLevelSystem)}] 디버그 화면 적 처치 — {killed}마리");
 #endif
+        }
+
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+        private void RequestSpawnDebugItemsRpc()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            SpawnDebugItems();
+#endif
+        }
+
+        private void SpawnDebugItems()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (!IsServer) return;
+            if (debugSpawnItems == null || debugSpawnItems.Length == 0)
+            {
+                Debug.LogWarning($"[{nameof(SharedLevelSystem)}] debugSpawnItems 비어 있음 — Inspector에서 아이템 할당 필요");
+                return;
+            }
+
+            Vector3 spawnPos = GetDebugSpawnPosition();
+            foreach (var item in debugSpawnItems)
+            {
+                if (item == null) continue;
+                bool ok = NetworkedItemPickup.SpawnAt(item, spawnPos);
+                Debug.Log($"[{nameof(SharedLevelSystem)}] 디버그 아이템 스폰 {(ok ? "성공" : "실패")}: {item.name} @ {spawnPos}");
+                spawnPos += Vector3.right * 1.5f; // 겹치지 않도록 간격
+            }
+#endif
+        }
+
+        private Vector3 GetDebugSpawnPosition()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            foreach (var client in NetworkManager.ConnectedClients.Values)
+                if (client.PlayerObject != null)
+                    return client.PlayerObject.transform.position + Vector3.forward * 2f;
+#endif
+            return Vector3.zero;
         }
     }
 }

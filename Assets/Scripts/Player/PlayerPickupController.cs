@@ -14,8 +14,8 @@ namespace Vamsurlike.Player
         private const float CheckInterval  = 0.1f;
         private const float ItemPickupRadius = 1.5f;
 
-        private readonly List<ulong>              nearbyOrbs  = new();
-        private readonly List<NetworkedItemPickup> nearbyItems = new();
+        private readonly List<ulong>   nearbyOrbs           = new();
+        private readonly HashSet<ulong> pendingPickupRequests = new();
 
         private void Awake()
         {
@@ -47,12 +47,21 @@ namespace Vamsurlike.Player
 
         private void CheckItemPickups()
         {
-            // 클라이언트 로컬 OverlapSphere — 서버에서 거리 재검증함
             var cols = Physics.OverlapSphere(transform.position, ItemPickupRadius);
+
+            // 이번 프레임 범위 내 활성 아이템 ID 수집 → 범위 이탈/소멸 항목 정리
+            var inRange = new HashSet<ulong>(cols.Length);
+            foreach (var col in cols)
+                if (col.TryGetComponent<NetworkedItemPickup>(out var p) && p.IsSpawned)
+                    inRange.Add(p.NetworkObjectId);
+            pendingPickupRequests.IntersectWith(inRange);
+
+            // 이미 요청한 아이템은 건너뜀 — 서버에서 거리 재검증함
             foreach (var col in cols)
             {
                 if (!col.TryGetComponent<NetworkedItemPickup>(out var pickup)) continue;
                 if (!pickup.IsSpawned) continue;
+                if (!pendingPickupRequests.Add(pickup.NetworkObjectId)) continue;
                 pickup.RequestPickupRpc();
             }
         }

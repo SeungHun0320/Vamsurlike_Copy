@@ -15,6 +15,6 @@ MonoBehaviour:
   itemName: "\uBBF8\uC0AC\uC77C"
   itemType: 2
   icon: {fileID: 0}
-  pickupPrefab: {fileID: 3533313218899643882, guid: 50e7f7cd6a4e20544803ae9978a43ec5, type: 3}
+  pickupPrefab: {fileID: 6730158641198373091, guid: 452abcaeb47e5c842aa00824156aa691, type: 3}
   value: 80
   missileRadius: 30

@@ -63,14 +63,15 @@ namespace Vamsurlike.Skills
             isBurstActive = true;
             context.Manager.StartSkillCoroutine(FireBurstCoroutine(
                 skill.projectilePrefab, levelData, context.FinalDamage,
-                context.OwnerClientId, context.CasterTransform, baseForward, skill.name));
+                context.OwnerClientId, context.CasterTransform, baseForward, skill.name, context.SpeedMultiplier));
 
             return true;
         }
 
         private IEnumerator FireBurstCoroutine(
             GameObject prefab, SkillLevelData levelData, float finalDamage,
-            ulong ownerClientId, Transform casterTransform, Vector3 baseForward, string skillName)
+            ulong ownerClientId, Transform casterTransform, Vector3 baseForward, string skillName,
+            float speedMultiplier = 1f)
         {
             int count = Mathf.Max(1, levelData.scatterBulletCount);
             float halfSpread = levelData.scatterAngle * 0.5f;
@@ -92,7 +93,7 @@ namespace Vamsurlike.Skills
 
                 Vector3 origin = casterTransform.position + Vector3.up * DefaultSpawnHeight;
                 Vector3 dir = Quaternion.AngleAxis(recoilAngle, Vector3.up) * baseForward;
-                SpawnBullet(prefab, levelData, finalDamage, ownerClientId, origin, dir);
+                SpawnBullet(prefab, levelData, finalDamage, ownerClientId, origin, dir, speedMultiplier);
 
                 if (i < count - 1 && interval > 0f)
                     yield return new WaitForSeconds(interval);
@@ -102,7 +103,7 @@ namespace Vamsurlike.Skills
         }
 
         private static void SpawnBullet(GameObject prefab, SkillLevelData levelData, float finalDamage,
-            ulong ownerClientId, Vector3 position, Vector3 direction)
+            ulong ownerClientId, Vector3 position, Vector3 direction, float speedMultiplier = 1f)
         {
             Quaternion rot = Quaternion.LookRotation(direction, Vector3.up);
             if (prefab.TryGetComponent<NetworkProjectile>(out var template))
@@ -115,7 +116,7 @@ namespace Vamsurlike.Skills
             if (obj == null) return;
 
             if (obj.TryGetComponent<NetworkProjectile>(out var projectile))
-                projectile.Initialize(prefab, ownerClientId, position, direction, levelData, finalDamage);
+                projectile.Initialize(prefab, ownerClientId, position, direction, levelData, finalDamage, speedMultiplier);
             else
                 Debug.LogWarning($"[{nameof(ScatterShotSkill)}] NetworkProjectile 없음. prefab={prefab.name}");
 

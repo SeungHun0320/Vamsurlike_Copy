@@ -496,6 +496,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Items.ChestRewardManager
   ShowTopMostFoldoutHeaderGroup: 1
+  fallbackXP: 30
 --- !u!1 &419785226
 GameObject:
   m_ObjectHideFlags: 0
@@ -5254,6 +5255,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Stage.SharedLevelSystem
   ShowTopMostFoldoutHeaderGroup: 1
+  enableDebugLevelUpKey: 1
+  debugLevelUpKey: 26
+  enableDebugKillVisibleKey: 1
+  debugKillVisibleEnemiesKey: 25
+  enableDebugSpawnItemKey: 1
+  debugSpawnItemKey: 23
+  debugSpawnItems:
+  - {fileID: 11400000, guid: 3fdc95bc044b14942892853539b8513a, type: 2}
+  - {fileID: 11400000, guid: 19b06f6caa77e9142a6aebb22b944364, type: 2}
+  - {fileID: 11400000, guid: b071a133fe886fb40821ef13cdeb0c13, type: 2}
 --- !u!114 &2012731489
 MonoBehaviour:
   m_ObjectHideFlags: 0

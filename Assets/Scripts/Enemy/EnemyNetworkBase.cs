@@ -78,6 +78,7 @@ namespace Vamsurlike.Enemy
 
         protected virtual void HandleDeath()
         {
+            TriggerDeathAnimClientRpc();
             PlayDeathVFXClientRpc();
             if (StageRuntime.Instance != null && StageRuntime.Instance.Drops != null)
                 StageRuntime.Instance.Drops.OnEnemyDied(data, transform.position);
@@ -97,6 +98,13 @@ namespace Vamsurlike.Enemy
         private void ShowDamageClientRpc(float damage, Vector3 worldPosition)
         {
             FloatingTextManager.Instance?.ShowDamage(damage, worldPosition);
+        }
+
+        [ClientRpc]
+        private void TriggerDeathAnimClientRpc()
+        {
+            var anim = GetComponentInChildren<Animator>();
+            if (anim != null) anim.SetTrigger(Animator.StringToHash("Die"));
         }
 
         [ClientRpc]

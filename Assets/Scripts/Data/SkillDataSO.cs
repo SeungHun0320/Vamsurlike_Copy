@@ -73,6 +73,10 @@ namespace Vamsurlike.Data
         [Header("Projectile / Grenade / ScatterShot")]
         public GameObject projectilePrefab;
 
+        [Header("Client Visual Model")]
+        [Tooltip("클라이언트에서 재생할 비주얼 모델 프리팹 (Melee·Grenade 등 비-Projectile 스킬용)")]
+        public GameObject vfxPrefab;
+
         [Header("Levels")]
         [Min(1)] public int maxLevel = 1;
         public SkillLevelData[] levels = { new() };

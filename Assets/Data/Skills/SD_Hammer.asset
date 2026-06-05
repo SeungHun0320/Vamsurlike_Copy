@@ -17,6 +17,7 @@ MonoBehaviour:
   castType: 6
   isManual: 0
   projectilePrefab: {fileID: 1348174882345252545, guid: c2ec4bfd1a6491c49a0c34b8dc3a7639, type: 3}
+  vfxPrefab: {fileID: 1348174882345252545, guid: beb5e03bcc0b69d4993fba9359467e97, type: 3}
   maxLevel: 3
   levels:
   - cooldown: 2
@@ -45,7 +46,7 @@ MonoBehaviour:
     scatterAngle: 60
     burstDuration: 2
     meleeArcAngle: 120
-    meleeRange: 2.5
+    meleeRange: 5
   - cooldown: 1.8
     damage: 90
     range: 10
@@ -72,7 +73,7 @@ MonoBehaviour:
     scatterAngle: 60
     burstDuration: 2
     meleeArcAngle: 130
-    meleeRange: 3
+    meleeRange: 5
   - cooldown: 1.5
     damage: 120
     range: 10
@@ -99,4 +100,4 @@ MonoBehaviour:
     scatterAngle: 60
     burstDuration: 2
     meleeArcAngle: 140
-    meleeRange: 3.5
+    meleeRange: 5

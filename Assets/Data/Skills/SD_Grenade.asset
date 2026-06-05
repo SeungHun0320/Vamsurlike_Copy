@@ -17,6 +17,7 @@ MonoBehaviour:
   castType: 4
   isManual: 0
   projectilePrefab: {fileID: 7209417620919649187, guid: 9378fd5e85aa92a42bf1b911ce5a3b9d, type: 3}
+  vfxPrefab: {fileID: 7209417620919649187, guid: 9378fd5e85aa92a42bf1b911ce5a3b9d, type: 3}
   maxLevel: 3
   levels:
   - cooldown: 4

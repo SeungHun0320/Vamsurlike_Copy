@@ -45,7 +45,10 @@ namespace Vamsurlike.Skills
             }
 
             if (count > 0)
+            {
                 Debug.Log($"[{nameof(MeleeSkill)}] {count}마리 피격. damage={damage}, range={levelData.meleeRange}, arc={levelData.meleeArcAngle}°");
+                context.Manager.BroadcastMeleeVFXClientRpc(origin, forward);
+            }
 
             return count > 0;
         }

@@ -42,9 +42,12 @@ namespace Vamsurlike.Skills
         [SerializeField] private float spawnForwardOffset = 0.8f;
         [SerializeField] private float failedCastRetryDelay = 0.1f;
 
-        // OrbitalSkill이 생성할 클라이언트 비주얼 설정 — SkillManager Inspector에서 할당
+        // OrbitalSkill 비주얼 — Inspector에서 할당
         [SerializeField] private GameObject orbitalVisualPrefab;
-        [SerializeField] private float orbitalHeightOffset = 0.9f;
+        [SerializeField] private float      orbitalHeightOffset = 0.9f;
+
+        // 스킬 타입별 클라이언트 비주얼 프리팹 — Awake에서 SkillDataSO.vfxPrefab 기반으로 자동 구성
+        private readonly Dictionary<SkillCastType, GameObject> vfxPrefabsByType = new();
 
         private PassiveStatHandler passiveStatHandler;
         private PlayerNetworkStats playerStats;
@@ -55,6 +58,8 @@ namespace Vamsurlike.Skills
         private readonly Dictionary<SkillCastType, SkillBase> executorRegistry = new();
         private readonly List<SkillBase> allExecutors = new();
         private OrbitalSkill orbitalSkill;
+        private AuraSkill    auraSkill;
+        private GrenadeSkill grenadeSkill;
         // ─────────────────────────────────────────────────────────────────────
 
         private float nextNoTargetLogTime;
@@ -62,6 +67,31 @@ namespace Vamsurlike.Skills
         private void Awake()
         {
             BuildExecutorRegistry();
+            BuildVFXPrefabMap();
+        }
+
+        // SkillDataSO.vfxPrefab 기반으로 타입별 룩업 테이블 구성 — 서버/클라이언트 동일.
+        // startingSkills + UpgradeCatalog 전체를 스캔해 나중에 습득하는 스킬도 커버.
+        private void BuildVFXPrefabMap()
+        {
+            // 시작 스킬
+            if (characterData != null && characterData.startingSkills != null)
+            {
+                foreach (var skill in characterData.startingSkills)
+                {
+                    if (skill != null && skill.vfxPrefab != null)
+                        vfxPrefabsByType[skill.castType] = skill.vfxPrefab;
+                }
+            }
+
+            // 업그레이드 카탈로그에 있는 모든 스킬 (상자·레벨업으로 습득)
+            var catalog = UpgradeCatalog.Instance;
+            if (catalog == null) return;
+            foreach (var opt in catalog.options)
+            {
+                if (opt == null || opt.skillData == null || opt.skillData.vfxPrefab == null) continue;
+                vfxPrefabsByType[opt.skillData.castType] = opt.skillData.vfxPrefab;
+            }
         }
 
         public override void OnNetworkSpawn()
@@ -268,6 +298,42 @@ namespace Vamsurlike.Skills
             _ = position; // Phase 8: 궁극기 완료 VFX 연결 시 사용
         }
 
+        // MeleeSkill: 타격 시 클라이언트에 모델 순간 생성 (0.5s)
+        [ClientRpc]
+        internal void BroadcastMeleeVFXClientRpc(Vector3 position, Vector3 forward)
+        {
+            if (!vfxPrefabsByType.TryGetValue(SkillCastType.Melee, out var prefab) || prefab == null) return;
+            var go = Instantiate(prefab, position, Quaternion.LookRotation(forward, Vector3.up));
+            Destroy(go, 0.5f);
+        }
+
+        // GrenadeSkill: 포물선 모델 비행
+        [ClientRpc]
+        internal void BroadcastGrenadeVFXClientRpc(Vector3 from, Vector3 to, float arcHeight, float flightTime)
+        {
+            if (!vfxPrefabsByType.TryGetValue(SkillCastType.Grenade, out var prefab)) prefab = null;
+            StartCoroutine(GrenadeVisualCoroutine(from, to, arcHeight, flightTime, prefab));
+        }
+
+        private System.Collections.IEnumerator GrenadeVisualCoroutine(
+            Vector3 from, Vector3 to, float arcHeight, float flightTime, GameObject prefab)
+        {
+            var visual = prefab != null ? Instantiate(prefab, from, Quaternion.identity) : null;
+
+            float elapsed = 0f;
+            while (elapsed < flightTime)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / flightTime);
+                Vector3 pos = Vector3.Lerp(from, to, t);
+                pos.y += arcHeight * 4f * t * (1f - t);
+                if (visual != null) visual.transform.position = pos;
+                yield return null;
+            }
+
+            if (visual != null) Destroy(visual);
+        }
+
         // ─────────────────────────────────────────────────────────────────────
 
         private void InitializeStartingSkills()
@@ -326,9 +392,13 @@ namespace Vamsurlike.Skills
                 ? passiveStatHandler.AttackMultiplier.Value
                 : 1f;
 
+            float baseSpeed    = characterData != null ? characterData.baseMoveSpeed : 5f;
+            float currentSpeed = playerStats   != null ? playerStats.MoveSpeed.Value : baseSpeed;
+            float speedMultiplier = baseSpeed > 0f ? currentSpeed / baseSpeed : 1f;
+
             var context = new SkillCastContext(
                 this, skill, levelData, ownedSkill.level, OwnerClientId,
-                transform, projectileSpawnPoint, spawnForwardOffset, attackMultiplier);
+                transform, projectileSpawnPoint, spawnForwardOffset, attackMultiplier, speedMultiplier);
 
             return executor.TryExecute(context);
         }
@@ -339,11 +409,13 @@ namespace Vamsurlike.Skills
             allExecutors.Clear();
 
             orbitalSkill = new OrbitalSkill(orbitalVisualPrefab, orbitalHeightOffset);
+            auraSkill    = new AuraSkill();
+            grenadeSkill = new GrenadeSkill();
 
             Register(new ProjectileSkill());
-            Register(new AuraSkill());
+            Register(auraSkill);
             Register(new MeleeSkill());
-            Register(new GrenadeSkill());
+            Register(grenadeSkill);
             Register(orbitalSkill);
             Register(new ScatterShotSkill());
             Register(new UltimateSkill());

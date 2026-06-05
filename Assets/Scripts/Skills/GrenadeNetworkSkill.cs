@@ -8,7 +8,7 @@ namespace Vamsurlike.Skills
     // 서버: 포물선 시뮬레이션 + 착지 스플래시
     public sealed class GrenadeSkill : SkillBase
     {
-        private const float FlightTime = 0.6f;
+        internal const float FlightTime = 0.6f;
         private const float SpawnHeightOffset = 0.8f;
 
         // RULES.md: 랜덤은 시드 기반 System.Random 인스턴스 사용
@@ -25,11 +25,11 @@ namespace Vamsurlike.Skills
                 return false;
 
             context.Manager.StartSkillCoroutine(
-                ThrowGrenadeCoroutine(context.CasterTransform.position, levelData, context.FinalDamage));
+                ThrowGrenadeCoroutine(context.CasterTransform.position, levelData, context.FinalDamage, context.Manager));
             return true;
         }
 
-        private IEnumerator ThrowGrenadeCoroutine(Vector3 origin, SkillLevelData levelData, float finalDamage)
+        private IEnumerator ThrowGrenadeCoroutine(Vector3 origin, SkillLevelData levelData, float finalDamage, SkillManager manager)
         {
             double rx = rng.NextDouble() * 2.0 - 1.0;
             double rz = rng.NextDouble() * 2.0 - 1.0;
@@ -38,6 +38,9 @@ namespace Vamsurlike.Skills
 
             float range = (float)(rng.NextDouble() * levelData.grenadeRange);
             Vector3 target = origin + new Vector3((float)rx * range, 0f, (float)rz * range);
+
+            Vector3 spawnPos = origin + Vector3.up * SpawnHeightOffset;
+            manager.BroadcastGrenadeVFXClientRpc(spawnPos, target, levelData.grenadeArcHeight, FlightTime);
 
             float elapsed = 0f;
             while (elapsed < FlightTime)
