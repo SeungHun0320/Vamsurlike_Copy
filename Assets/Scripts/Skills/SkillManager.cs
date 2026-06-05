@@ -418,6 +418,7 @@ namespace Vamsurlike.Skills
             Register(grenadeSkill);
             Register(orbitalSkill);
             Register(new ScatterShotSkill());
+            Register(new ClusterGrenadeSkill());
             Register(new UltimateSkill());
         }
 

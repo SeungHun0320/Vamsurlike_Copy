@@ -8,9 +8,10 @@ namespace Vamsurlike.Data
         AreaAura,
         Orbital,
         Ultimate,
-        Grenade,     // 포물선 투척 + 착지 스플래시
-        ScatterShot, // 부채꼴 랜덤 발사, duration + cooldown
-        Melee        // 전방 근접 스플래시
+        Grenade,        // 포물선 투척 + 착지 스플래시
+        ScatterShot,    // 부채꼴 랜덤 발사, duration + cooldown
+        Melee,          // 전방 근접 스플래시
+        ClusterGrenade  // 포물선 투척 + 착지 시 서브 그레네이드 분열
     }
 
     [System.Serializable]
@@ -60,6 +61,12 @@ namespace Vamsurlike.Data
         [Header("Melee")]
         [Min(10f)]  public float meleeArcAngle = 120f; // 전방 판정 각도
         [Min(0.5f)] public float meleeRange    = 2.5f; // 판정 거리
+
+        [Header("ClusterGrenade")]
+        [Min(1)]    public int   clusterCount        = 4;    // 착지 후 분열 서브 그레네이드 수
+        [Min(0.5f)] public float clusterSpread       = 3f;   // 서브 그레네이드 착탄 반경
+        [Min(0.1f)] public float clusterSplashRadius = 1.5f; // 서브 그레네이드 개별 스플래시 반경
+        [Range(0f, 1f)] public float clusterDamageRatio = 0.5f; // 서브 그레네이드 데미지 = 메인 * 비율
     }
 
     [CreateAssetMenu(fileName = "SkillData", menuName = "Vamsurlike/Data/Skill")]

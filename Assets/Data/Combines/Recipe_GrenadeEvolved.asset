@@ -13,4 +13,4 @@ MonoBehaviour:
   m_Name: Recipe_GrenadeEvolved
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Items.CombineRecipeSO
   sourceSkill: {fileID: 11400000, guid: d8c71cede9483044492e25fd88689cf3, type: 2}
-  evolvedSkill: {fileID: 0}
+  evolvedSkill: {fileID: 11400000, guid: c48048563989ee04896a6da7cc6a903e, type: 2}
