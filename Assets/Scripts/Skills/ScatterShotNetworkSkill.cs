@@ -8,7 +8,7 @@ using Vamsurlike.Network;
 namespace Vamsurlike.Skills
 {
     // 산탄 — 한 발씩 연속 발사. 반동이 누적되어 탄착군이 퍼짐.
-    public sealed class ScatterShotSkill : SkillBase
+    public class ScatterShotSkill : SkillBase
     {
         private const float DefaultSpawnHeight = 0.8f;
         private const float MinDirectionSqrMagnitude = 0.0001f;

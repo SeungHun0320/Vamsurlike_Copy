@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ce6debee47ff83e4fb707048bf1ace2a, type: 3}
+  m_Name: Recipe_OrbitalGrenade
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Items.CombineRecipeSO
+  sourceSkill: {fileID: 11400000, guid: d524e4c633a57894fadeb5e9940f4cd5, type: 2}
+  sourceSkill2: {fileID: 11400000, guid: d8c71cede9483044492e25fd88689cf3, type: 2}
+  evolvedSkill: {fileID: 11400000, guid: 1ebbc7138fc424e44aa1e6e7099c113f, type: 2}

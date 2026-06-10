@@ -11,7 +11,10 @@ namespace Vamsurlike.Data
         Grenade,        // 포물선 투척 + 착지 스플래시
         ScatterShot,    // 부채꼴 랜덤 발사, duration + cooldown
         Melee,          // 전방 근접 스플래시
-        ClusterGrenade  // 포물선 투척 + 착지 시 서브 그레네이드 분열
+        ClusterGrenade, // 포물선 투척 + 착지 시 서브 그레네이드 분열
+        OrbitalGrenade, // Orbital + Grenade: 궤도 위성이 주기적으로 착지 폭발
+        BlackHole,      // DamageAura + Orbital: 범위 끌어당김 + 위성 집중 타격
+        PierceShotgun,  // ScatterShot + PierceProjectile: 관통 산탄
     }
 
     [System.Serializable]
@@ -67,6 +70,9 @@ namespace Vamsurlike.Data
         [Min(0.5f)] public float clusterSpread       = 3f;   // 서브 그레네이드 착탄 반경
         [Min(0.1f)] public float clusterSplashRadius = 1.5f; // 서브 그레네이드 개별 스플래시 반경
         [Range(0f, 1f)] public float clusterDamageRatio = 0.5f; // 서브 그레네이드 데미지 = 메인 * 비율
+
+        [Header("BlackHole")]
+        [Min(0.1f)] public float pullSpeed = 3f; // 틱당 적 끌어당김 속도 (m/s)
     }
 
     [CreateAssetMenu(fileName = "SkillData", menuName = "Vamsurlike/Data/Skill")]

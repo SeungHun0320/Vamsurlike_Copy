@@ -1,0 +1,118 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b4a51447856db045ae04069e1460781, type: 3}
+  m_Name: SD_PierceShotgun
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Data.SkillDataSO
+  skillName: "\uAD00\uD1B5 \uC0B0\uD0C4"
+  icon: {fileID: 0}
+  castType: 10
+  isManual: 0
+  projectilePrefab: {fileID: 4756532345730749531, guid: d2ea673924e42cb43b7bdd7a34a25601, type: 3}
+  vfxPrefab: {fileID: 0}
+  maxLevel: 3
+  levels:
+  - cooldown: 5
+    damage: 14
+    range: 10
+    projectileSpeed: 16
+    projectileLifetime: 2
+    projectileHitRadius: 0.6
+    projectileCount: 1
+    spreadAngle: 0
+    pierceCount: 2
+    duration: 0
+    tickInterval: 1
+    areaRadius: 0
+    orbitalCount: 1
+    orbitalRadius: 2
+    orbitalRotationSpeed: 180
+    orbitalHitRadius: 0.65
+    waveCount: 1
+    waveDelay: 0.15
+    rotationPerWave: 30
+    grenadeRange: 6
+    grenadeArcHeight: 3
+    splashRadius: 2.5
+    scatterBulletCount: 6
+    scatterAngle: 60
+    burstDuration: 1.5
+    meleeArcAngle: 120
+    meleeRange: 2.5
+    clusterCount: 4
+    clusterSpread: 3
+    clusterSplashRadius: 1.5
+    clusterDamageRatio: 0.5
+    pullSpeed: 3
+  - cooldown: 4
+    damage: 18
+    range: 11
+    projectileSpeed: 17
+    projectileLifetime: 2
+    projectileHitRadius: 0.65
+    projectileCount: 1
+    spreadAngle: 0
+    pierceCount: 3
+    duration: 0
+    tickInterval: 1
+    areaRadius: 0
+    orbitalCount: 1
+    orbitalRadius: 2
+    orbitalRotationSpeed: 180
+    orbitalHitRadius: 0.65
+    waveCount: 1
+    waveDelay: 0.15
+    rotationPerWave: 30
+    grenadeRange: 6
+    grenadeArcHeight: 3
+    splashRadius: 2.5
+    scatterBulletCount: 8
+    scatterAngle: 70
+    burstDuration: 1.3
+    meleeArcAngle: 120
+    meleeRange: 2.5
+    clusterCount: 4
+    clusterSpread: 3
+    clusterSplashRadius: 1.5
+    clusterDamageRatio: 0.5
+    pullSpeed: 3
+  - cooldown: 3
+    damage: 23
+    range: 12
+    projectileSpeed: 18
+    projectileLifetime: 2
+    projectileHitRadius: 0.7
+    projectileCount: 1
+    spreadAngle: 0
+    pierceCount: 4
+    duration: 0
+    tickInterval: 1
+    areaRadius: 0
+    orbitalCount: 1
+    orbitalRadius: 2
+    orbitalRotationSpeed: 180
+    orbitalHitRadius: 0.65
+    waveCount: 1
+    waveDelay: 0.15
+    rotationPerWave: 30
+    grenadeRange: 6
+    grenadeArcHeight: 3
+    splashRadius: 2.5
+    scatterBulletCount: 10
+    scatterAngle: 80
+    burstDuration: 1.2
+    meleeArcAngle: 120
+    meleeRange: 2.5
+    clusterCount: 4
+    clusterSpread: 3
+    clusterSplashRadius: 1.5
+    clusterDamageRatio: 0.5
+    pullSpeed: 3

@@ -57,9 +57,11 @@ namespace Vamsurlike.Skills
         // ── Executor registry ─────────────────────────────────────────────────
         private readonly Dictionary<SkillCastType, SkillBase> executorRegistry = new();
         private readonly List<SkillBase> allExecutors = new();
-        private OrbitalSkill orbitalSkill;
-        private AuraSkill    auraSkill;
-        private GrenadeSkill grenadeSkill;
+        private OrbitalSkill        orbitalSkill;
+        private AuraSkill           auraSkill;
+        private GrenadeSkill        grenadeSkill;
+        private OrbitalGrenadeSkill orbitalGrenadeSkill;
+        private BlackHoleSkill      blackHoleSkill;
         // ─────────────────────────────────────────────────────────────────────
 
         private float nextNoTargetLogTime;
@@ -234,7 +236,7 @@ namespace Vamsurlike.Skills
         }
 
         // 서버 전용: source 스킬 제거 + evolved 스킬 신규 습득 (진화)
-        public bool EvolveSkill(SkillDataSO source, SkillDataSO evolved)
+        public bool EvolveSkill(SkillDataSO source, SkillDataSO evolved, SkillDataSO source2 = null)
         {
             if (!IsServer || source == null || evolved == null) return false;
             if (!TryGetOwnedSkill(source, out _))
@@ -242,12 +244,19 @@ namespace Vamsurlike.Skills
                 Debug.LogWarning($"[{nameof(SkillManager)}] EvolveSkill: '{source.name}' 미보유. owner={OwnerClientId}");
                 return false;
             }
+            if (source2 != null && !TryGetOwnedSkill(source2, out _))
+            {
+                Debug.LogWarning($"[{nameof(SkillManager)}] EvolveSkill: '{source2.name}' 미보유. owner={OwnerClientId}");
+                return false;
+            }
 
             for (int i = ownedSkills.Count - 1; i >= 0; i--)
-                if (ownedSkills[i].skill == source) { ownedSkills.RemoveAt(i); break; }
+                if (ownedSkills[i].skill == source || (source2 != null && ownedSkills[i].skill == source2))
+                    ownedSkills.RemoveAt(i);
 
             ownedSkills.Add(new OwnedSkill(evolved, 1));
-            Debug.Log($"[{nameof(SkillManager)}] 진화. owner={OwnerClientId}, {source.name} → {evolved.name}");
+            string from = source2 != null ? $"{source.name} + {source2.name}" : source.name;
+            Debug.Log($"[{nameof(SkillManager)}] 합체/진화. owner={OwnerClientId}, {from} → {evolved.name}");
             return true;
         }
 
@@ -289,6 +298,18 @@ namespace Vamsurlike.Skills
         internal void BroadcastOrbitalClientRpc(int count, float radius, float rotSpeed)
         {
             orbitalSkill?.OnClientOrbitalActivated(count, radius, rotSpeed, transform);
+        }
+
+        [ClientRpc]
+        internal void BroadcastOrbitalGrenadeClientRpc(int count, float radius, float rotSpeed)
+        {
+            orbitalGrenadeSkill?.OnClientOrbitalActivated(count, radius, rotSpeed, transform);
+        }
+
+        [ClientRpc]
+        internal void BroadcastBlackHoleClientRpc(int count, float radius, float rotSpeed)
+        {
+            blackHoleSkill?.OnClientOrbitalActivated(count, radius, rotSpeed, transform);
         }
 
         // UltimateSkill 코루틴이 완료 시 호출 — Phase 8에서 VFX 연결
@@ -408,9 +429,11 @@ namespace Vamsurlike.Skills
             executorRegistry.Clear();
             allExecutors.Clear();
 
-            orbitalSkill = new OrbitalSkill(orbitalVisualPrefab, orbitalHeightOffset);
-            auraSkill    = new AuraSkill();
-            grenadeSkill = new GrenadeSkill();
+            orbitalSkill        = new OrbitalSkill(orbitalVisualPrefab, orbitalHeightOffset);
+            auraSkill           = new AuraSkill();
+            grenadeSkill        = new GrenadeSkill();
+            orbitalGrenadeSkill = new OrbitalGrenadeSkill(orbitalVisualPrefab, orbitalHeightOffset);
+            blackHoleSkill      = new BlackHoleSkill(orbitalVisualPrefab, orbitalHeightOffset);
 
             Register(new ProjectileSkill());
             Register(auraSkill);
@@ -420,6 +443,9 @@ namespace Vamsurlike.Skills
             Register(new ScatterShotSkill());
             Register(new ClusterGrenadeSkill());
             Register(new UltimateSkill());
+            Register(orbitalGrenadeSkill);
+            Register(blackHoleSkill);
+            Register(new PierceShotgunSkill());
         }
 
         private void Register(SkillBase executor)
