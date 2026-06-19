@@ -11,7 +11,7 @@ namespace Vamsurlike.UI
         [SerializeField] private GameObject  panel;
         [SerializeField] private ChestCardUI[] cards; // Inspector에서 3개 연결
 
-        private int[] currentOptions;
+        private ChestChoiceData[] currentOptions;
 
         private void OnEnable()
         {
@@ -25,26 +25,59 @@ namespace Vamsurlike.UI
             ChestRewardManager.OnChestRewardCompleted -= Hide;
         }
 
-        private void Show(int[] optionIndices)
+        private void Show(ChestChoiceData[] choices)
         {
-            currentOptions = optionIndices;
+            currentOptions = choices;
             if (panel != null) panel.SetActive(true);
 
-            var catalog = UpgradeCatalog.Instance;
+            var upgradeCatalog = UpgradeCatalog.Instance;
+            var recipeCatalog  = CombineRecipeCatalog.Instance;
+            var itemCatalog    = ChestFallbackRewardCatalog.Instance;
 
             for (int i = 0; i < cards.Length; i++)
             {
                 if (cards[i] == null) continue;
 
-                if (i >= optionIndices.Length || catalog == null || !catalog.IsValidIndex(optionIndices[i]))
+                if (i >= choices.Length)
                 {
                     cards[i].gameObject.SetActive(false);
                     continue;
                 }
 
+                ChestChoiceData choice = choices[i];
                 cards[i].gameObject.SetActive(true);
                 int captured = i;
-                cards[i].SetupUpgrade(catalog.options[optionIndices[i]], () => OnCardSelected(captured));
+
+                if (choice.type == ChestChoiceType.Evolution)
+                {
+                    if (recipeCatalog == null || !recipeCatalog.IsValidIndex(choice.index))
+                    {
+                        cards[i].gameObject.SetActive(false);
+                        continue;
+                    }
+
+                    cards[i].SetupEvolution(recipeCatalog.recipes[choice.index], () => OnCardSelected(captured));
+                }
+                else if (choice.type == ChestChoiceType.ItemReward)
+                {
+                    if (itemCatalog == null || !itemCatalog.IsValidIndex(choice.index))
+                    {
+                        cards[i].gameObject.SetActive(false);
+                        continue;
+                    }
+
+                    cards[i].SetupItemReward(itemCatalog.rewards[choice.index], () => OnCardSelected(captured));
+                }
+                else
+                {
+                    if (upgradeCatalog == null || !upgradeCatalog.IsValidIndex(choice.index))
+                    {
+                        cards[i].gameObject.SetActive(false);
+                        continue;
+                    }
+
+                    cards[i].SetupUpgrade(upgradeCatalog.options[choice.index], () => OnCardSelected(captured));
+                }
             }
         }
 

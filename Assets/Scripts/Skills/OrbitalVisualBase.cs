@@ -59,6 +59,12 @@ namespace Vamsurlike.Skills
 
         public override void OnDespawn() => DestroyVisuals();
 
+        public override void OnSkillRemoved(Vamsurlike.Data.SkillCastType castType)
+        {
+            if (castType == SupportedCastType)
+                DestroyVisuals();
+        }
+
         protected void DestroyVisuals()
         {
             if (visualObjects == null) return;

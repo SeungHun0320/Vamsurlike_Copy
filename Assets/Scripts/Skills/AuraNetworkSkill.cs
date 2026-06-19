@@ -8,9 +8,19 @@ namespace Vamsurlike.Skills
     public sealed class AuraSkill : SkillBase
     {
         private readonly List<EnemyNetworkBase> targets = new();
+        private bool serverBroadcastSent;
+        private float serverRadius;
 
         public override SkillCastType SupportedCastType => SkillCastType.AreaAura;
         public override bool IsPersistentExecution => true;
+
+        public override void OnSkillRemoved(SkillCastType castType)
+        {
+            if (castType != SupportedCastType) return;
+
+            serverBroadcastSent = false;
+            serverRadius = 0f;
+        }
 
         public override bool TryExecute(in SkillCastContext context)
         {
@@ -21,6 +31,13 @@ namespace Vamsurlike.Skills
                 return false;
 
             float radius = levelData.areaRadius > 0f ? levelData.areaRadius : levelData.range;
+            if (!serverBroadcastSent || !Mathf.Approximately(serverRadius, radius))
+            {
+                serverBroadcastSent = true;
+                serverRadius = radius;
+                context.Manager.BroadcastAreaCircleClientRpc(SupportedCastType, radius, 0f, true);
+            }
+
             int count = AutoTargeting.FindEnemiesInRange(context.CasterTransform.position, radius, targets);
 
             if (count == 0)

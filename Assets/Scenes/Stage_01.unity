@@ -5195,6 +5195,7 @@ GameObject:
   - component: {fileID: 2012731486}
   - component: {fileID: 2012731489}
   - component: {fileID: 2012731488}
+  - component: {fileID: 2012731490}
   m_Layer: 0
   m_Name: LevelSystem
   m_TagString: Untagged
@@ -5255,6 +5256,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Stage.SharedLevelSystem
   ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &2012731490
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2012731485}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2d5e2d9f30b74aaf9961331326473e0c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Stage.SharedLevelDebugController
+  ShowTopMostFoldoutHeaderGroup: 1
   enableDebugLevelUpKey: 1
   debugLevelUpKey: 26
   enableDebugKillVisibleKey: 1
@@ -5265,6 +5279,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 3fdc95bc044b14942892853539b8513a, type: 2}
   - {fileID: 11400000, guid: 19b06f6caa77e9142a6aebb22b944364, type: 2}
   - {fileID: 11400000, guid: b071a133fe886fb40821ef13cdeb0c13, type: 2}
+  enableDebugRespawnWaveKey: 1
+  debugRespawnWaveKey: 32
 --- !u!114 &2012731489
 MonoBehaviour:
   m_ObjectHideFlags: 0

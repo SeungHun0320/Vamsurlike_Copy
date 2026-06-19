@@ -100,11 +100,12 @@ namespace Vamsurlike.Editor
 
                 case SkillCastType.Orbital:
                     DrawPersistentSection(level);
-                    DrawSection("Orbital");
-                    DrawField(level, "orbitalCount");
-                    DrawField(level, "orbitalRadius");
-                    DrawField(level, "orbitalRotationSpeed");
-                    DrawField(level, "orbitalHitRadius");
+                    DrawOrbitalSection(level, includeProjectileDetach: false);
+                    break;
+
+                case SkillCastType.OrbitalGrenade:
+                    DrawProjectileSection(level, includeCountAndSpread: false, includePierce: true);
+                    DrawOrbitalSection(level, includeProjectileDetach: true);
                     break;
 
                 case SkillCastType.Ultimate:
@@ -162,6 +163,25 @@ namespace Vamsurlike.Editor
             DrawField(level, "tickInterval");
         }
 
+        private static void DrawOrbitalSection(SerializedProperty level, bool includeProjectileDetach)
+        {
+            DrawSection("Orbital");
+            DrawField(level, "orbitalCount");
+            DrawField(level, "orbitalRadius");
+            DrawField(level, "orbitalRotationSpeed");
+            DrawField(level, "orbitalHitRadius");
+            DrawField(level, "orbitalDamageMultiplier");
+            DrawField(level, "orbitalHitCooldown");
+
+            if (!includeProjectileDetach) return;
+
+            DrawField(level, "orbitalProjectileScale");
+            DrawField(level, "detachedOrbitalLifetimeMultiplier");
+            DrawField(level, "detachedOrbitalHomingDelay");
+            DrawField(level, "detachedOrbitalHomingRange");
+            DrawField(level, "detachedOrbitalHomingTurnSpeed");
+        }
+
         private static void DrawField(SerializedProperty owner, string propertyName)
         {
             SerializedProperty property = owner.FindPropertyRelative(propertyName);
@@ -178,7 +198,8 @@ namespace Vamsurlike.Editor
         private static bool UsesProjectilePrefab(SkillCastType type) =>
             type == SkillCastType.Projectile ||
             type == SkillCastType.ScatterShot ||
-            type == SkillCastType.Ultimate;
+            type == SkillCastType.Ultimate ||
+            type == SkillCastType.OrbitalGrenade;
 
         private static bool UsesVFXPrefab(SkillCastType type) =>
             type == SkillCastType.Grenade ||
@@ -187,6 +208,7 @@ namespace Vamsurlike.Editor
         private static bool UsesRange(SkillCastType type) =>
             type == SkillCastType.Projectile ||
             type == SkillCastType.AreaAura ||
-            type == SkillCastType.ScatterShot;
+            type == SkillCastType.ScatterShot ||
+            type == SkillCastType.OrbitalGrenade;
     }
 }

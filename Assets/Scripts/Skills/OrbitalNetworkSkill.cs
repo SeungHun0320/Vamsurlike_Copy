@@ -22,6 +22,17 @@ namespace Vamsurlike.Skills
         public override SkillCastType SupportedCastType => SkillCastType.Orbital;
         public override bool IsPersistentExecution => true;
 
+        public override void OnSkillRemoved(SkillCastType castType)
+        {
+            if (castType != SupportedCastType) return;
+
+            base.OnSkillRemoved(castType);
+            serverBroadcastSent = false;
+            serverCount = 0;
+            serverRadius = 0f;
+            serverRotSpeed = 0f;
+        }
+
         public override bool TryExecute(in SkillCastContext context)
         {
             SkillDataSO skill = context.Skill;

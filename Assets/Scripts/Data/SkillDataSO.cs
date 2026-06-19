@@ -45,6 +45,13 @@ namespace Vamsurlike.Data
         [Min(0.1f)] public float orbitalRadius       = 2f;
         [Min(0f)]   public float orbitalRotationSpeed = 180f;
         [Min(0.05f)] public float orbitalHitRadius   = 0.65f;
+        [Min(0f)] public float orbitalDamageMultiplier = 1f;
+        [Min(0.01f)] public float orbitalHitCooldown = 0.2f;
+        [Min(0.01f)] public float orbitalProjectileScale = 0.75f;
+        [Min(0.1f)] public float detachedOrbitalLifetimeMultiplier = 0.8f;
+        [Min(0f)] public float detachedOrbitalHomingDelay = 0.2f;
+        [Min(0.1f)] public float detachedOrbitalHomingRange = 18f;
+        [Min(1f)] public float detachedOrbitalHomingTurnSpeed = 540f;
 
         [Header("Ultimate")]
         [Min(1)] public int   waveCount      = 1;

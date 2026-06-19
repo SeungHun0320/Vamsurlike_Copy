@@ -22,6 +22,9 @@ namespace Vamsurlike.Skills
         // SkillManager.OnNetworkDespawn()이 호출 — 비주얼 정리용 (기본 no-op)
         public virtual void OnDespawn() { }
 
+        // SkillManager 보유 목록에서 제거될 때 호출 — 지속 비주얼 정리용 (기본 no-op)
+        public virtual void OnSkillRemoved(SkillCastType castType) { }
+
         protected bool ShouldLogNoTarget()
         {
             if (Time.time < nextNoTargetLogTime) return false;

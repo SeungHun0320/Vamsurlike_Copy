@@ -19,18 +19,20 @@ namespace Vamsurlike.Upgrades
         // 서버: 아직 선택하지 않은 플레이어 집합
         private readonly HashSet<ulong>           pendingChoices = new();
 
-        // 클라이언트 이벤트: 이 클라이언트에 옵션이 도착했을 때
-        public static event Action<int[]> OnOptionsReceived;
+        // 클라이언트 이벤트: 이 클라이언트에 옵션이 도착했을 때 (optionIndices, currentLevels)
+        public static event Action<int[], int[]> OnOptionsReceived;
         // 클라이언트 이벤트: 레벨업이 완전히 완료(모두 선택)됐을 때
         public static event Action OnLevelUpCompleted;
 
         // RULES.md: 시드 기반 System.Random 사용
         private readonly System.Random rng = new();
+        private LevelUpOptionPicker optionPicker;
 
         private void Awake()
         {
             if (Instance != null) { Destroy(this); return; }
             Instance = this;
+            optionPicker = new LevelUpOptionPicker(rng);
         }
 
         public override void OnNetworkSpawn()
@@ -54,13 +56,7 @@ namespace Vamsurlike.Upgrades
         // SharedLevelSystem이 XP 차감 전에 호출해 사전 검증 — null 엔트리도 걸러냄
         public bool HasValidCatalog()
         {
-            var catalog = UpgradeCatalog.Instance;
-            if (catalog == null)
-                return false;
-            foreach (var opt in catalog.options)
-                if (opt != null)
-                    return true;
-            return false;
+            return optionPicker.HasValidCatalog(UpgradeCatalog.Instance);
         }
 
         // 서버 전용: SharedLevelSystem에서 레벨업 조건 달성 시 호출
@@ -81,11 +77,18 @@ namespace Vamsurlike.Upgrades
             foreach (ulong clientId in NetworkManager.ConnectedClientsIds)
             {
                 // 플레이어별 보유 스킬에 맞는 옵션 풀로 필터링
-                int[] indices = GenerateOptionsForPlayer(catalog, 3, clientId);
+                SkillManager skillManager = GetPlayerSkillManager(clientId);
+                int[] indices = optionPicker.GenerateOptions(
+                    catalog,
+                    3,
+                    skillManager,
+                    clientId,
+                    message => Debug.LogWarning($"[{nameof(LevelUpManager)}] {message}"));
+                int[] levels = optionPicker.BuildCurrentLevels(indices, catalog, skillManager);
                 playerOptions[clientId] = indices;
                 pendingChoices.Add(clientId);
 
-                ShowLevelUpOptionsClientRpc(indices, new ClientRpcParams
+                ShowLevelUpOptionsClientRpc(indices, levels, new ClientRpcParams
                 {
                     Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
                 });
@@ -163,67 +166,6 @@ namespace Vamsurlike.Upgrades
             CheckAllDone();
         }
 
-        // 플레이어가 보유한 스킬에 맞게 필터링된 옵션 풀에서 count개를 선택
-        private int[] GenerateOptionsForPlayer(UpgradeCatalog catalog, int count, ulong clientId)
-        {
-            SkillManager skillManager = GetPlayerSkillManager(clientId);
-
-            var pool = new List<int>(catalog.options.Length);
-            for (int i = 0; i < catalog.options.Length; i++)
-            {
-                var opt = catalog.options[i];
-                if (opt == null) continue;
-
-                switch (opt.effectType)
-                {
-                    case UpgradeEffectType.SkillLevelUp:
-                        // 이미 보유 중이고 최대 레벨 미달인 경우만 표시
-                        if (opt.skillData == null) continue;
-                        if (skillManager != null)
-                        {
-                            int lvl = skillManager.GetSkillLevel(opt.skillData);
-                            if (lvl <= 0 || lvl >= opt.skillData.maxLevel) continue;
-                        }
-                        pool.Add(i);
-                        break;
-
-                    case UpgradeEffectType.NewSkill:
-                        // 미보유인 경우만 표시
-                        if (opt.skillData == null) continue;
-                        if (skillManager != null)
-                        {
-                            int lvl = skillManager.GetSkillLevel(opt.skillData);
-                            if (lvl > 0) continue;
-                        }
-                        pool.Add(i);
-                        break;
-
-                    default:
-                        // PassiveStat 계열은 항상 포함
-                        pool.Add(i);
-                        break;
-                }
-            }
-
-            // 필터링 후 풀이 비었으면 null 엔트리만 제외한 전체로 폴백
-            if (pool.Count == 0)
-            {
-                Debug.LogWarning($"[{nameof(LevelUpManager)}] clientId {clientId}: 필터링 후 옵션 없음 — 전체 카탈로그로 폴백");
-                for (int i = 0; i < catalog.options.Length; i++)
-                    if (catalog.options[i] != null) pool.Add(i);
-            }
-
-            count = Mathf.Min(count, pool.Count);
-            var result = new int[count];
-            for (int i = 0; i < count; i++)
-            {
-                int pick = rng.Next(pool.Count);
-                result[i] = pool[pick];
-                pool.RemoveAt(pick);
-            }
-            return result;
-        }
-
         private SkillManager GetPlayerSkillManager(ulong clientId)
         {
             if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)) return null;
@@ -231,11 +173,11 @@ namespace Vamsurlike.Upgrades
             return client.PlayerObject.GetComponent<SkillManager>();
         }
 
-        // 서버 → 특정 클라이언트: 해당 플레이어의 업그레이드 옵션 인덱스 전달
+        // 서버 → 특정 클라이언트: 해당 플레이어의 업그레이드 옵션 인덱스 + 현재 스킬 레벨 전달
         [ClientRpc]
-        private void ShowLevelUpOptionsClientRpc(int[] optionIndices, ClientRpcParams rpcParams = default)
+        private void ShowLevelUpOptionsClientRpc(int[] optionIndices, int[] currentLevels, ClientRpcParams rpcParams = default)
         {
-            OnOptionsReceived?.Invoke(optionIndices);
+            OnOptionsReceived?.Invoke(optionIndices, currentLevels);
         }
 
         // 서버 → 전체 클라이언트: 레벨업 완료 통보

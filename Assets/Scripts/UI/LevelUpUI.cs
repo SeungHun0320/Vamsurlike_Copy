@@ -1,4 +1,6 @@
+using Unity.Netcode;
 using UnityEngine;
+using Vamsurlike.Player;
 using Vamsurlike.Upgrades;
 
 namespace Vamsurlike.UI
@@ -26,7 +28,7 @@ namespace Vamsurlike.UI
             LevelUpManager.OnLevelUpCompleted -= Hide;
         }
 
-        private void Show(int[] optionIndices)
+        private void Show(int[] optionIndices, int[] currentLevels)
         {
             currentOptionIndices = optionIndices;
             var catalog = UpgradeCatalog.Instance;
@@ -36,6 +38,11 @@ namespace Vamsurlike.UI
                 Debug.LogError($"[{nameof(LevelUpUI)}] UpgradeCatalog을 찾을 수 없습니다.");
                 return;
             }
+
+            // 로컬 플레이어 스탯 — 패시브 수치 표시용
+            NetworkObject localPlayer = NetworkManager.Singleton?.LocalClient?.PlayerObject;
+            var playerStats = localPlayer != null ? localPlayer.GetComponent<PlayerNetworkStats>() : null;
+            var statHandler = localPlayer != null ? localPlayer.GetComponent<PassiveStatHandler>()  : null;
 
             if (panel != null) panel.SetActive(true);
 
@@ -51,8 +58,37 @@ namespace Vamsurlike.UI
                 }
 
                 cards[i].gameObject.SetActive(true);
-                int captured = i; // 클로저 캡처용
-                cards[i].Setup(catalog.options[optionIndices[i]], () => OnCardSelected(captured));
+                var option = catalog.options[optionIndices[i]];
+                float currentValue = ResolveCurrentValue(option, i, currentLevels, playerStats, statHandler);
+                int captured = i;
+                cards[i].Setup(option, currentValue, () => OnCardSelected(captured));
+            }
+        }
+
+        private static float ResolveCurrentValue(
+            UpgradeOptionSO option,
+            int cardIndex,
+            int[] currentLevels,
+            PlayerNetworkStats playerStats,
+            PassiveStatHandler statHandler)
+        {
+            switch (option.effectType)
+            {
+                case UpgradeEffectType.SkillLevelUp:
+                case UpgradeEffectType.NewSkill:
+                    return currentLevels != null && cardIndex < currentLevels.Length
+                        ? currentLevels[cardIndex]
+                        : 0f;
+                case UpgradeEffectType.PassiveMaxHP:
+                    return playerStats != null ? playerStats.MaxHP.Value : -1f;
+                case UpgradeEffectType.PassiveMoveSpeed:
+                    return playerStats != null ? playerStats.MoveSpeed.Value : -1f;
+                case UpgradeEffectType.PassivePickupRadius:
+                    return playerStats != null ? playerStats.PickupRadius.Value : -1f;
+                case UpgradeEffectType.PassiveAttackPower:
+                    return statHandler != null ? statHandler.AttackMultiplier.Value : -1f;
+                default:
+                    return -1f;
             }
         }
 

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Data;
+using Vamsurlike.Items;
 using Vamsurlike.Player;
 using Vamsurlike.Stage;
 using Vamsurlike.Upgrades;
@@ -13,30 +14,6 @@ namespace Vamsurlike.Skills
     [RequireComponent(typeof(NetworkObject))]
     public class SkillManager : NetworkBehaviour
     {
-        [Serializable]
-        private class OwnedSkill
-        {
-            public SkillDataSO skill;
-            [Min(1)] public int level = 1;
-
-            // Projectile / Ultimate
-            public float cooldownTimer;
-
-            // Aura / Orbital (persistent)
-            public bool isActive = true;
-            public float durationTimer;  // -1 sentinel: 첫 프레임에 levelData.duration으로 초기화
-            public float tickTimer;      // 0이면 즉시 첫 틱
-
-            public OwnedSkill(SkillDataSO skill, int level)
-            {
-                this.skill    = skill;
-                this.level    = Mathf.Max(1, level);
-                isActive      = true;
-                tickTimer     = 0f;
-                durationTimer = -1f;
-            }
-        }
-
         [SerializeField] private CharacterDataSO characterData;
         [SerializeField] private Transform projectileSpawnPoint;
         [SerializeField] private float spawnForwardOffset = 0.8f;
@@ -48,11 +25,13 @@ namespace Vamsurlike.Skills
 
         // 스킬 타입별 클라이언트 비주얼 프리팹 — Awake에서 SkillDataSO.vfxPrefab 기반으로 자동 구성
         private readonly Dictionary<SkillCastType, GameObject> vfxPrefabsByType = new();
+        private readonly Dictionary<SkillCastType, AreaCircleVFX> areaCircleVfxByType = new();
 
         private PassiveStatHandler passiveStatHandler;
         private PlayerNetworkStats playerStats;
 
-        private readonly List<OwnedSkill> ownedSkills = new();
+        private readonly SkillInventory skillInventory = new();
+        private readonly SkillExecutionScheduler executionScheduler = new();
 
         // ── Executor registry ─────────────────────────────────────────────────
         private readonly Dictionary<SkillCastType, SkillBase> executorRegistry = new();
@@ -60,16 +39,19 @@ namespace Vamsurlike.Skills
         private OrbitalSkill        orbitalSkill;
         private AuraSkill           auraSkill;
         private GrenadeSkill        grenadeSkill;
-        private OrbitalGrenadeSkill orbitalGrenadeSkill;
+        private OrbitalGrenadeSkill orbitalGrenadeSkill; // 비주얼은 투사체에 귀속 — ClientRpc 미사용
         private BlackHoleSkill      blackHoleSkill;
         // ─────────────────────────────────────────────────────────────────────
+
+        // 클라이언트 HUD 구독용 — 소유자에게 스킬 목록이 동기화될 때 발생
+        public static event Action<string[], int[]> OnSkillsSynced;
 
         private float nextNoTargetLogTime;
 
         private void Awake()
         {
             BuildExecutorRegistry();
-            BuildVFXPrefabMap();
+            // VFX 맵은 OnNetworkSpawn()에서 역할 확인 후 구성 (데디케이티드 서버에서는 불필요)
         }
 
         // SkillDataSO.vfxPrefab 기반으로 타입별 룩업 테이블 구성 — 서버/클라이언트 동일.
@@ -88,29 +70,46 @@ namespace Vamsurlike.Skills
 
             // 업그레이드 카탈로그에 있는 모든 스킬 (상자·레벨업으로 습득)
             var catalog = UpgradeCatalog.Instance;
-            if (catalog == null) return;
-            foreach (var opt in catalog.options)
+            if (catalog != null)
             {
-                if (opt == null || opt.skillData == null || opt.skillData.vfxPrefab == null) continue;
-                vfxPrefabsByType[opt.skillData.castType] = opt.skillData.vfxPrefab;
+                foreach (var opt in catalog.options)
+                {
+                    if (opt == null || opt.skillData == null || opt.skillData.vfxPrefab == null) continue;
+                    vfxPrefabsByType[opt.skillData.castType] = opt.skillData.vfxPrefab;
+                }
+            }
+
+            var recipeCatalog = CombineRecipeCatalog.Instance;
+            if (recipeCatalog == null || recipeCatalog.recipes == null) return;
+
+            foreach (var recipe in recipeCatalog.recipes)
+            {
+                if (recipe == null || recipe.evolvedSkill == null || recipe.evolvedSkill.vfxPrefab == null) continue;
+                vfxPrefabsByType[recipe.evolvedSkill.castType] = recipe.evolvedSkill.vfxPrefab;
             }
         }
 
         public override void OnNetworkSpawn()
         {
+            // ── 비주얼 레이어: 서버는 VFX 불필요 ─────────────────────────────
+            if (!IsServer)
+                BuildVFXPrefabMap();
+
+            // ── 클라이언트 초기화 ──────────────────────────────────────────────
             if (!IsServer)
             {
-                // Update()는 비활성화하지 않음 — OrbitalSkill 비주얼 갱신(OnUpdate)이 클라이언트에서도 필요
                 Debug.Log($"[{nameof(SkillManager)}] 클라이언트 모드. owner={OwnerClientId}, object={name}");
                 return;
             }
 
+            // ── 서버 게임 로직 초기화 ──────────────────────────────────────────
             passiveStatHandler = GetComponent<PassiveStatHandler>();
             playerStats        = GetComponent<PlayerNetworkStats>();
             InitializeStartingSkills();
-            Debug.Log($"[{nameof(SkillManager)}] 서버 스폰. owner={OwnerClientId}, object={name}, skillCount={ownedSkills.Count}");
+            BroadcastSkillsToOwner();
+            Debug.Log($"[{nameof(SkillManager)}] 서버 스폰. owner={OwnerClientId}, object={name}, skillCount={skillInventory.Count}");
 
-            if (ownedSkills.Count == 0)
+            if (skillInventory.Count == 0)
                 Debug.LogWarning($"[{nameof(SkillManager)}] 시작 스킬 없음. object={name}");
         }
 
@@ -119,91 +118,32 @@ namespace Vamsurlike.Skills
             base.OnNetworkDespawn();
             for (int i = 0; i < allExecutors.Count; i++)
                 allExecutors[i].OnDespawn();
+            foreach (var entry in areaCircleVfxByType)
+                if (entry.Value != null)
+                    Destroy(entry.Value.gameObject);
+            areaCircleVfxByType.Clear();
         }
 
         private void Update()
         {
-            // 클라이언트 비주얼 갱신 (OrbitalSkill 등) — 서버/클라이언트 모두 실행
-            for (int i = 0; i < allExecutors.Count; i++)
-                allExecutors[i].OnUpdate(transform);
+            // ── 클라이언트 비주얼 레이어 ──────────────────────────────────────
+            if (!IsServer)
+            {
+                for (int i = 0; i < allExecutors.Count; i++)
+                    allExecutors[i].OnUpdate(transform);
+            }
 
+            // ── 서버 게임 로직 레이어 ─────────────────────────────────────────
             if (!IsServer) return;
             if (playerStats != null && !playerStats.IsAlive) return;
             if (StageRuntime.Instance == null || StageRuntime.Instance.CurrentState.Value != GameState.Playing) return;
 
-            for (int i = 0; i < ownedSkills.Count; i++)
-            {
-                OwnedSkill owned = ownedSkills[i];
-                if (owned.skill == null)
-                {
-                    if (Time.time >= nextNoTargetLogTime)
-                    {
-                        Debug.LogWarning($"[{nameof(SkillManager)}] ownedSkills[{i}].skill is null. object={name}");
-                        nextNoTargetLogTime = Time.time + 2f;
-                    }
-                    continue;
-                }
-
-                if (IsPersistent(owned.skill))
-                    UpdatePersistentSkill(owned);
-                else
-                    UpdateCooldownSkill(owned);
-            }
-        }
-
-        // Aura / Orbital: tickInterval마다 데미지, duration 후 cooldown 대기
-        private void UpdatePersistentSkill(OwnedSkill owned)
-        {
-            SkillLevelData levelData = owned.skill.GetLevelData(owned.level);
-            if (levelData == null) return;
-
-            if (owned.isActive)
-            {
-                if (owned.durationTimer < 0f)
-                    owned.durationTimer = levelData.duration;
-
-                owned.tickTimer -= Time.deltaTime;
-                if (owned.tickTimer <= 0f)
-                {
-                    TryCast(owned, levelData);
-                    owned.tickTimer = levelData.tickInterval;
-                }
-
-                if (levelData.duration > 0f)
-                {
-                    owned.durationTimer -= Time.deltaTime;
-                    if (owned.durationTimer <= 0f)
-                    {
-                        owned.isActive = false;
-                        owned.cooldownTimer = levelData.cooldown;
-                        Debug.Log($"[{nameof(SkillManager)}] Persistent 종료. skill={owned.skill.name}, cooldown={levelData.cooldown}s");
-                    }
-                }
-            }
-            else
-            {
-                owned.cooldownTimer -= Time.deltaTime;
-                if (owned.cooldownTimer <= 0f)
-                {
-                    owned.isActive      = true;
-                    owned.durationTimer = levelData.duration;
-                    owned.tickTimer     = 0f;
-                    Debug.Log($"[{nameof(SkillManager)}] Persistent 활성화. skill={owned.skill.name}, duration={levelData.duration}s");
-                }
-            }
-        }
-
-        // Projectile / Ultimate: cooldown 후 발동
-        private void UpdateCooldownSkill(OwnedSkill owned)
-        {
-            owned.cooldownTimer -= Time.deltaTime;
-            if (owned.skill.isManual) return;
-            if (owned.cooldownTimer > 0f) return;
-
-            SkillLevelData levelData = owned.skill.GetLevelData(owned.level);
-            owned.cooldownTimer = TryCast(owned, levelData)
-                ? levelData != null ? levelData.cooldown : 1f
-                : failedCastRetryDelay;
+            executionScheduler.Tick(
+                skillInventory.Skills,
+                failedCastRetryDelay,
+                IsPersistent,
+                TryCast,
+                message => Debug.LogWarning($"[{nameof(SkillManager)}] {message} object={name}"));
         }
 
         private bool IsPersistent(SkillDataSO skill)
@@ -215,23 +155,36 @@ namespace Vamsurlike.Skills
         public bool LearnSkill(SkillDataSO skill)
         {
             if (!IsServer || skill == null) return false;
-            if (TryGetOwnedSkill(skill, out _)) return UpgradeSkill(skill);
-            ownedSkills.Add(new OwnedSkill(skill, 1));
-            Debug.Log($"[{nameof(SkillManager)}] 스킬 습득. owner={OwnerClientId}, skill={skill.name}");
+            if (skillInventory.IsEvolutionLocked(skill))
+            {
+                Debug.Log($"[{nameof(SkillManager)}] 진화 재료 스킬 재획득 차단. owner={OwnerClientId}, skill={skill.name}");
+                return false;
+            }
+
+            bool learned = skillInventory.Learn(skill, failedCastRetryDelay, out bool upgradedExisting);
+            if (!learned) return false;
+
+            BroadcastSkillsToOwner();
+            string action = upgradedExisting ? "스킬 강화" : "스킬 습득";
+            Debug.Log($"[{nameof(SkillManager)}] {action}. owner={OwnerClientId}, skill={skill.name}, level={GetSkillLevel(skill)}");
             return true;
         }
 
         public bool UpgradeSkill(SkillDataSO skill)
         {
             if (!IsServer || skill == null) return false;
-            if (!TryGetOwnedSkill(skill, out var ownedSkill)) return LearnSkill(skill);
+            if (skillInventory.IsEvolutionLocked(skill))
+            {
+                Debug.Log($"[{nameof(SkillManager)}] 진화 재료 스킬 강화/재획득 차단. owner={OwnerClientId}, skill={skill.name}");
+                return false;
+            }
 
-            int maxLevel = Mathf.Max(1, skill.maxLevel);
-            if (ownedSkill.level >= maxLevel) return false;
+            bool upgraded = skillInventory.Upgrade(skill, failedCastRetryDelay, out bool learnedMissing);
+            if (!upgraded) return false;
 
-            ownedSkill.level++;
-            ownedSkill.cooldownTimer = Mathf.Min(ownedSkill.cooldownTimer, failedCastRetryDelay);
-            Debug.Log($"[{nameof(SkillManager)}] 스킬 강화. owner={OwnerClientId}, skill={skill.name}, level={ownedSkill.level}");
+            BroadcastSkillsToOwner();
+            string action = learnedMissing ? "스킬 습득" : "스킬 강화";
+            Debug.Log($"[{nameof(SkillManager)}] {action}. owner={OwnerClientId}, skill={skill.name}, level={GetSkillLevel(skill)}");
             return true;
         }
 
@@ -239,25 +192,60 @@ namespace Vamsurlike.Skills
         public bool EvolveSkill(SkillDataSO source, SkillDataSO evolved, SkillDataSO source2 = null)
         {
             if (!IsServer || source == null || evolved == null) return false;
-            if (!TryGetOwnedSkill(source, out _))
+
+            var removedSkillTypes = new List<SkillCastType>();
+            if (!skillInventory.Evolve(source, evolved, source2, removedSkillTypes, out string failureReason))
             {
-                Debug.LogWarning($"[{nameof(SkillManager)}] EvolveSkill: '{source.name}' 미보유. owner={OwnerClientId}");
-                return false;
-            }
-            if (source2 != null && !TryGetOwnedSkill(source2, out _))
-            {
-                Debug.LogWarning($"[{nameof(SkillManager)}] EvolveSkill: '{source2.name}' 미보유. owner={OwnerClientId}");
+                Debug.LogWarning($"[{nameof(SkillManager)}] EvolveSkill: {failureReason} owner={OwnerClientId}");
                 return false;
             }
 
-            for (int i = ownedSkills.Count - 1; i >= 0; i--)
-                if (ownedSkills[i].skill == source || (source2 != null && ownedSkills[i].skill == source2))
-                    ownedSkills.RemoveAt(i);
+            for (int i = 0; i < removedSkillTypes.Count; i++)
+                NotifySkillRemoved(removedSkillTypes[i]);
 
-            ownedSkills.Add(new OwnedSkill(evolved, 1));
+            BroadcastSkillsToOwner();
             string from = source2 != null ? $"{source.name} + {source2.name}" : source.name;
             Debug.Log($"[{nameof(SkillManager)}] 합체/진화. owner={OwnerClientId}, {from} → {evolved.name}");
             return true;
+        }
+
+        // 스킬 목록이 바뀔 때마다 소유 클라이언트에 현재 상태 전송
+        // NGO RPC는 string[]을 지원하지 않으므로 이름을 '|' 구분자로 합쳐서 전송
+        private void BroadcastSkillsToOwner()
+        {
+            skillInventory.BuildSnapshot(out string joinedNames, out int[] levels);
+            SyncSkillsToOwnerClientRpc(joinedNames, levels, new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { OwnerClientId } }
+            });
+        }
+
+        private void NotifySkillRemoved(SkillCastType castType)
+        {
+            if (executorRegistry.TryGetValue(castType, out var executor))
+                executor.OnSkillRemoved(castType);
+
+            NotifySkillRemovedClientRpc(castType, new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { OwnerClientId } }
+            });
+        }
+
+        [ClientRpc]
+        private void NotifySkillRemovedClientRpc(SkillCastType castType, ClientRpcParams rpcParams = default)
+        {
+            if (executorRegistry.TryGetValue(castType, out var executor))
+                executor.OnSkillRemoved(castType);
+            DestroyAreaCircleVFX(castType);
+        }
+
+        [ClientRpc]
+        private void SyncSkillsToOwnerClientRpc(string joinedNames, int[] levels, ClientRpcParams rpcParams = default)
+        {
+            string[] names = joinedNames.Length > 0
+                ? joinedNames.Split('|')
+                : System.Array.Empty<string>();
+            OnSkillsSynced?.Invoke(names, levels);
         }
 
         [ServerRpc]
@@ -265,18 +253,19 @@ namespace Vamsurlike.Skills
         {
             if (StageRuntime.Instance == null || StageRuntime.Instance.CurrentState.Value != GameState.Playing) return;
 
-            for (int i = 0; i < ownedSkills.Count; i++)
+            IReadOnlyList<SkillRuntimeState> skills = skillInventory.Skills;
+            for (int i = 0; i < skills.Count; i++)
             {
-                OwnedSkill owned = ownedSkills[i];
-                if (owned.skill == null || !owned.skill.isManual) continue;
-                if (owned.cooldownTimer > 0f)
+                SkillRuntimeState owned = skills[i];
+                if (owned.Skill == null || !owned.Skill.isManual) continue;
+                if (owned.CooldownTimer > 0f)
                 {
-                    Debug.Log($"[{nameof(SkillManager)}] 수동 스킬 쿨다운 중. skill={owned.skill.name}, remaining={owned.cooldownTimer:F2}s");
+                    Debug.Log($"[{nameof(SkillManager)}] 수동 스킬 쿨다운 중. skill={owned.Skill.name}, remaining={owned.CooldownTimer:F2}s");
                     return;
                 }
 
-                SkillLevelData levelData = owned.skill.GetLevelData(owned.level);
-                owned.cooldownTimer = TryCast(owned, levelData)
+                SkillLevelData levelData = owned.Skill.GetLevelData(owned.Level);
+                owned.CooldownTimer = TryCast(owned, levelData)
                     ? levelData != null ? levelData.cooldown : 5f
                     : failedCastRetryDelay;
                 return;
@@ -285,7 +274,12 @@ namespace Vamsurlike.Skills
 
         public int GetSkillLevel(SkillDataSO skill)
         {
-            return TryGetOwnedSkill(skill, out var owned) ? owned.level : 0;
+            return skillInventory.GetSkillLevel(skill);
+        }
+
+        public bool IsEvolutionLocked(SkillDataSO skill)
+        {
+            return skillInventory.IsEvolutionLocked(skill);
         }
 
         // ── Executor를 위한 공용 헬퍼 ─────────────────────────────────────────
@@ -300,16 +294,30 @@ namespace Vamsurlike.Skills
             orbitalSkill?.OnClientOrbitalActivated(count, radius, rotSpeed, transform);
         }
 
+        // OrbitalShot: 위성 비주얼은 투사체에 귀속 — 별도 ClientRpc 불필요 (Phase N에서 VFX 연결)
         [ClientRpc]
         internal void BroadcastOrbitalGrenadeClientRpc(int count, float radius, float rotSpeed)
         {
-            orbitalGrenadeSkill?.OnClientOrbitalActivated(count, radius, rotSpeed, transform);
+            _ = count; _ = radius; _ = rotSpeed;
+        }
+
+        // BlackHole 위치 기반 VFX — Phase N에서 이펙트 연결
+        [ClientRpc]
+        internal void BroadcastBlackHolePosClientRpc(Vector3 center, float duration, float radius)
+        {
+            SpawnAreaCircleVFX(SkillCastType.BlackHole, center, radius, duration, new Color(0.45f, 0.1f, 1f, 0.9f));
         }
 
         [ClientRpc]
-        internal void BroadcastBlackHoleClientRpc(int count, float radius, float rotSpeed)
+        internal void BroadcastAreaCircleClientRpc(SkillCastType castType, float radius, float duration, bool followOwner)
         {
-            blackHoleSkill?.OnClientOrbitalActivated(count, radius, rotSpeed, transform);
+            Transform followTarget = followOwner ? transform : null;
+            Vector3 position = followTarget != null ? followTarget.position : transform.position;
+            Color color = castType == SkillCastType.AreaAura
+                ? new Color(0.15f, 0.85f, 1f, 0.75f)
+                : new Color(0.45f, 0.1f, 1f, 0.9f);
+
+            SpawnAreaCircleVFX(castType, position, radius, duration, color, followTarget);
         }
 
         // UltimateSkill 코루틴이 완료 시 호출 — Phase 8에서 VFX 연결
@@ -359,44 +367,15 @@ namespace Vamsurlike.Skills
 
         private void InitializeStartingSkills()
         {
-            ownedSkills.Clear();
             SkillDataSO[] starting = characterData != null ? characterData.startingSkills : null;
-            if (starting == null) return;
-
-            for (int i = 0; i < starting.Length; i++)
-            {
-                SkillDataSO skill = starting[i];
-                if (skill == null)
-                {
-                    Debug.LogWarning($"[{nameof(SkillManager)}] startingSkills[{i}] is null. object={name}");
-                    continue;
-                }
-
-                if (TryGetOwnedSkill(skill, out var owned))
-                {
-                    owned.level = Mathf.Min(owned.level + 1, Mathf.Max(1, skill.maxLevel));
-                    continue;
-                }
-
-                ownedSkills.Add(new OwnedSkill(skill, 1));
-            }
+            skillInventory.InitializeStartingSkills(
+                starting,
+                message => Debug.LogWarning($"[{nameof(SkillManager)}] {message} object={name}"));
         }
 
-        private bool TryGetOwnedSkill(SkillDataSO skill, out OwnedSkill ownedSkill)
+        private bool TryCast(SkillRuntimeState ownedSkill, SkillLevelData levelData)
         {
-            for (int i = 0; i < ownedSkills.Count; i++)
-            {
-                if (ownedSkills[i].skill != skill) continue;
-                ownedSkill = ownedSkills[i];
-                return true;
-            }
-            ownedSkill = null;
-            return false;
-        }
-
-        private bool TryCast(OwnedSkill ownedSkill, SkillLevelData levelData)
-        {
-            SkillDataSO skill = ownedSkill.skill;
+            SkillDataSO skill = ownedSkill.Skill;
             if (skill == null || levelData == null) return false;
 
             if (!executorRegistry.TryGetValue(skill.castType, out var executor))
@@ -418,7 +397,7 @@ namespace Vamsurlike.Skills
             float speedMultiplier = baseSpeed > 0f ? currentSpeed / baseSpeed : 1f;
 
             var context = new SkillCastContext(
-                this, skill, levelData, ownedSkill.level, OwnerClientId,
+                this, skill, levelData, ownedSkill.Level, OwnerClientId,
                 transform, projectileSpawnPoint, spawnForwardOffset, attackMultiplier, speedMultiplier);
 
             return executor.TryExecute(context);
@@ -432,8 +411,8 @@ namespace Vamsurlike.Skills
             orbitalSkill        = new OrbitalSkill(orbitalVisualPrefab, orbitalHeightOffset);
             auraSkill           = new AuraSkill();
             grenadeSkill        = new GrenadeSkill();
-            orbitalGrenadeSkill = new OrbitalGrenadeSkill(orbitalVisualPrefab, orbitalHeightOffset);
-            blackHoleSkill      = new BlackHoleSkill(orbitalVisualPrefab, orbitalHeightOffset);
+            orbitalGrenadeSkill = new OrbitalGrenadeSkill();
+            blackHoleSkill      = new BlackHoleSkill();
 
             Register(new ProjectileSkill());
             Register(auraSkill);
@@ -452,6 +431,41 @@ namespace Vamsurlike.Skills
         {
             executorRegistry[executor.SupportedCastType] = executor;
             allExecutors.Add(executor);
+        }
+
+        private void SpawnAreaCircleVFX(
+            SkillCastType castType,
+            Vector3 position,
+            float radius,
+            float duration,
+            Color color,
+            Transform followTarget = null)
+        {
+            if (!vfxPrefabsByType.TryGetValue(castType, out var prefab) || prefab == null) return;
+
+            if (duration <= 0f)
+                DestroyAreaCircleVFX(castType);
+
+            GameObject go = Instantiate(prefab, position, Quaternion.identity);
+            if (!go.TryGetComponent<AreaCircleVFX>(out var vfx))
+            {
+                Debug.LogWarning($"[{nameof(SkillManager)}] AreaCircleVFX 컴포넌트 없음. prefab={prefab.name}");
+                Destroy(go);
+                return;
+            }
+
+            vfx.Initialize(radius, duration, color, followTarget);
+
+            if (duration <= 0f)
+                areaCircleVfxByType[castType] = vfx;
+        }
+
+        private void DestroyAreaCircleVFX(SkillCastType castType)
+        {
+            if (!areaCircleVfxByType.TryGetValue(castType, out var vfx)) return;
+            if (vfx != null)
+                Destroy(vfx.gameObject);
+            areaCircleVfxByType.Remove(castType);
         }
     }
 }

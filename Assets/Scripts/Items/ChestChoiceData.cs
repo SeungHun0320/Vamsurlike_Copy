@@ -5,7 +5,8 @@ namespace Vamsurlike.Items
     public enum ChestChoiceType : byte
     {
         UpgradeOption, // UpgradeCatalog 인덱스
-        Evolution      // CombineRecipeCatalog 인덱스
+        Evolution,     // CombineRecipeCatalog 인덱스
+        ItemReward     // ChestFallbackRewardCatalog 인덱스
     }
 
     // RPC로 전송되는 상자 카드 1장의 직렬화 구조체

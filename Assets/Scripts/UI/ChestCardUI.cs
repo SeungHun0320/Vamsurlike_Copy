@@ -2,6 +2,7 @@ using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using Vamsurlike.Data;
 using Vamsurlike.Items;
 using Vamsurlike.Upgrades;
 
@@ -45,6 +46,30 @@ namespace Vamsurlike.UI
                 iconImage.gameObject.SetActive(recipe.evolvedSkill.icon != null);
             }
             if (evolutionBadge != null) evolutionBadge.SetActive(true);
+
+            BindButton(onSelect);
+        }
+
+        public void SetupItemReward(ItemDataSO item, Action onSelect)
+        {
+            if (item == null) { gameObject.SetActive(false); return; }
+
+            if (nameText != null) nameText.text = item.itemName;
+            if (descText != null)
+            {
+                descText.text = item.itemType switch
+                {
+                    ItemType.HealthOrb => $"HP {item.value:0} 회복",
+                    ItemType.Missile => $"모든 적에게 {item.value:0} 피해",
+                    _ => "아이템 보상"
+                };
+            }
+            if (iconImage != null)
+            {
+                iconImage.sprite = item.icon;
+                iconImage.gameObject.SetActive(item.icon != null);
+            }
+            if (evolutionBadge != null) evolutionBadge.SetActive(false);
 
             BindButton(onSelect);
         }

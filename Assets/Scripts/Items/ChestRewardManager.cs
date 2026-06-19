@@ -14,20 +14,24 @@ namespace Vamsurlike.Items
     {
         public static ChestRewardManager Instance { get; private set; }
 
-        private readonly Dictionary<ulong, int[]> playerOptions = new();
-        private readonly HashSet<ulong>           pendingChoices = new();
+        private readonly Dictionary<ulong, ChestChoiceData[]> playerOptions = new();
+        private readonly HashSet<ulong>                      pendingChoices = new();
 
-        public static event Action<int[]> OnOptionsReceived;
+        public static event Action<ChestChoiceData[]> OnOptionsReceived;
         public static event Action        OnChestRewardCompleted;
 
         [SerializeField] private int fallbackXP = 30;
 
         private readonly System.Random rng = new();
+        private ChestChoiceBuilder choiceBuilder;
+        private ChestRewardApplier rewardApplier;
 
         private void Awake()
         {
             if (Instance != null) { Destroy(this); return; }
             Instance = this;
+            choiceBuilder = new ChestChoiceBuilder(rng);
+            rewardApplier = new ChestRewardApplier();
         }
 
         public override void OnNetworkSpawn()
@@ -75,21 +79,20 @@ namespace Vamsurlike.Items
             foreach (ulong clientId in NetworkManager.ConnectedClientsIds)
             {
                 var skillManager = GetSkillManager(clientId);
-                int[] indices    = BuildSkillCardIndices(catalog, skillManager);
+                ChestChoiceData[] choices = choiceBuilder.Build(catalog, skillManager);
 
-                if (indices.Length == 0)
+                if (choices.Length == 0)
                 {
-                    // 이 플레이어는 유효 스킬 없음 → XP 지급 후 대기 목록에서 제외
                     SharedLevelSystem.Instance?.AddXP(fallbackXP);
                     Debug.Log($"[{nameof(ChestRewardManager)}] clientId {clientId} 스킬 없음 → XP +{fallbackXP}");
                     continue;
                 }
 
-                playerOptions[clientId] = indices;
+                playerOptions[clientId] = choices;
                 pendingChoices.Add(clientId);
                 anyHasCards = true;
 
-                ShowOptionsClientRpc(indices, new ClientRpcParams
+                ShowOptionsClientRpc(choices, new ClientRpcParams
                 {
                     Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
                 });
@@ -115,7 +118,7 @@ namespace Vamsurlike.Items
                 return;
             }
 
-            if (!playerOptions.TryGetValue(clientId, out int[] options) ||
+            if (!playerOptions.TryGetValue(clientId, out ChestChoiceData[] options) ||
                 choiceIndex < 0 || choiceIndex >= options.Length)
             {
                 Debug.LogWarning($"[{nameof(ChestRewardManager)}] clientId {clientId}: 유효하지 않은 인덱스 {choiceIndex}");
@@ -123,22 +126,16 @@ namespace Vamsurlike.Items
             }
 
             pendingChoices.Remove(clientId);
-            ApplySkill(clientId, options[choiceIndex]);
+            ApplyChoice(clientId, options[choiceIndex]);
             CheckAllDone();
         }
 
-        private void ApplySkill(ulong clientId, int catalogIndex)
+        private void ApplyChoice(ulong clientId, ChestChoiceData choice)
         {
-            var catalog = UpgradeCatalog.Instance;
-            if (catalog == null || !catalog.IsValidIndex(catalogIndex)) return;
             if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)) return;
             if (client.PlayerObject == null) return;
 
-            var handler = client.PlayerObject.GetComponent<PassiveStatHandler>();
-            if (handler != null)
-                handler.ApplyUpgrade(catalog.options[catalogIndex]);
-            else
-                Debug.LogWarning($"[{nameof(ChestRewardManager)}] clientId {clientId}: PassiveStatHandler 없음");
+            rewardApplier.Apply(client.PlayerObject.gameObject, choice);
         }
 
         private void CheckAllDone()
@@ -160,46 +157,6 @@ namespace Vamsurlike.Items
             CheckAllDone();
         }
 
-        // 스킬 타입(NewSkill / SkillLevelUp)만 필터링해 최대 3장 반환
-        private int[] BuildSkillCardIndices(UpgradeCatalog catalog, Skills.SkillManager skillManager)
-        {
-            var pool = new List<int>(catalog.options.Length);
-            for (int i = 0; i < catalog.options.Length; i++)
-            {
-                var opt = catalog.options[i];
-                if (opt == null) continue;
-
-                switch (opt.effectType)
-                {
-                    case UpgradeEffectType.SkillLevelUp:
-                        if (opt.skillData == null) continue;
-                        if (skillManager != null)
-                        {
-                            int lvl = skillManager.GetSkillLevel(opt.skillData);
-                            if (lvl >= opt.skillData.maxLevel) continue; // 만렙만 제외, 미소유(0)는 포함
-                        }
-                        pool.Add(i);
-                        break;
-
-                    case UpgradeEffectType.NewSkill:
-                        if (opt.skillData == null) continue;
-                        if (skillManager != null && skillManager.GetSkillLevel(opt.skillData) > 0) continue;
-                        pool.Add(i);
-                        break;
-                }
-            }
-
-            int count  = Mathf.Min(3, pool.Count);
-            var result = new int[count];
-            for (int i = 0; i < count; i++)
-            {
-                int pick  = rng.Next(pool.Count);
-                result[i] = pool[pick];
-                pool.RemoveAt(pick);
-            }
-            return result;
-        }
-
         private Skills.SkillManager GetSkillManager(ulong clientId)
         {
             if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)) return null;
@@ -208,9 +165,9 @@ namespace Vamsurlike.Items
         }
 
         [ClientRpc]
-        private void ShowOptionsClientRpc(int[] optionIndices, ClientRpcParams rpcParams = default)
+        private void ShowOptionsClientRpc(ChestChoiceData[] choices, ClientRpcParams rpcParams = default)
         {
-            OnOptionsReceived?.Invoke(optionIndices);
+            OnOptionsReceived?.Invoke(choices);
         }
 
         [ClientRpc]
