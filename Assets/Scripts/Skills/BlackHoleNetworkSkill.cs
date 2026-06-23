@@ -13,26 +13,20 @@ namespace Vamsurlike.Skills
     {
         public override SkillCastType SupportedCastType => SkillCastType.BlackHole;
 
-        public override bool TryExecute(in SkillCastContext context)
+        protected override bool Execute(in SkillCastContext context, Vector3 direction, EnemyNetworkBase target)
         {
             SkillLevelData data = context.LevelData;
-            if (context.CasterTransform == null || data == null) return false;
 
-            EnemyNetworkBase target = AutoTargeting.FindNearestEnemy(context.CasterTransform.position, data.range);
-            if (target == null)
-            {
-                if (ShouldLogNoTarget())
-                    Debug.Log($"[{nameof(BlackHoleSkill)}] 범위 내 적 없음. range={data.range}");
-                return false;
-            }
+            // 타겟이 있으면 타겟 위치, 없으면 이동 방향 절반 사거리에 생성
+            Vector3 center = target != null
+                ? target.transform.position
+                : context.CasterTransform.position + direction * (data.range * 0.5f);
+            float pullRadius = data.areaRadius > 0f ? data.areaRadius : data.range;
 
-            Vector3 center     = target.transform.position;
-            float   pullRadius = data.areaRadius > 0f ? data.areaRadius : data.range;
+            context.VFX?.ShowBlackHole(center, data.duration, pullRadius);
+            context.CoroutineRunner.StartSkillCoroutine(
+                RunBlackHole(center, data, context.FinalDamage));
 
-            context.Manager.BroadcastBlackHolePosClientRpc(center, data.duration, pullRadius);
-            context.Manager.StartSkillCoroutine(RunBlackHole(center, data, context.FinalDamage));
-
-            Debug.Log($"[{nameof(BlackHoleSkill)}] 블랙홀 생성. center={center}, duration={data.duration}s, pullRadius={pullRadius}");
             return true;
         }
 

@@ -21,15 +21,25 @@ namespace Vamsurlike.Skills
             SkillDataSO skill = context.Skill;
             SkillLevelData levelData = context.LevelData;
 
-            if (skill == null || levelData == null || context.CasterTransform == null)
+            if (skill == null
+                || levelData == null
+                || context.CasterTransform == null
+                || context.CoroutineRunner == null)
                 return false;
 
-            context.Manager.StartSkillCoroutine(
-                ThrowGrenadeCoroutine(context.CasterTransform.position, levelData, context.FinalDamage, context.Manager));
+            context.CoroutineRunner.StartSkillCoroutine(ThrowGrenadeCoroutine(
+                context.CasterTransform.position,
+                levelData,
+                context.FinalDamage,
+                context.VFX));
             return true;
         }
 
-        private IEnumerator ThrowGrenadeCoroutine(Vector3 origin, SkillLevelData levelData, float finalDamage, SkillManager manager)
+        private IEnumerator ThrowGrenadeCoroutine(
+            Vector3 origin,
+            SkillLevelData levelData,
+            float finalDamage,
+            ISkillVFXBroadcaster vfx)
         {
             double rx = rng.NextDouble() * 2.0 - 1.0;
             double rz = rng.NextDouble() * 2.0 - 1.0;
@@ -40,7 +50,7 @@ namespace Vamsurlike.Skills
             Vector3 target = origin + new Vector3((float)rx * range, 0f, (float)rz * range);
 
             Vector3 spawnPos = origin + Vector3.up * SpawnHeightOffset;
-            manager.BroadcastGrenadeVFXClientRpc(spawnPos, target, levelData.grenadeArcHeight, FlightTime);
+            vfx?.ShowGrenade(spawnPos, target, levelData.grenadeArcHeight, FlightTime);
 
             float elapsed = 0f;
             while (elapsed < FlightTime)
@@ -60,7 +70,6 @@ namespace Vamsurlike.Skills
                 if (col.TryGetComponent<EnemyNetworkBase>(out var enemy))
                     enemy.TakeDamage(damage);
             }
-            Debug.Log($"[{nameof(GrenadeSkill)}] 착지 스플래시. center={center}, radius={radius}, damage={damage}");
         }
     }
 }

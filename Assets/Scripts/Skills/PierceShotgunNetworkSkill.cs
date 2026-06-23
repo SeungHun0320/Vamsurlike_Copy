@@ -11,17 +11,13 @@ namespace Vamsurlike.Skills
     public sealed class PierceShotgunSkill : SkillBase
     {
         private const float DefaultSpawnHeight = 0.8f;
-        private const float MinDirectionSqrMagnitude = 0.0001f;
 
         public override SkillCastType SupportedCastType => SkillCastType.PierceShotgun;
 
-        public override bool TryExecute(in SkillCastContext context)
+        protected override bool Execute(in SkillCastContext context, Vector3 direction, EnemyNetworkBase _)
         {
             SkillDataSO skill = context.Skill;
             SkillLevelData levelData = context.LevelData;
-
-            if (skill == null || levelData == null || context.CasterTransform == null)
-                return false;
 
             if (skill.projectilePrefab == null)
             {
@@ -29,31 +25,16 @@ namespace Vamsurlike.Skills
                 return false;
             }
 
-            EnemyNetworkBase target = AutoTargeting.FindNearestEnemy(context.CasterTransform.position, levelData.range);
-            if (target == null)
-            {
-                if (ShouldLogNoTarget())
-                    Debug.Log($"[{nameof(PierceShotgunSkill)}] 범위 내 적 없음. skill={skill.name}, range={levelData.range}");
-                return false;
-            }
-
-            Vector3 baseForward = target.transform.position - context.CasterTransform.position;
-            baseForward.y = 0f;
-            if (baseForward.sqrMagnitude < MinDirectionSqrMagnitude)
-                baseForward = context.CasterTransform.forward;
-            baseForward.Normalize();
-
             Vector3 origin = context.CasterTransform.position + Vector3.up * DefaultSpawnHeight;
             int count = Mathf.Max(1, levelData.scatterBulletCount);
             float spreadAngle = Mathf.Max(0f, levelData.scatterAngle);
 
             for (int i = 0; i < count; i++)
             {
-                Vector3 dir = GetSpreadDirection(baseForward, i, count, spreadAngle);
+                Vector3 dir = GetSpreadDirection(direction, i, count, spreadAngle);
                 SpawnBullet(skill.projectilePrefab, levelData, context.FinalDamage, context.OwnerClientId, origin, dir, context.SpeedMultiplier);
             }
 
-            Debug.Log($"[{nameof(PierceShotgunSkill)}] 발사. skill={skill.name}, count={count}, spread={spreadAngle}, pierce={levelData.pierceCount}");
             return true;
         }
 

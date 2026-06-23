@@ -1,20 +1,34 @@
 using UnityEngine;
 using Vamsurlike.Data;
+using Vamsurlike.Enemy;
 
 namespace Vamsurlike.Skills
 {
-    // 순수 C# 추상 클래스 — NetworkBehaviour 없음. RPC/Coroutine은 context.Manager 경유.
+    // 순수 C# 추상 클래스 — NetworkBehaviour 없이 실행 포트만 사용한다.
     public abstract class SkillBase : ISkillExecutor
     {
-        private float nextNoTargetLogTime;
-
-        private const float NoTargetLogInterval = 2f;
-
         public abstract SkillCastType SupportedCastType { get; }
         public virtual bool IsPersistentExecution => false;
 
         public bool CanExecute(SkillDataSO skill) => skill != null && skill.castType == SupportedCastType;
-        public abstract bool TryExecute(in SkillCastContext context);
+
+        // 템플릿: 공통 유효성 검사 → 방향 결정 → Execute 호출.
+        // 광역 처리 스킬(Aura, Melee 등)은 TryExecute를 직접 override.
+        public virtual bool TryExecute(in SkillCastContext context)
+        {
+            if (context.Skill == null || context.LevelData == null
+                || context.CasterTransform == null || context.CoroutineRunner == null)
+                return false;
+
+            Vector3 dir = ResolveDirection(
+                context.CasterTransform.position, context.LevelData.range,
+                context.CasterForward, out var target);
+            return Execute(context, dir, target);
+        }
+
+        // 타겟/방향 확정 후 실제 동작. 방향 기반 스킬이 override.
+        protected virtual bool Execute(in SkillCastContext context, Vector3 direction, EnemyNetworkBase target)
+            => false;
 
         // SkillManager.Update()가 매 프레임 호출 — 클라이언트 비주얼 갱신용 (기본 no-op)
         public virtual void OnUpdate(Transform ownerTransform) { }
@@ -25,11 +39,15 @@ namespace Vamsurlike.Skills
         // SkillManager 보유 목록에서 제거될 때 호출 — 지속 비주얼 정리용 (기본 no-op)
         public virtual void OnSkillRemoved(SkillCastType castType) { }
 
-        protected bool ShouldLogNoTarget()
+        // 가장 가까운 적 방향 반환. 없으면 fallback(CasterForward).
+        private static Vector3 ResolveDirection(
+            Vector3 from, float range, Vector3 fallback, out EnemyNetworkBase target)
         {
-            if (Time.time < nextNoTargetLogTime) return false;
-            nextNoTargetLogTime = Time.time + NoTargetLogInterval;
-            return true;
+            target = AutoTargeting.FindNearestEnemy(from, range);
+            if (target == null) return fallback;
+            Vector3 dir = target.transform.position - from;
+            dir.y = 0f;
+            return dir.sqrMagnitude > 0.0001f ? dir.normalized : fallback;
         }
     }
 }

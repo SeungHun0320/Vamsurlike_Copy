@@ -1,23 +1,31 @@
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEngine;
+using Vamsurlike.Network;
 
 namespace Vamsurlike.Player
 {
     [RequireComponent(typeof(CharacterController))]
     [RequireComponent(typeof(NetworkObject))]
     [RequireComponent(typeof(NetworkTransform))]
-    public class PlayerNetworkController : NetworkBehaviour
+    public class PlayerNetworkController : ServerBehaviour
     {
         [SerializeField] private float fallbackMoveSpeed = 5f;
         [SerializeField] private float gravity = -25f;
         [SerializeField] private float rotationSpeed = 720f;
         [SerializeField] private float maxInputMagnitude = 1f;
 
+        // 서버가 쓰고 모든 클라이언트가 읽어 애니메이션 속도를 동기화
+        public NetworkVariable<float> NetSpeed { get; } = new(
+            0f,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
+
         private CharacterController characterController;
         private PlayerNetworkStats  stats;
         private Vector2             moveInput;
         private float               verticalVelocity;
+        private bool                lastCanActState = true;
 
         public Vector2  MoveInput            => moveInput;
         public float    MoveInputMagnitude   => moveInput.magnitude;
@@ -33,9 +41,8 @@ namespace Vamsurlike.Player
 
         private void FixedUpdate()
         {
-            if (!IsServer || characterController == null) 
-                return;
-            if (stats != null && !stats.IsAlive)
+            if (characterController == null) return;
+            if (stats != null && !stats.CanAct)
             {
                 moveInput = Vector2.zero;
                 return;
@@ -46,7 +53,18 @@ namespace Vamsurlike.Player
         [ServerRpc]
         public void SubmitMoveInputServerRpc(Vector2 input)
         {
-            if (stats != null && !stats.IsAlive)
+            bool canAct = stats == null || stats.CanAct;
+
+            if (canAct != lastCanActState)
+            {
+                lastCanActState = canAct;
+                if (!canAct)
+                    Debug.LogWarning($"[SubmitMoveInputServerRpc] FAIL — CanAct=false (downed/dead). input={input}, owner={OwnerClientId}");
+                else
+                    Debug.Log($"[SubmitMoveInputServerRpc] OK — CanAct 복귀. owner={OwnerClientId}");
+            }
+
+            if (!canAct)
             {
                 moveInput = Vector2.zero;
                 return;
@@ -80,6 +98,11 @@ namespace Vamsurlike.Player
                     target,
                     rotationSpeed * deltaTime);
             }
+
+            // 모든 클라이언트가 Animator 속도를 동기화하도록 NetSpeed 갱신
+            float newSpeed = moveInput.magnitude;
+            if (Mathf.Abs(newSpeed - NetSpeed.Value) > 0.01f)
+                NetSpeed.Value = newSpeed;
         }
     }
 }

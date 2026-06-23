@@ -12,107 +12,107 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6b4a51447856db045ae04069e1460781, type: 3}
   m_Name: SD_BlackHole
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Data.SkillDataSO
-  skillName: "\uBE14\uB799\uD640"
+  skillName: "블랙홀"
   icon: {fileID: 0}
   castType: 9
   isManual: 0
   projectilePrefab: {fileID: 0}
-  vfxPrefab: {fileID: 0}
+  vfxPrefab: {fileID: 100000, guid: 42d8e21b1cd94e829d54bf8352726ca8, type: 3}
   maxLevel: 3
   levels:
-  - cooldown: 0
+  - cooldown: 10
     damage: 8
-    range: 6
-    projectileSpeed: 12
-    projectileLifetime: 2
-    projectileHitRadius: 0.5
-    projectileCount: 1
+    range: 10
+    projectileSpeed: 0
+    projectileLifetime: 0
+    projectileHitRadius: 0
+    projectileCount: 0
     spreadAngle: 0
     pierceCount: 0
-    duration: 0
+    duration: 4
     tickInterval: 0.5
     areaRadius: 6
-    orbitalCount: 2
-    orbitalRadius: 3
-    orbitalRotationSpeed: 160
-    orbitalHitRadius: 0.8
-    waveCount: 1
-    waveDelay: 0.15
-    rotationPerWave: 30
-    grenadeRange: 6
-    grenadeArcHeight: 3
-    splashRadius: 2.5
-    scatterBulletCount: 8
-    scatterAngle: 60
-    burstDuration: 2
-    meleeArcAngle: 120
-    meleeRange: 2.5
-    clusterCount: 4
-    clusterSpread: 3
-    clusterSplashRadius: 1.5
-    clusterDamageRatio: 0.5
+    orbitalCount: 0
+    orbitalRadius: 0
+    orbitalRotationSpeed: 0
+    orbitalHitRadius: 0
+    waveCount: 0
+    waveDelay: 0
+    rotationPerWave: 0
+    grenadeRange: 0
+    grenadeArcHeight: 0
+    splashRadius: 0
+    scatterBulletCount: 0
+    scatterAngle: 0
+    burstDuration: 0
+    meleeArcAngle: 0
+    meleeRange: 0
+    clusterCount: 0
+    clusterSpread: 0
+    clusterSplashRadius: 0
+    clusterDamageRatio: 0
     pullSpeed: 2
-  - cooldown: 0
+  - cooldown: 9
     damage: 12
-    range: 7
-    projectileSpeed: 12
-    projectileLifetime: 2
-    projectileHitRadius: 0.5
-    projectileCount: 1
+    range: 11
+    projectileSpeed: 0
+    projectileLifetime: 0
+    projectileHitRadius: 0
+    projectileCount: 0
     spreadAngle: 0
     pierceCount: 0
-    duration: 0
+    duration: 5
     tickInterval: 0.45
     areaRadius: 7
-    orbitalCount: 3
-    orbitalRadius: 3.5
-    orbitalRotationSpeed: 190
-    orbitalHitRadius: 0.9
-    waveCount: 1
-    waveDelay: 0.15
-    rotationPerWave: 30
-    grenadeRange: 6
-    grenadeArcHeight: 3
-    splashRadius: 2.5
-    scatterBulletCount: 8
-    scatterAngle: 60
-    burstDuration: 2
-    meleeArcAngle: 120
-    meleeRange: 2.5
-    clusterCount: 4
-    clusterSpread: 3
-    clusterSplashRadius: 1.5
-    clusterDamageRatio: 0.5
+    orbitalCount: 0
+    orbitalRadius: 0
+    orbitalRotationSpeed: 0
+    orbitalHitRadius: 0
+    waveCount: 0
+    waveDelay: 0
+    rotationPerWave: 0
+    grenadeRange: 0
+    grenadeArcHeight: 0
+    splashRadius: 0
+    scatterBulletCount: 0
+    scatterAngle: 0
+    burstDuration: 0
+    meleeArcAngle: 0
+    meleeRange: 0
+    clusterCount: 0
+    clusterSpread: 0
+    clusterSplashRadius: 0
+    clusterDamageRatio: 0
     pullSpeed: 2.5
-  - cooldown: 0
+  - cooldown: 8
     damage: 16
-    range: 8
-    projectileSpeed: 12
-    projectileLifetime: 2
-    projectileHitRadius: 0.5
-    projectileCount: 1
+    range: 12
+    projectileSpeed: 0
+    projectileLifetime: 0
+    projectileHitRadius: 0
+    projectileCount: 0
     spreadAngle: 0
     pierceCount: 0
-    duration: 0
+    duration: 6
     tickInterval: 0.4
     areaRadius: 8
-    orbitalCount: 4
-    orbitalRadius: 4
-    orbitalRotationSpeed: 220
-    orbitalHitRadius: 1
-    waveCount: 1
-    waveDelay: 0.15
-    rotationPerWave: 30
-    grenadeRange: 6
-    grenadeArcHeight: 3
-    splashRadius: 2.5
-    scatterBulletCount: 8
-    scatterAngle: 60
-    burstDuration: 2
-    meleeArcAngle: 120
-    meleeRange: 2.5
-    clusterCount: 4
-    clusterSpread: 3
-    clusterSplashRadius: 1.5
-    clusterDamageRatio: 0.5
+    orbitalCount: 0
+    orbitalRadius: 0
+    orbitalRotationSpeed: 0
+    orbitalHitRadius: 0
+    waveCount: 0
+    waveDelay: 0
+    rotationPerWave: 0
+    grenadeRange: 0
+    grenadeArcHeight: 0
+    splashRadius: 0
+    scatterBulletCount: 0
+    scatterAngle: 0
+    burstDuration: 0
+    meleeArcAngle: 0
+    meleeRange: 0
+    clusterCount: 0
+    clusterSpread: 0
+    clusterSplashRadius: 0
+    clusterDamageRatio: 0
     pullSpeed: 3

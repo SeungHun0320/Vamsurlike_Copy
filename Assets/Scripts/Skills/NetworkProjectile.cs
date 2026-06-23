@@ -162,7 +162,6 @@ namespace Vamsurlike.Skills
             if (target == null) return false;
 
             hitEnemyIds.Add(target.NetworkObjectId);
-            Debug.Log($"[{nameof(NetworkProjectile)}] Hit {target.name}. damage={Damage}, projectile={name}, position={transform.position}, hitRadius={HitRadius}");
             target.TakeDamage(Damage);
 
             if (PierceRemaining <= 0)

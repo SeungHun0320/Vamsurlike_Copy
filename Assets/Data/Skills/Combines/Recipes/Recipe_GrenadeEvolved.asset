@@ -10,8 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ce6debee47ff83e4fb707048bf1ace2a, type: 3}
-  m_Name: Recipe_OrbitalGrenade
+  m_Name: Recipe_ClusterGrenade
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Items.CombineRecipeSO
-  sourceSkill: {fileID: 11400000, guid: d524e4c633a57894fadeb5e9940f4cd5, type: 2}
-  sourceSkill2: {fileID: 11400000, guid: d8c71cede9483044492e25fd88689cf3, type: 2}
-  evolvedSkill: {fileID: 11400000, guid: 1ebbc7138fc424e44aa1e6e7099c113f, type: 2}
+  sourceSkill: {fileID: 11400000, guid: d8c71cede9483044492e25fd88689cf3, type: 2}
+  sourceSkill2: {fileID: 11400000, guid: 7af840a663adfec4d848ee4c5241a8b3, type: 2}
+  evolvedSkill: {fileID: 11400000, guid: c48048563989ee04896a6da7cc6a903e, type: 2}

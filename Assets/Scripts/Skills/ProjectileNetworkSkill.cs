@@ -9,17 +9,13 @@ namespace Vamsurlike.Skills
     public sealed class ProjectileSkill : SkillBase
     {
         private const float DefaultSpawnHeight = 0.8f;
-        private const float MinDirectionSqrMagnitude = 0.0001f;
 
         public override SkillCastType SupportedCastType => SkillCastType.Projectile;
 
-        public override bool TryExecute(in SkillCastContext context)
+        protected override bool Execute(in SkillCastContext context, Vector3 direction, EnemyNetworkBase target)
         {
             SkillDataSO skill = context.Skill;
             SkillLevelData levelData = context.LevelData;
-
-            if (skill == null || levelData == null || context.CasterTransform == null)
-                return false;
 
             if (skill.projectilePrefab == null)
             {
@@ -27,42 +23,26 @@ namespace Vamsurlike.Skills
                 return false;
             }
 
-            EnemyNetworkBase target = AutoTargeting.FindNearestEnemy(context.CasterTransform.position, levelData.range);
-            if (target == null)
-            {
-                if (ShouldLogNoTarget())
-                    Debug.Log($"[{nameof(ProjectileSkill)}] 범위 내 적 없음. skill={skill.name}, range={levelData.range}");
-                return false;
-            }
-
             Vector3 spawnPos = context.ProjectileSpawnPoint != null
                 ? context.ProjectileSpawnPoint.position
                 : context.CasterTransform.position + Vector3.up * DefaultSpawnHeight;
-
-            Vector3 direction = target.transform.position - spawnPos;
-            direction.y = 0f;
-            if (direction.sqrMagnitude < MinDirectionSqrMagnitude)
-                direction = context.CasterTransform.forward;
-
-            Vector3 baseDir = direction.normalized;
-            spawnPos += baseDir * context.SpawnForwardOffset;
+            spawnPos += direction * context.SpawnForwardOffset;
 
             int count = Mathf.Max(1, levelData.projectileCount);
             float spread = Mathf.Max(0f, levelData.spreadAngle);
             int spawnedCount = 0;
             float finalDamage = context.FinalDamage;
-
             float speedMultiplier = context.SpeedMultiplier;
+
             for (int i = 0; i < count; i++)
             {
-                Vector3 dir = GetSpreadDirection(baseDir, i, count, spread);
+                Vector3 dir = GetSpreadDirection(direction, i, count, spread);
                 if (SpawnProjectile(skill, levelData, finalDamage, context.OwnerClientId, spawnPos, dir, speedMultiplier))
                     spawnedCount++;
             }
 
             if (spawnedCount == 0) return false;
 
-            Debug.Log($"[{nameof(ProjectileSkill)}] 발사. skill={skill.name}, level={context.Level}, target={target.name}, damage={finalDamage}(x{context.AttackMultiplier}), count={spawnedCount}");
             return true;
         }
 

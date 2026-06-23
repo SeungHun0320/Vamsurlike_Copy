@@ -21,4 +21,5 @@ MonoBehaviour:
   baseDefense: 0
   basePickupRadius: 2
   startingSkills:
-  - {fileID: 11400000, guid: 7a1c7f92b9506f84dadff95298203c39, type: 2}
+  - {fileID: 11400000, guid: 1ebbc7138fc424e44aa1e6e7099c113f, type: 2}
+  - {fileID: 11400000, guid: 32b7110446a0d8641b0f165e5744725a, type: 2}

@@ -76,6 +76,13 @@ namespace Vamsurlike.Upgrades
 
             foreach (ulong clientId in NetworkManager.ConnectedClientsIds)
             {
+                // 다운된 플레이어는 카드 선택에서 제외
+                if (NetworkManager.ConnectedClients.TryGetValue(clientId, out var cl)
+                    && cl.PlayerObject != null
+                    && cl.PlayerObject.TryGetComponent<PlayerNetworkStats>(out var s)
+                    && s.IsDowned.Value)
+                    continue;
+
                 // 플레이어별 보유 스킬에 맞는 옵션 풀로 필터링
                 SkillManager skillManager = GetPlayerSkillManager(clientId);
                 int[] indices = optionPicker.GenerateOptions(
@@ -122,6 +129,7 @@ namespace Vamsurlike.Upgrades
                 return;
             }
 
+            Debug.Log($"[SubmitChoiceServerRpc] OK — clientId={clientId}, choice={choiceIndex}");
             pendingChoices.Remove(clientId);
             ApplyUpgrade(clientId, options[choiceIndex]);
             CheckAllDone();
@@ -162,7 +170,6 @@ namespace Vamsurlike.Upgrades
         {
             if (!pendingChoices.Contains(clientId)) return;
             pendingChoices.Remove(clientId);
-            Debug.Log($"[{nameof(LevelUpManager)}] clientId {clientId} 이탈 — pendingChoices에서 제거");
             CheckAllDone();
         }
 

@@ -6,7 +6,8 @@ namespace Vamsurlike.Skills
     public readonly struct SkillCastContext
     {
         public SkillCastContext(
-            SkillManager manager,
+            ISkillCoroutineRunner coroutineRunner,
+            ISkillVFXBroadcaster vfx,
             SkillDataSO skill,
             SkillLevelData levelData,
             int level,
@@ -14,10 +15,12 @@ namespace Vamsurlike.Skills
             Transform casterTransform,
             Transform projectileSpawnPoint,
             float spawnForwardOffset,
+            Vector3 casterForward,
             float attackMultiplier = 1f,
             float speedMultiplier  = 1f)
         {
-            Manager = manager;
+            CoroutineRunner = coroutineRunner;
+            VFX = vfx;
             Skill = skill;
             LevelData = levelData;
             Level = level;
@@ -25,11 +28,13 @@ namespace Vamsurlike.Skills
             CasterTransform = casterTransform;
             ProjectileSpawnPoint = projectileSpawnPoint;
             SpawnForwardOffset = spawnForwardOffset;
+            CasterForward = casterForward.sqrMagnitude > 0.0001f ? casterForward.normalized : Vector3.forward;
             AttackMultiplier = Mathf.Max(0f, attackMultiplier);
             SpeedMultiplier  = Mathf.Max(0f, speedMultiplier);
         }
 
-        public SkillManager    Manager              { get; }
+        public ISkillCoroutineRunner CoroutineRunner { get; }
+        public ISkillVFXBroadcaster VFX              { get; }
         public SkillDataSO     Skill                { get; }
         public SkillLevelData  LevelData            { get; }
         public int             Level                { get; }
@@ -37,6 +42,8 @@ namespace Vamsurlike.Skills
         public Transform       CasterTransform      { get; }
         public Transform       ProjectileSpawnPoint { get; }
         public float           SpawnForwardOffset   { get; }
+        // 타겟 없을 때 스킬 발사 방향 폴백 (LastNonZeroMoveDirection 기반)
+        public Vector3         CasterForward        { get; }
         public float           AttackMultiplier     { get; }
         public float           SpeedMultiplier      { get; }
 

@@ -6,7 +6,7 @@ namespace Vamsurlike.Network
 {
     // Enemy 프리팹에 부착. 서버 전용으로 거리 기반 NetworkShow/NetworkHide를 주기적으로 평가한다.
     [DisallowMultipleComponent]
-    public class NetworkVisibilityController : NetworkBehaviour
+    public class NetworkVisibilityController : ServerBehaviour
     {
         [SerializeField] private float visibilityRange = 50f;
         [SerializeField] private float updateInterval  = 0.5f;
@@ -21,22 +21,18 @@ namespace Vamsurlike.Network
                 netObj.CheckObjectVisibility = IsVisibleToClient;
         }
 
-        public override void OnNetworkSpawn()
+        protected override void OnServerSpawned()
         {
-            if (!IsServer) { enabled = false; return; }
-
-            // 스폰 시점에 이미 접속 중인 클라이언트 가시 목록 초기화
             foreach (var kv in NetworkManager.Singleton.ConnectedClients)
             {
                 if (IsVisibleToClient(kv.Key))
                     visibleClients.Add(kv.Key);
             }
-
             NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
             timer = 0f;
         }
 
-        public override void OnNetworkDespawn()
+        protected override void OnServerDespawned()
         {
             if (NetworkManager.Singleton != null)
                 NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;

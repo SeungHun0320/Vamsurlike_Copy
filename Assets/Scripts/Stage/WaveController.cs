@@ -16,6 +16,7 @@ namespace Vamsurlike.Stage
 
         private SysRandom rng;
         private EnemySpawnManager spawnManager;
+        private int _currentWaveIndex;
 
         // StageRuntime.OnNetworkSpawn에서 Initialize → Begin 순으로 호출
         public void Initialize(EnemySpawnManager enemySpawnManager)
@@ -35,6 +36,7 @@ namespace Vamsurlike.Stage
         {
             for (int i = 0; i < waves.Length; i++)
             {
+                _currentWaveIndex = i;
                 WaveDataSO wave = waves[i];
                 if (wave == null) continue;
                 yield return StartCoroutine(SpawnWave(wave));
@@ -43,15 +45,24 @@ namespace Vamsurlike.Stage
 
             if (!loopLastWave || waves.Length == 0) yield break;
 
-            var last = waves[waves.Length - 1];
-            if(last == null)
-                yield break;
+            _currentWaveIndex = waves.Length - 1;
+            var last = waves[_currentWaveIndex];
+            if (last == null) yield break;
 
             while (true)
             {
                 yield return StartCoroutine(SpawnWave(last));
                 yield return new WaitForSeconds(last.waveDuration);
             }
+        }
+
+        public void ForceRespawnWave()
+        {
+            if (waves == null || waves.Length == 0) return;
+            int idx = Mathf.Clamp(_currentWaveIndex, 0, waves.Length - 1);
+            if (waves[idx] == null) return;
+            StartCoroutine(SpawnWave(waves[idx]));
+            Debug.Log($"[WaveController] 디버그 강제 스폰: Wave {idx}");
         }
 
         private IEnumerator SpawnWave(WaveDataSO wave)

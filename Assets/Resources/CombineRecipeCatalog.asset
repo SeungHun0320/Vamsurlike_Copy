@@ -13,7 +13,6 @@ MonoBehaviour:
   m_Name: CombineRecipeCatalog
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Items.CombineRecipeCatalog
   recipes:
-  - {fileID: 11400000, guid: 906ea1fc1b5176d489e710d5437c4daf, type: 2}
   - {fileID: 11400000, guid: 066bc59094f1f2b40a88645128e71e45, type: 2}
   - {fileID: 11400000, guid: 3a8a71768a152cb41b0e60c415212536, type: 2}
   - {fileID: 11400000, guid: 259e8c8312fc16c4a98e2b6b8fae970b, type: 2}

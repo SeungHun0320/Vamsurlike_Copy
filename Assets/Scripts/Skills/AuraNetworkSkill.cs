@@ -35,23 +35,17 @@ namespace Vamsurlike.Skills
             {
                 serverBroadcastSent = true;
                 serverRadius = radius;
-                context.Manager.BroadcastAreaCircleClientRpc(SupportedCastType, radius, 0f, true);
+                context.VFX?.ShowAreaCircle(SupportedCastType, radius, 0f, true);
             }
 
             int count = AutoTargeting.FindEnemiesInRange(context.CasterTransform.position, radius, targets);
 
-            if (count == 0)
-            {
-                if (ShouldLogNoTarget())
-                    Debug.Log($"[{nameof(AuraSkill)}] 범위 내 적 없음. skill={skill.name}, radius={radius}");
-                return false;
-            }
+            if (count == 0) return true; // 적 없어도 VFX 유지, 데미지만 생략
 
             float damage = context.FinalDamage;
             for (int i = 0; i < targets.Count; i++)
                 targets[i].TakeDamage(damage);
 
-            Debug.Log($"[{nameof(AuraSkill)}] 틱. skill={skill.name}, level={context.Level}, damage={damage}(x{context.AttackMultiplier}), radius={radius}, targets={count}");
             return true;
         }
     }

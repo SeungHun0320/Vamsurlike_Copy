@@ -18,20 +18,32 @@ namespace Vamsurlike.Skills
 
         public override bool TryExecute(in SkillCastContext context)
         {
-            if (context.Skill == null || context.LevelData == null || context.CasterTransform == null)
+            if (context.Skill == null
+                || context.LevelData == null
+                || context.CasterTransform == null
+                || context.CoroutineRunner == null)
                 return false;
 
-            context.Manager.StartSkillCoroutine(
-                ThrowCoroutine(context.CasterTransform.position, context.LevelData, context.FinalDamage, context.Manager));
+            context.CoroutineRunner.StartSkillCoroutine(ThrowCoroutine(
+                context.CasterTransform.position,
+                context.LevelData,
+                context.FinalDamage,
+                context.CoroutineRunner,
+                context.VFX));
             return true;
         }
 
-        private IEnumerator ThrowCoroutine(Vector3 origin, SkillLevelData levelData, float finalDamage, SkillManager manager)
+        private IEnumerator ThrowCoroutine(
+            Vector3 origin,
+            SkillLevelData levelData,
+            float finalDamage,
+            ISkillCoroutineRunner coroutineRunner,
+            ISkillVFXBroadcaster vfx)
         {
             Vector3 target = PickRandomTarget(origin, levelData.grenadeRange);
 
             Vector3 spawnPos = origin + Vector3.up * SpawnHeightOffset;
-            manager.BroadcastGrenadeVFXClientRpc(spawnPos, target, levelData.grenadeArcHeight, FlightTime);
+            vfx?.ShowGrenade(spawnPos, target, levelData.grenadeArcHeight, FlightTime);
 
             float elapsed = 0f;
             while (elapsed < FlightTime)
@@ -49,8 +61,13 @@ namespace Vamsurlike.Skills
             for (int i = 0; i < levelData.clusterCount; i++)
             {
                 Vector3 subTarget = PickRandomTarget(target, levelData.clusterSpread);
-                manager.BroadcastGrenadeVFXClientRpc(target, subTarget, levelData.grenadeArcHeight * 0.4f, SubFlightTime);
-                manager.StartSkillCoroutine(SubGrenadeCoroutine(subTarget, levelData.clusterSplashRadius, subDamage));
+                vfx?.ShowGrenade(
+                    target,
+                    subTarget,
+                    levelData.grenadeArcHeight * 0.4f,
+                    SubFlightTime);
+                coroutineRunner.StartSkillCoroutine(
+                    SubGrenadeCoroutine(subTarget, levelData.clusterSplashRadius, subDamage));
             }
         }
 

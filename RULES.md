@@ -11,7 +11,7 @@
 | **S** 단일 책임 | 클래스 하나 = 역할 하나. `PlayerStats`는 스탯만, `PlayerController`는 이동만 |
 | **O** 개방/폐쇄 | 새 스킬/아이템 추가 시 기존 코드 수정 금지. `SkillBase` 상속으로 확장 |
 | **L** 리스코프 치환 | 파생 클래스는 베이스 계약을 깨지 않음. `BossBase`는 `EnemyBase`를 완전히 대체 가능 |
-| **I** 인터페이스 분리 | `IDamageable`, `IPickupable`, `ISkillExecutable` 등 작게 분리. 거대 인터페이스 금지 |
+| **I** 인터페이스 분리 | `ISkillExecutor`, `IGameObjectPool`, `INetworkObjectPool` 등 작게 분리. 거대 인터페이스 금지. `IDamageable`, `IPickupable`은 추후 추가 예정 |
 | **D** 의존성 역전 | 구체 클래스가 아닌 인터페이스/추상 클래스에 의존. 직접 `new` 생성 최소화 |
 
 ---
@@ -32,6 +32,7 @@
 | Command | 레벨업 선택 적용, Undo 가능 구조 |
 | Decorator | 스탯 버프/디버프 스택 |
 | Singleton | `GameManager`, `PoolManager` 등 전역 매니저 (남용 금지) |
+| Facade | `ICoreFacade`, `IWorldFacade` — 시스템 진입점을 단일 인터페이스로 노출. 외부가 내부 구조를 직접 참조하지 않도록 |
 
 ---
 
@@ -159,6 +160,20 @@ public void TakeDamage(float amount)
 - **멀티 대비**: 게임 로직(데미지, 스폰, 드롭)은 반드시 매니저 경유. 직접 처리 금지.
 - **랜덤**: `Random.Range` 대신 시드 기반 `System.Random` 인스턴스 사용 (서버/클라 재현성 보장).
 - **물리 처리**: `CharacterController`, 중력, `Rigidbody` 관련 처리는 모두 `FixedUpdate` + `Time.fixedDeltaTime`. 입력 읽기는 `Update`.
+- **서버 권한 검증**: 데미지·드롭·스폰 등 게임 상태를 바꾸는 모든 메서드는 첫 줄에 `if (!IsServer) return;` 또는 `if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;` 삽입. 클라이언트가 직접 상태를 수정하지 않도록 강제.
+
+```csharp
+// ✅ 서버 권한 검증 패턴
+public void TakeDamage(float amount)
+{
+    if (!IsServer)
+    {
+        Debug.LogWarning($"[{nameof(EnemyNetworkBase)}] TakeDamage ignored on client.");
+        return;
+    }
+    // 이하 서버 로직
+}
+```
 
 ---
 

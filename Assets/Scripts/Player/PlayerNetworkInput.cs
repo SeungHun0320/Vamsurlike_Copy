@@ -1,35 +1,90 @@
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Vamsurlike.Network;
 
 namespace Vamsurlike.Player
 {
     [RequireComponent(typeof(PlayerNetworkController))]
     [RequireComponent(typeof(Skills.SkillManager))]
-    public class PlayerNetworkInput : NetworkBehaviour
+    public class PlayerNetworkInput : OwnerBehaviour
     {
+        private const float ReviveInteractRadius = 2.5f;
+
         private PlayerNetworkController controller;
-        private Skills.SkillManager skillManager;
-        private Vector2 lastSentDir;
+        private Skills.SkillManager     skillManager;
+        private Vector2                 lastSentDir;
+        private PlayerReviveHandler     currentReviveTarget;
 
         private void Awake()
         {
-            controller = GetComponent<PlayerNetworkController>();
+            controller   = GetComponent<PlayerNetworkController>();
             skillManager = GetComponent<Skills.SkillManager>();
         }
 
         private void Update()
         {
-            if (!IsOwner) return;
-
             Keyboard keyboard = Keyboard.current;
-            if (keyboard != null && keyboard.spaceKey.wasPressedThisFrame && skillManager != null)
+            if (keyboard == null) return;
+
+            if (keyboard.spaceKey.wasPressedThisFrame && skillManager != null)
                 skillManager.ActivateFirstManualSkillServerRpc();
+
+            if (keyboard.eKey.wasPressedThisFrame)
+                TryStartRevive();
+            else if (keyboard.eKey.wasReleasedThisFrame)
+                StopRevive();
+        }
+
+        private void TryStartRevive()
+        {
+            var all = PlayerReviveHandler.All;
+            Debug.Log($"[TryStartRevive] E 입력. 등록된 핸들러 수={all.Count}");
+
+            for (int i = 0; i < all.Count; i++)
+            {
+                var h = all[i];
+                var ps = h.GetComponent<PlayerNetworkStats>();
+                float dist = Vector3.Distance(transform.position, h.transform.position);
+                bool isDowned = ps != null && ps.IsDowned.Value;
+                Debug.Log($"  [{i}] owner={h.NetworkObject.OwnerClientId}, local={NetworkManager.LocalClientId}, " +
+                          $"isDowned={isDowned}, dist={dist:F2}, radius={ReviveInteractRadius}");
+            }
+
+            var target = FindDownedPlayerInRange();
+            if (target == null) return;
+            currentReviveTarget = target;
+            target.BeginReviveServerRpc();
+        }
+
+        private void StopRevive()
+        {
+            if (currentReviveTarget == null) return;
+            currentReviveTarget.CancelReviveServerRpc();
+            currentReviveTarget = null;
+        }
+
+        private PlayerReviveHandler FindDownedPlayerInRange()
+        {
+            var all = PlayerReviveHandler.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var handler = all[i];
+                if (!handler.IsSpawned) continue;
+                if (handler.NetworkObject.OwnerClientId == NetworkManager.LocalClientId) continue;
+
+                var pStats = handler.GetComponent<PlayerNetworkStats>();
+                if (pStats == null || !pStats.IsDowned.Value) continue;
+
+                if (Vector3.Distance(transform.position, handler.transform.position) <= ReviveInteractRadius)
+                    return handler;
+            }
+            return null;
         }
 
         private void FixedUpdate()
         {
-            if (!IsOwner || controller == null) return;
+            if (controller == null) return;
 
             Vector2 raw      = ReadMoveInput();
             Vector2 worldDir = ToCameraRelative(raw);

@@ -11,7 +11,6 @@ namespace Vamsurlike.Skills
     public class ScatterShotSkill : SkillBase
     {
         private const float DefaultSpawnHeight = 0.8f;
-        private const float MinDirectionSqrMagnitude = 0.0001f;
 
         // RULES.md: 시드 기반 System.Random 사용
         private readonly System.Random rng = new();
@@ -24,15 +23,12 @@ namespace Vamsurlike.Skills
         // 쿨다운 방식으로 변경 — SkillManager의 UpdateCooldownSkill이 처리
         public override bool IsPersistentExecution => false;
 
-        public override bool TryExecute(in SkillCastContext context)
+        protected override bool Execute(in SkillCastContext context, Vector3 direction, EnemyNetworkBase _)
         {
             if (isBurstActive) return false; // burst 중 중복 시작 차단
 
             SkillDataSO skill = context.Skill;
             SkillLevelData levelData = context.LevelData;
-
-            if (skill == null || levelData == null || context.CasterTransform == null)
-                return false;
 
             if (skill.projectilePrefab == null)
             {
@@ -40,30 +36,10 @@ namespace Vamsurlike.Skills
                 return false;
             }
 
-            // 가장 가까운 적 방향을 기준 방향으로 사용
-            EnemyNetworkBase target = AutoTargeting.FindNearestEnemy(
-                context.CasterTransform.position, levelData.range);
-
-            Vector3 baseForward;
-            if (target != null)
-            {
-                baseForward = target.transform.position - context.CasterTransform.position;
-                baseForward.y = 0f;
-                baseForward = baseForward.sqrMagnitude < MinDirectionSqrMagnitude
-                    ? context.CasterTransform.forward
-                    : baseForward.normalized;
-            }
-            else
-            {
-                if (ShouldLogNoTarget())
-                    Debug.Log($"[{nameof(ScatterShotSkill)}] 범위 내 적 없음. skill={skill.name}, range={levelData.range}");
-                return false; // 타겟 없으면 burst 시작 안 함
-            }
-
             isBurstActive = true;
-            context.Manager.StartSkillCoroutine(FireBurstCoroutine(
+            context.CoroutineRunner.StartSkillCoroutine(FireBurstCoroutine(
                 skill.projectilePrefab, levelData, context.FinalDamage,
-                context.OwnerClientId, context.CasterTransform, baseForward, skill.name, context.SpeedMultiplier));
+                context.OwnerClientId, context.CasterTransform, direction, skill.name, context.SpeedMultiplier));
 
             return true;
         }
@@ -80,8 +56,6 @@ namespace Vamsurlike.Skills
             float interval = count > 1 ? levelData.burstDuration / (count - 1) : 0f;
 
             float recoilAngle = 0f; // 누적 반동 각도
-
-            Debug.Log($"[{nameof(ScatterShotSkill)}] Burst 시작. skill={skillName}, count={count}, spread=±{halfSpread}°, interval={interval:F3}s");
 
             for (int i = 0; i < count; i++)
             {

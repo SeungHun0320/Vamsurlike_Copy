@@ -17,7 +17,10 @@ namespace Vamsurlike.Skills
             SkillDataSO skill = context.Skill;
             SkillLevelData levelData = context.LevelData;
 
-            if (skill == null || levelData == null || context.CasterTransform == null)
+            if (skill == null
+                || levelData == null
+                || context.CasterTransform == null
+                || context.CoroutineRunner == null)
                 return false;
 
             if (skill.projectilePrefab == null)
@@ -27,16 +30,19 @@ namespace Vamsurlike.Skills
             }
 
             // in 파라미터는 코루틴에 캡처 불가 — 필요한 값만 추출
-            context.Manager.StartSkillCoroutine(FireWavesCoroutine(
+            context.CoroutineRunner.StartSkillCoroutine(FireWavesCoroutine(
                 skill.projectilePrefab, levelData, context.FinalDamage,
-                context.OwnerClientId, context.CasterTransform, skill.name, context.Manager));
+                context.OwnerClientId, context.CasterTransform, skill.name, context.VFX));
 
             return true;
         }
 
         private static IEnumerator FireWavesCoroutine(
             GameObject prefab, SkillLevelData levelData, float finalDamage,
-            ulong ownerClientId, Transform casterTransform, string skillName, SkillManager manager)
+            ulong ownerClientId,
+            Transform casterTransform,
+            string skillName,
+            ISkillVFXBroadcaster vfx)
         {
             int waveCount = Mathf.Max(1, levelData.waveCount);
             int bulletsPerWave = Mathf.Max(1, levelData.projectileCount);
@@ -65,7 +71,7 @@ namespace Vamsurlike.Skills
             }
 
             if (casterTransform != null)
-                manager.PlayUltimateVFXClientRpc(casterTransform.position);
+                vfx?.ShowUltimate(casterTransform.position);
 
             Debug.Log($"[{nameof(UltimateSkill)}] BulletStorm 완료. skill={skillName}");
         }

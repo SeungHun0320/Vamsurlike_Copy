@@ -51,7 +51,6 @@ namespace Vamsurlike.Network
             NetworkManager.Singleton.SceneManager.OnLoadEventCompleted += HandleLoadEventCompleted;
             NetworkManager.Singleton.SceneManager.OnSynchronizeComplete += HandleSynchronizeComplete;
             isSubscribedToSceneEvents = true;
-            Debug.Log($"[{nameof(NetworkPlayerSpawner)}] NetworkSceneManager 이벤트 구독 완료.");
         }
 
         private void UnsubscribeFromSceneEvents()
@@ -114,7 +113,6 @@ namespace Vamsurlike.Network
             }
 
             networkObject.SpawnAsPlayerObject(clientId, destroyWithScene: true);
-            Debug.Log($"[{nameof(NetworkPlayerSpawner)}] clientId {clientId} 플레이어 스폰 완료. position={spawnPosition}");
         }
 
         private bool CanServerSpawnInScene(string sceneName)

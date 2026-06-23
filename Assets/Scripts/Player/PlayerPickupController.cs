@@ -2,12 +2,13 @@ using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Items;
+using Vamsurlike.Network;
 using Vamsurlike.Stage;
 
 namespace Vamsurlike.Player
 {
     [RequireComponent(typeof(PlayerNetworkStats))]
-    public class PlayerPickupController : NetworkBehaviour
+    public class PlayerPickupController : OwnerBehaviour
     {
         private PlayerNetworkStats stats;
         private float checkTimer;
@@ -24,8 +25,6 @@ namespace Vamsurlike.Player
 
         private void Update()
         {
-            if (!IsOwner) return;
-
             checkTimer -= Time.deltaTime;
             if (checkTimer > 0f) return;
             checkTimer = CheckInterval;

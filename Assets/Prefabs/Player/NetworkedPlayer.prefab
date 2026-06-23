@@ -419,7 +419,9 @@ GameObject:
   - component: {fileID: 4068285843582478324}
   - component: {fileID: 5028191962685312863}
   - component: {fileID: 4342171377839567156}
+  - component: {fileID: 7483216701945328601}
   - component: {fileID: 3868694679171841}
+  - component: {fileID: 126953368653616146}
   m_Layer: 6
   m_Name: NetworkedPlayer
   m_TagString: Player
@@ -643,6 +645,20 @@ MonoBehaviour:
   projectileSpawnPoint: {fileID: 0}
   spawnForwardOffset: 0.8
   failedCastRetryDelay: 0.1
+--- !u!114 &7483216701945328601
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3346994395623583896}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 52d8e11890614116a1bbf15637ba89c4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Skills.SkillVFXController
+  ShowTopMostFoldoutHeaderGroup: 1
+  characterData: {fileID: 11400000, guid: 964b173f302986044b98b8a08fae49d7, type: 2}
   orbitalVisualPrefab: {fileID: 7209417620919649187, guid: 9378fd5e85aa92a42bf1b911ce5a3b9d, type: 3}
   orbitalHeightOffset: 1
 --- !u!114 &3868694679171841
@@ -658,6 +674,23 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Upgrades.PassiveStatHandler
   ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &126953368653616146
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3346994395623583896}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 962554eb3693ff449bdbbd1fe8a2f77d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Player.PlayerReviveHandler
+  ShowTopMostFoldoutHeaderGroup: 1
+  downedDuration: 30
+  reviveDuration: 3
+  reviveHPRatio: 0.3
+  reviveRadius: 2.5
 --- !u!1 &3716566736859526982
 GameObject:
   m_ObjectHideFlags: 0

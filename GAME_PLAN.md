@@ -499,9 +499,21 @@ int maxLevel / SkillLevelData[] levels
 CombineRecipeSO evolutionRecipe / GameObject effectPrefab / AudioClip sfx
 ```
 
-### ItemDataSO / CombineRecipeSO / WaveDataSO / StageDataSO
+### ItemDataSO / CombineRecipeSO
 
-구조는 기존 계획과 동일. WaveDataSO에 `int basePlayerCount` 추가 (Co-op 밸런싱 기준).
+구조는 기존 계획과 동일.
+
+### DataTableSO 패턴 (Phase 7 도입)
+
+스테이지·웨이브처럼 **동종 데이터가 여러 행**으로 늘어나는 경우, 개별 `.asset` 파일 대신 단일 테이블 에셋으로 관리한다.
+
+| 테이블 에셋 | 행 타입 | 위치 |
+|---|---|---|
+| `StageTable.asset` | `StageRow` | `Assets/Data/Stages/` |
+| `WaveTable.asset` | `WaveRow` | `Assets/Data/Stages/` |
+| `EnemyScalingTable.asset` | `ScalingRow` | `Assets/Data/Stages/` |
+
+규칙: 행 타입은 `[Serializable] struct`. 외부 참조(EnemyDataSO 등)는 필드로 허용. 인덱스 또는 ID 기반 조회는 `DataTableSO<TRow>.TryGet(int index)` 통일.
 
 ---
 
@@ -566,6 +578,16 @@ Done when: 4명이 Stage_01에 접속하고 WASD 이동이 모든 클라이언�
   - HUD는 `hp.OnValueChanged` 구독으로 갱신 (별도 ClientRpc 불필요)
   - 피격 연출처럼 값과 별개의 이벤트가 필요할 때만 `[ClientRpc]` 추가
 - [ ] PlayerNetworkAnimator 구현 (NetworkAnimator 연동)
+- [ ] `PlayerNetworkStats`에 다운 상태 추가 (Co-op 부활 시스템 기반)
+  - `NetworkVariable<bool>` IsDowned — HP=0 직후 진입하는 부활 가능 상태 (IsAlive=false 영구 사망과 구분)
+  - `NetworkVariable<float>` DownedTimeRemaining — 카운트다운. 만료 시 영구 사망
+  - `CanAct = IsAlive && !IsDowned.Value` — 이동·스킬 발동 조건
+- [ ] PlayerReviveHandler 구현 (서버 권한, 부활 흐름 전담)
+  - `static List<PlayerReviveHandler> All` — 범위 탐색용 레지스트리 (OnNetworkSpawn/Despawn 자동 등록)
+  - `BeginReviveServerRpc` / `CancelReviveServerRpc` — `RequireOwnership = false` (누구나 호출 가능)
+  - 구조자가 일정 거리 내에 있는 동안 진행도 누적 → 완료 시 `IsDowned=false` + HP 일부 복구
+  - 다운 타이머 만료 → `IsAlive=false` 영구 사망
+- [ ] `PlayerNetworkInput`에 E키 부활 상호작용 추가 (`PlayerReviveHandler.All` 레지스트리 순회로 탐색)
 - [ ] 로컬 Cinemachine 설정 (OnNetworkSpawn에서 IsLocalPlayer 기준으로 카메라 활성화)
 - [ ] NetworkPlayerSpawner 구현 (서버가 플레이어 스폰 위치 지정)
 - [ ] CharacterDataSO 연결 (baseHP, baseMoveSpeed 초기화)
@@ -580,7 +602,7 @@ Done when: 4명이 Stage_01에 접속하고 WASD 이동이 모든 클라이언�
 Done when: 서버가 적 3종을 스폰하고 NavMesh로 플레이어를 추적하며, 공격·사망·XP 드랍이 모든 클라이언트에 동기화된다.
 
 - [ ] EnemyDataSO 3종 작성
-- [ ] WaveDataSO, WaveEntryData 구현 (Co-op 플레이어 수 배율 포함)
+- [ ] WaveDataSO, WaveEntryData 구현 (Co-op 플레이어 수 배율 포함) — Phase 7에서 WaveTableSO로 대체되는 임시 구조
 - [ ] EnemyNetworkBase 구현
   - NetworkBehaviour + NetworkTransform (Server Authority)
   - AI 로직은 `if (!IsServer) return;` 가드
@@ -661,7 +683,8 @@ Done when: 모든 플레이어가 공유 XP로 동시에 레벨업하면, 게임
   - XP 추가는 서버만 (`IsServer` 체크)
   - `XPOrbManager.TryPickup`은 `PlayerNetworkStats.AddXP`가 아니라 `SharedLevelSystem.AddXP`로 연결
   - 레벨업 조건 달성 시 `GameState → LevelingUp` 전환 + 각 클라이언트 옵션 전송
-- [ ] GameState에 `LevelingUp` 추가 (`NetworkVariable<GameState>` in StageNetworkManager)
+- [ ] `StageRuntime` 최소 구조 구현 (Phase 7에서 완성 — 여기서는 `NetworkVariable<GameState> CurrentState`와 `SetGameState()` 진입점만 필요. Phase 5~6 코드가 `StageRuntime.Instance`를 참조하므로 먼저 존재해야 함)
+- [ ] GameState에 `LevelingUp` 추가 (`NetworkVariable<GameState>` in StageRuntime)
   - 서버 gameplay tick은 `GameState.Playing`일 때만 진행
   - `LevelingUp` 진입: 서버와 모든 클라이언트 `Time.timeScale = 0`
   - `Playing` 복귀: 서버와 모든 클라이언트 `Time.timeScale = 1`
@@ -721,7 +744,7 @@ Done when: 적이 3종 아이템을 드랍하고, 상자 픽업 시 전원에게
   → GameState → Playing
 ```
 
-> **ChestOpening은 LevelingUp과 별도 GameState로 확정.** 상태 의미가 달라 디버깅·로그 구분이 편하고, `StageRuntime.OnGameStateChanged`와 각 tick 가드에서 두 상태를 명확히 처리할 수 있다. Phase 7 `GameState` enum에 `ChestOpening` 추가 필요.
+> **ChestOpening은 LevelingUp과 별도 GameState로 확정.** 상태 의미가 달라 디버깅·로그 구분이 편하고, `StageRuntime.OnGameStateChanged`와 각 tick 가드에서 두 상태를 명확히 처리할 수 있다. `GameState` enum 추가는 이 Phase(6)의 구현 항목에 포함됨.
 
 > **ChestRewardManager는 LevelUpManager와 별도로 구현.** LevelUpManager는 공유 XP 레벨업 책임이 이미 있어 상자 흐름을 합치면 책임이 커진다. 구조가 거의 동일하므로 복사 후 분리하는 것이 유지보수에 유리하다.
 
@@ -839,26 +862,241 @@ float meleeRange          // 판정 거리
 
 ---
 
-### Phase 7. 스테이지와 보스
+### Phase 7. 스테이지와 보스 (데이터 테이블 기반)
 
 Done when: Stage_01에서 5분 생존 후 보스가 등장하고, 보스 처치/전멸 결과가 전원에게 동기화된다.
 
-- [ ] StageDataSO 구현
-- [ ] StageNetworkManager 구현
-  - `NetworkVariable<GameState>` Playing / LevelingUp / ChestOpening / BossPhase / Clear / GameOver
-  - 생존 타이머 서버에서만 실행
-- [ ] MapManager 구현
-- [ ] BossNetworkBase 구현 (EnemyNetworkBase 상속, 페이즈 전환 로직)
-- [ ] BossHealthBar 구현 (`NetworkVariable<float>` HP → 모든 클라이언트 HUD)
-- [ ] Stage_01 웨이브 데이터 작성
-- [ ] 보스 1종 데이터 작성
-- [ ] 승리/패배 `[ClientRpc]` 동기화 → 결과 화면 전환
+---
 
-예상 기간: 4~7일
+#### 데이터 테이블 설계
+
+"ScriptableObject 1개 = 데이터 1개" 방식 대신 **DataTableSO 패턴**을 사용한다.
+테이블 1개 에셋이 전체 행(row)을 보관하며, 인덱스 또는 ID로 조회한다. UE4 DataTable과 동일한 발상.
+
+```csharp
+// 공통 제네릭 베이스 — Assets/Scripts/Data/DataTableSO.cs
+public abstract class DataTableSO<TRow> : ScriptableObject
+    where TRow : struct
+{
+    [SerializeField] private List<TRow> rows = new();
+
+    public IReadOnlyList<TRow> Rows       => rows;
+    public int                 Count      => rows.Count;
+    public TRow                this[int i] => rows[i];
+
+    public bool TryGet(int index, out TRow row)
+    {
+        if (index < 0 || index >= rows.Count) { row = default; return false; }
+        row = rows[index];
+        return true;
+    }
+}
+```
 
 ---
 
-### Phase 8. UI, 저장, 최적화, 밸런스
+#### 테이블 스키마
+
+**StageTableSO** — `Assets/Data/Stages/StageTable.asset`
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `stageId` | `int` | 고유 ID (1부터) |
+| `stageName` | `string` | "Stage 01 — Survival" |
+| `durationSeconds` | `float` | 생존 목표 시간 (기본 300초) |
+| `waveGroupId` | `int` | WaveTableSO에서 이 ID와 일치하는 행들을 시퀀스로 사용 |
+| `bossData` | `EnemyDataSO` | 보스 스폰 데이터 (null이면 보스 없음) |
+| `clearCondition` | `StageClearCondition` | `TimeSurvival` / `BossKill` / `BothRequired` |
+
+**WaveTableSO** — `Assets/Data/Stages/WaveTable.asset`
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `waveGroupId` | `int` | StageRow.waveGroupId와 매핑 |
+| `sequenceIndex` | `int` | 웨이브 순서 (0부터, 오름차순) |
+| `entries` | `WaveEntryData[]` | 적 종류 + 수 + 스폰 간격 (spawnActionName이 비어 있을 때 사용) |
+| `waveDuration` | `float` | 이 웨이브 종료 후 다음까지 대기 시간(초) |
+| `loopFromHere` | `bool` | 이 행 이후 루프 시작점 여부 |
+| `spawnActionName` | `string` | 호출할 커스텀 스폰 함수 이름. 비어 있으면 entries 기반 기본 스폰 실행 |
+
+```csharp
+[Serializable]
+public struct WaveRow
+{
+    public int             waveGroupId;
+    public int             sequenceIndex;
+    public WaveEntryData[] entries;
+    public float           waveDuration;
+    public bool            loopFromHere;
+    public string          spawnActionName; // 예: "SpawnEliteRing", "SpawnBossMinions"
+}
+```
+
+---
+
+#### Named Spawn Action 패턴
+
+`spawnActionName`이 지정된 웨이브는 `entries` 대신 이름으로 등록된 커스텀 함수를 실행한다.
+
+**WaveSpawnActionRegistry** — `WaveController`가 소유하는 딕셔너리 레지스트리
+
+```csharp
+// WaveController 내부
+private readonly Dictionary<string, Func<WaveRow, IEnumerator>> spawnActions = new();
+
+private void RegisterSpawnActions()
+{
+    spawnActions["SpawnEliteRing"]    = SpawnEliteRing;
+    spawnActions["SpawnBossMinions"]  = SpawnBossMinions;
+    spawnActions["SpawnAmbush"]       = SpawnAmbush;
+    // 새 스폰 패턴 추가 시 이곳에만 등록
+}
+```
+
+**WaveController 디스패치 흐름**
+
+```csharp
+private IEnumerator ExecuteWave(WaveRow wave)
+{
+    if (!string.IsNullOrEmpty(wave.spawnActionName) &&
+        spawnActions.TryGetValue(wave.spawnActionName, out var action))
+    {
+        yield return StartCoroutine(action(wave));   // 커스텀 스폰
+    }
+    else
+    {
+        yield return StartCoroutine(DefaultSpawnWave(wave));  // entries 기반 기본 스폰
+    }
+    yield return new WaitForSeconds(wave.waveDuration);
+}
+```
+
+**커스텀 스폰 함수 예시**
+
+```csharp
+// 원형 포위 — 8방향에서 엘리트 동시 스폰
+private IEnumerator SpawnEliteRing(WaveRow wave)
+{
+    if (wave.entries.Length == 0) yield break;
+    var entry = wave.entries[0];
+    int count = Mathf.Max(1, entry.count);
+    for (int i = 0; i < count; i++)
+    {
+        float angle = i * (360f / count) * Mathf.Deg2Rad;
+        Vector3 pos = GetCenterPosition() +
+                      new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * spawnRadius;
+        spawnManager.SpawnEnemy(entry.enemyData, pos, hpMul, dmgMul);
+    }
+}
+
+// 보스 미니언 — 보스 HP 50% 이하 트리거로 호출
+private IEnumerator SpawnBossMinions(WaveRow wave) { ... }
+```
+
+**등록 규칙:**
+- 함수 이름은 `PascalCase` + `Spawn` 접두사 (`SpawnEliteRing`, `SpawnAmbush`)
+- 시그니처 고정: `IEnumerator FuncName(WaveRow wave)`
+- 코드에 없는 이름을 테이블에 입력하면 기본 스폰으로 폴백 (LogWarning 출력)
+
+```csharp
+// 미등록 이름 경고
+if (!string.IsNullOrEmpty(wave.spawnActionName) &&
+    !spawnActions.ContainsKey(wave.spawnActionName))
+{
+    Debug.LogWarning($"[WaveController] 미등록 spawnActionName='{wave.spawnActionName}' → 기본 스폰 실행");
+}
+```
+
+**EnemyScalingTableSO** — `Assets/Data/Stages/EnemyScalingTable.asset`
+
+시간 경과에 따른 난이도 배율을 인라인 수식 대신 테이블로 관리. `WaveController`에서 경과 시간 기준으로 가장 가까운 행을 조회한다.
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `timeMinutes` | `float` | 이 행이 적용되는 시작 분 |
+| `hpMultiplier` | `float` | 기준 HP 배율 |
+| `damageMultiplier` | `float` | 기준 공격력 배율 |
+| `spawnRateMultiplier` | `float` | 스폰 속도 배율 |
+
+```text
+예시 행:
+ 0분:  HP ×1.00 / Dmg ×1.00 / Rate ×1.00
+ 2분:  HP ×1.30 / Dmg ×1.20 / Rate ×1.40
+ 5분:  HP ×1.75 / Dmg ×1.50 / Rate ×2.00
+10분:  HP ×2.50 / Dmg ×2.00 / Rate ×3.00
+```
+
+→ §8의 인라인 공식(`1 + tMin * 0.15f` 등)을 이 테이블로 대체.  
+  디자이너가 코드 수정 없이 Inspector에서 직접 수치 조정 가능.
+
+**Co-op 배율은 테이블 분리 없이 코드에서 플레이어 수 기반으로 곱한다** (플레이어 수는 런타임 값이라 테이블화 불필요).
+
+---
+
+#### 조회 유틸리티
+
+```csharp
+// WaveController 내부에서 사용
+private ScalingRow GetCurrentScaling(EnemyScalingTableSO table, float elapsedSeconds)
+{
+    float elapsedMinutes = elapsedSeconds / 60f;
+    ScalingRow result = table[0];
+    for (int i = 0; i < table.Count; i++)
+    {
+        if (table[i].timeMinutes <= elapsedMinutes)
+            result = table[i];
+        else
+            break;
+    }
+    return result;
+}
+```
+
+---
+
+#### 구현 항목
+
+**데이터 테이블 인프라**
+- [ ] `DataTableSO<TRow>` 제네릭 베이스 구현 (`Assets/Scripts/Data/DataTableSO.cs`)
+- [ ] `StageTableSO` + `StageRow` 구조체 구현
+- [ ] `WaveTableSO` + `WaveRow` 구조체 구현 (기존 `WaveDataSO` 대체)
+- [ ] `EnemyScalingTableSO` + `ScalingRow` 구조체 구현
+- [ ] `StageClearCondition` enum 추가 (`TimeSurvival`, `BossKill`, `BothRequired`)
+
+**WaveController 리팩터링**
+- [ ] `WaveDataSO` 폐기 — `WaveDataSO[]` 직접 참조를 `WaveTableSO` + `StageTableSO` 참조로 교체 (Phase 3에서 임시 사용한 구조를 이 단계에서 완전히 제거)
+- [ ] 인라인 난이도 공식 → `EnemyScalingTableSO.GetCurrentScaling()` 조회로 교체
+- [ ] `waveGroupId` 기반으로 해당 스테이지 웨이브 행만 필터링해 시퀀스 실행
+- [ ] `RegisterSpawnActions()` 구현 (딕셔너리 등록)
+- [ ] `ExecuteWave()` 디스패치 로직 구현 (`spawnActionName` → 커스텀 / 기본 폴백)
+- [ ] 커스텀 스폰 함수 1~2종 구현 (`SpawnEliteRing` 등)
+
+**데이터 에셋 작성**
+- [ ] `StageTable.asset` — Stage_01 행 1개 작성
+- [ ] `WaveTable.asset` — Stage_01용 웨이브 4~6행 작성 (loopLastWave 행 포함)
+- [ ] `EnemyScalingTable.asset` — 0 / 2 / 5 / 10 / 15 / 20분 기준 6행 작성
+
+**스테이지 런타임**
+- [ ] `StageRuntime`에 생존 타이머 추가 (서버 전용, `ElapsedTime` NetworkVariable 동기화)
+- [ ] `GameState` enum에 `BossPhase`, `Clear`, `GameOver` 추가
+- [ ] 생존 타이머가 `StageRow.durationSeconds` 도달 → `BossPhase` 전환 + 보스 스폰
+- [ ] `StageRuntime.LoadStage(int stageId)` — `StageTableSO`에서 행 조회 후 WaveController에 전달
+
+**보스**
+- [ ] `BossNetworkBase : EnemyNetworkBase` 구현 (고유 페이즈 전환 로직)
+- [ ] 보스 HP `NetworkVariable<float>` → 전체 클라이언트 HUD 동기화 (`BossHealthBar`)
+- [ ] 보스 처치 → `GameState.Clear`
+- [ ] 전원 영구 사망 → `GameState.GameOver` (다운 상태≠사망. `IsAlive == false` 기준으로 생존자 카운트. `PlayerReviveHandler` 다운 타이머 만료 → `IsAlive=false` 전환 직후 재검사. 다운 중인 플레이어가 있어도 구조 가능한 생존자가 남아있으면 GameOver 아님 — 타이머 자연 소진까지 대기)
+
+**결과 화면 (최소)**
+- [ ] 승리/패배 `[ClientRpc]` 동기화
+- [ ] 결과 UI (Phase 8에서 정식화, 여기서는 텍스트 표시만)
+
+예상 기간: 6~9일
+
+---
+
+### Phase 8. UI, 이펙트, 저장, 최적화, 밸런스
 
 Done when: 메인 메뉴 → 방 생성 → 스테이지 → 결과 → 메인 메뉴 루프가 4인 모두 에러 없이 완성된다.
 
@@ -867,6 +1105,9 @@ Done when: 메인 메뉴 → 방 생성 → 스테이지 → 결과 → 메인 �
 - [ ] SaveManager 구현 (로컬 세이브: 설정, 통계)
 - [ ] HUDController 구현 (IsLocalPlayer 기준 HP, SharedXP/SharedLevel, 스킬 슬롯)
 - [ ] Co-op HUD 추가 (팀원 HP 미니 표시)
+- [ ] 팀원 다운 표시 — 팀원이 `IsDowned=true`일 때 Co-op HUD 해당 슬롯에 아이콘/색상 강조 (죽은 것처럼 보이지 않도록 구분)
+- [ ] 다운 상태 HUD — 자신이 다운됐을 때 `DownedTimeRemaining` 타이머 표시 (자력 부활 불가 안내 포함)
+- [ ] 부활 진행도 바 — 팀원이 E키를 누르고 있을 때 화면에 진행도 표시 (`PlayerReviveHandler.OnReviveProgressUpdated` 이벤트 구독)
 - [ ] SkillSlotUI, ItemSlotUI 구현
 - [ ] ResultUI 구현 (개인 통계: 처치수, 데미지, 생존 시간)
 - [ ] LoadingScreen 구현 (NetworkManager.SceneManager 로딩 이벤트 연동)
@@ -949,6 +1190,6 @@ Phase 9: 로컬 서버 빌드 안정화 (Windows, Relay 코드 공유)
 5. **NGO RPC 문법은 Mirror와 다르다.** `[TargetRpc]`·`NetworkConnection`은 Mirror 용어다. NGO 2.x는 `[Rpc(SendTo.SpecificClients)]`, NGO 1.x는 `ClientRpcParams`를 사용한다.
 6. **Time.timeScale은 전원 참여 선택 화면(LevelingUp·ChestOpening)에만 허용한다.** 두 상태 모두 모든 플레이어가 동시에 멈추고 선택하므로, `GameState.LevelingUp` / `GameState.ChestOpening` 진입/퇴장 시 서버와 전체 클라이언트에서 `Time.timeScale = 0/1` 처리한다. UI 애니메이션은 `unscaledDeltaTime` 사용. 그 외 개인 일시정지 용도로는 사용 금지.
 7. **NetworkObject 수를 최소화한다.** XP 오브처럼 수백 개가 필요한 것은 서버 데이터 + 클라이언트 비주얼 프록시로 처리한다.
-8. **ScriptableObject로 데이터를 관리한다.** 수치는 코드가 아니라 Inspector에서 조정한다.
+8. **ScriptableObject로 데이터를 관리한다.** 수치는 코드가 아니라 Inspector에서 조정한다. 동종 데이터가 여러 개 필요한 경우(스테이지, 웨이브, 난이도 스케일링 등)는 개별 `.asset` 파일 대신 `DataTableSO<TRow>` 패턴으로 단일 테이블 에셋에 행 단위로 관리한다.
 9. **매 Phase 끝마다 멀티플레이 가능한 상태를 만든다.** Phase 완료 기준은 항상 2인 이상 동작 확인이다.
 10. **Host 모드로 빠르게 반복하되, Server Build 경로를 Phase 1에 smoke test한다.** Windows Server Build 안정화는 Phase 9까지 미룬다. Linux/클라우드 배포는 장기 확장으로 별도 Phase에서 다룬다.

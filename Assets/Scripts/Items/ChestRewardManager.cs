@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using Vamsurlike.Player;
 using Vamsurlike.Stage;
 using Vamsurlike.Upgrades;
 
@@ -78,13 +79,19 @@ namespace Vamsurlike.Items
 
             foreach (ulong clientId in NetworkManager.ConnectedClientsIds)
             {
+                // 다운된 플레이어는 상자 카드 선택에서 제외
+                if (NetworkManager.ConnectedClients.TryGetValue(clientId, out var cl)
+                    && cl.PlayerObject != null
+                    && cl.PlayerObject.TryGetComponent<PlayerNetworkStats>(out var s)
+                    && s.IsDowned.Value)
+                    continue;
+
                 var skillManager = GetSkillManager(clientId);
                 ChestChoiceData[] choices = choiceBuilder.Build(catalog, skillManager);
 
                 if (choices.Length == 0)
                 {
                     SharedLevelSystem.Instance?.AddXP(fallbackXP);
-                    Debug.Log($"[{nameof(ChestRewardManager)}] clientId {clientId} 스킬 없음 → XP +{fallbackXP}");
                     continue;
                 }
 
@@ -99,10 +106,7 @@ namespace Vamsurlike.Items
             }
 
             if (!anyHasCards)
-            {
-                Debug.Log($"[{nameof(ChestRewardManager)}] 전원 스킬 없음 — UI 생략");
                 return;
-            }
 
             StageRuntime.Instance?.SetGameState(GameState.ChestOpening);
         }
@@ -125,6 +129,7 @@ namespace Vamsurlike.Items
                 return;
             }
 
+            Debug.Log($"[SubmitChoiceServerRpc] OK — clientId={clientId}, choice={choiceIndex}");
             pendingChoices.Remove(clientId);
             ApplyChoice(clientId, options[choiceIndex]);
             CheckAllDone();
@@ -153,7 +158,6 @@ namespace Vamsurlike.Items
         {
             if (!pendingChoices.Contains(clientId)) return;
             pendingChoices.Remove(clientId);
-            Debug.Log($"[{nameof(ChestRewardManager)}] clientId {clientId} 이탈 — 대기 제거");
             CheckAllDone();
         }
 

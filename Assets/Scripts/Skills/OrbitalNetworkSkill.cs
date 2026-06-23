@@ -5,7 +5,7 @@ using Vamsurlike.Enemy;
 
 namespace Vamsurlike.Skills
 {
-    public sealed class OrbitalSkill : OrbitalVisualBase
+    public sealed class OrbitalSkill : SkillBase
     {
         private readonly List<EnemyNetworkBase> targets = new();
         private readonly HashSet<ulong> hitEnemyIds = new();
@@ -16,9 +16,6 @@ namespace Vamsurlike.Skills
         private float serverRadius;
         private float serverRotSpeed;
 
-        public OrbitalSkill(GameObject visualPrefab, float heightOffset)
-            : base(visualPrefab, heightOffset) { }
-
         public override SkillCastType SupportedCastType => SkillCastType.Orbital;
         public override bool IsPersistentExecution => true;
 
@@ -26,7 +23,6 @@ namespace Vamsurlike.Skills
         {
             if (castType != SupportedCastType) return;
 
-            base.OnSkillRemoved(castType);
             serverBroadcastSent = false;
             serverCount = 0;
             serverRadius = 0f;
@@ -55,7 +51,7 @@ namespace Vamsurlike.Skills
                 serverCount    = count;
                 serverRadius   = radius;
                 serverRotSpeed = rotSpeed;
-                context.Manager.BroadcastOrbitalClientRpc(count, radius, rotSpeed);
+                context.VFX?.ShowOrbital(count, radius, rotSpeed);
             }
 
             int damagedCount = 0;
@@ -63,7 +59,7 @@ namespace Vamsurlike.Skills
 
             for (int i = 0; i < count; i++)
             {
-                Vector3 orbPos = GetOrbitalPosition(
+                Vector3 orbPos = OrbitalPositionMath.Calculate(
                     context.CasterTransform.position, radius, rotSpeed, i, count);
                 int targetCount = AutoTargeting.FindEnemiesInRange(orbPos, hitRadius, targets);
 
@@ -77,14 +73,8 @@ namespace Vamsurlike.Skills
                 }
             }
 
-            if (damagedCount == 0)
-            {
-                if (ShouldLogNoTarget())
-                    Debug.Log($"[{nameof(OrbitalSkill)}] 궤도체 범위 내 적 없음. skill={skill.name}, count={count}, radius={radius}");
-                return false;
-            }
+            if (damagedCount == 0) return true;
 
-            Debug.Log($"[{nameof(OrbitalSkill)}] 틱. skill={skill.name}, level={context.Level}, damage={context.FinalDamage}(x{context.AttackMultiplier}), orbCount={count}, damaged={damagedCount}");
             return true;
         }
     }

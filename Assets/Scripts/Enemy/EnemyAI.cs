@@ -2,6 +2,7 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
 using Vamsurlike.Data;
+using Vamsurlike.Network;
 using Vamsurlike.Player;
 using Vamsurlike.Stage;
 
@@ -9,7 +10,7 @@ namespace Vamsurlike.Enemy
 {
     [RequireComponent(typeof(NavMeshAgent))]
     [RequireComponent(typeof(EnemyNetworkBase))]
-    public class EnemyAI : NetworkBehaviour
+    public class EnemyAI : ServerBehaviour
     {
         private static readonly int SpeedHash  = Animator.StringToHash("Speed");
         private static readonly int AttackHash = Animator.StringToHash("Attack");
@@ -28,11 +29,14 @@ namespace Vamsurlike.Enemy
             Agent = GetComponent<NavMeshAgent>();
             Base  = GetComponent<EnemyNetworkBase>();
             Anim  = GetComponentInChildren<Animator>();
+            // 클라이언트에서 NavMeshAgent가 활성화된 채로 남으면 NavMesh 오류 발생.
+            // OnServerSpawned()에서 서버에서만 다시 켠다.
+            Agent.enabled = false;
         }
 
-        public override void OnNetworkSpawn()
+        protected override void OnServerSpawned()
         {
-            if (!IsServer) { Agent.enabled = false; enabled = false; return; }
+            Agent.enabled = true;
             ChangeState(EnemyStates.Idle);
         }
 
@@ -45,7 +49,7 @@ namespace Vamsurlike.Enemy
 
         private void Update()
         {
-            if (!IsServer || !Base.IsAlive) return;
+            if (!Base.IsAlive) return;
             if (StageRuntime.Instance == null || StageRuntime.Instance.CurrentState.Value != GameState.Playing) return;
 
             targetUpdateTimer -= Time.deltaTime;

@@ -6,24 +6,34 @@ using Unity.Services.Authentication;
 
 namespace Vamsurlike.Network
 {
-    // Bootstrap 씬에서 UGS 초기화 및 서버 빌드 자동 시작 담당
+    /// <summary>
+    /// Bootstrap 씬에서 UGS 초기화 및 서버 빌드 자동 시작 담당.
+    /// UNITY_SERVER 빌드 또는 커맨드라인 인자 -server 로 서버 모드를 활성화한다.
+    /// 지원 인자: -server  -ip 0.0.0.0  -port 7777
+    /// </summary>
     public class NetworkBootstrapper : MonoBehaviour
     {
         private static NetworkBootstrapper instance;
 
-        public static bool IsUgsReady { get; private set; }
+        public static bool IsUgsReady    { get; private set; }
+        public static bool IsServerBuild { get; private set; }
+
         public static event Action OnUgsReady;
 
         private void Awake()
         {
-            if (instance != null)
-            {
-                Destroy(this);
-                return;
-            }
+            if (instance != null) { Destroy(this); return; }
             instance = this;
-            IsUgsReady = false;
-            OnUgsReady = null;
+            IsUgsReady    = false;
+            IsServerBuild = DetectServerBuild();
+            OnUgsReady    = null;
+
+#if UNITY_EDITOR
+            string playerTags = string.Join(", ", Unity.Multiplayer.PlayMode.CurrentPlayer.Tags);
+            Debug.Log($"[{nameof(NetworkBootstrapper)}] MPM 태그=[{playerTags}], 서버 모드={IsServerBuild}");
+#else
+            Debug.Log($"[{nameof(NetworkBootstrapper)}] 서버 모드={IsServerBuild}");
+#endif
         }
 
         private void OnDestroy()
@@ -33,12 +43,65 @@ namespace Vamsurlike.Network
 
         private async void Start()
         {
-            await InitializeUgsAsync();
+            if (IsServerBuild)
+            {
+                StartDedicatedServer();
+                return;
+            }
 
+            await InitializeUgsAsync();
+        }
+
+        private void StartDedicatedServer()
+        {
+            string ip   = GetArgValue("-ip",   "0.0.0.0");
+            ushort port = GetArgPort("-port", 7777);
+            bool ok = GameNetworkManager.Instance?.StartAsServer(ip, port) ?? false;
+            ServerConsoleLogger.Log($"서버 시작 — {ip}:{port} (ok={ok})");
+        }
+
+        private static bool DetectServerBuild()
+        {
 #if UNITY_SERVER
-            // 전용 서버 빌드: 자동으로 서버 모드 시작
-            GameNetworkManager.Instance?.StartAsServer();
+            return true;
+#else
+            foreach (string arg in System.Environment.GetCommandLineArgs())
+            {
+                if (arg.Equals("-server", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+#if UNITY_EDITOR
+            // MPM 가상 플레이어에 "Server" 태그가 있으면 서버 모드로 시작
+            foreach (string tag in Unity.Multiplayer.PlayMode.CurrentPlayer.Tags)
+            {
+                if (tag.Equals("Server", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
 #endif
+            return false;
+#endif
+        }
+
+        // "-key value" 형식의 커맨드라인 인자에서 value 반환. 없으면 defaultValue.
+        private static string GetArgValue(string key, string defaultValue)
+        {
+            string[] args = System.Environment.GetCommandLineArgs();
+            for (int i = 0; i < args.Length - 1; i++)
+            {
+                if (args[i].Equals(key, StringComparison.OrdinalIgnoreCase))
+                    return args[i + 1];
+            }
+            return defaultValue;
+        }
+
+        private static ushort GetArgPort(string key, ushort defaultValue)
+        {
+            string val = GetArgValue(key, null);
+            if (val == null) return defaultValue;
+            if (ushort.TryParse(val, out ushort port) && port > 0) return port;
+
+            Debug.LogWarning($"[{nameof(NetworkBootstrapper)}] 잘못된 포트 '{val}' — 기본값 {defaultValue} 사용");
+            return defaultValue;
         }
 
         private async Task InitializeUgsAsync()

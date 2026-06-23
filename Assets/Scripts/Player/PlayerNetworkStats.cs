@@ -1,15 +1,19 @@
 using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Data;
+using Vamsurlike.Network;
 
 namespace Vamsurlike.Player
 {
-    public class PlayerNetworkStats : NetworkBehaviour
+    [RequireComponent(typeof(PlayerReviveHandler))]
+    public class PlayerNetworkStats : ServerBehaviour
     {
         [SerializeField] private CharacterDataSO characterData;
         [SerializeField] private float fallbackMaxHP = 100f;
         [SerializeField] private float fallbackMoveSpeed = 5f;
 
+        // 서버만 쓰고 모든 클라이언트가 읽는다.
+        // ServerBehaviour로 컴포넌트가 disabled여도 NetworkVariable 동기화는 NGO 프레임워크가 처리.
         public NetworkVariable<float> MaxHP { get; } = new(
             100f,
             NetworkVariableReadPermission.Everyone,
@@ -30,20 +34,25 @@ namespace Vamsurlike.Player
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
 
+        public NetworkVariable<bool> IsDowned { get; } = new(
+            false,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
+
         public bool IsAlive => HP.Value > 0f;
 
-        public override void OnNetworkSpawn()
+        // 이동/스킬 사용 가능 여부 (살아있고 다운되지 않음)
+        public bool CanAct => IsAlive && !IsDowned.Value;
+
+        protected override void OnServerSpawned()
         {
-            if (!IsServer) return;
             InitializeFromData(characterData);
         }
 
         public void InitializeFromData(CharacterDataSO data)
         {
-            if (!IsServer) return;
-
-            float maxHP      = data != null ? data.baseHP        : fallbackMaxHP;
-            float moveSpeed  = data != null ? data.baseMoveSpeed : fallbackMoveSpeed;
+            float maxHP     = data != null ? data.baseHP        : fallbackMaxHP;
+            float moveSpeed = data != null ? data.baseMoveSpeed : fallbackMoveSpeed;
 
             MaxHP.Value        = Mathf.Max(1f, maxHP);
             HP.Value           = MaxHP.Value;
@@ -53,18 +62,17 @@ namespace Vamsurlike.Player
 
         public void TakeDamage(float amount)
         {
-            if (!IsServer) return;
-            if (amount <= 0f || !IsAlive) return;
+            if (amount <= 0f || !IsAlive || IsDowned.Value) return;
 
             HP.Value = Mathf.Max(0f, HP.Value - amount);
-            Debug.Log($"[{nameof(PlayerNetworkStats)}] clientId {OwnerClientId} TakeDamage {amount} → HP {HP.Value}/{MaxHP.Value}");
+
+            if (HP.Value <= 0f)
+                GetComponent<PlayerReviveHandler>()?.BeginDowned();
         }
 
         public void Heal(float amount)
         {
-            if (!IsServer) return;
             if (amount <= 0f || !IsAlive) return;
-
             HP.Value = Mathf.Min(MaxHP.Value, HP.Value + amount);
         }
     }

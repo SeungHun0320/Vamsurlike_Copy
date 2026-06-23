@@ -1,228 +1,203 @@
 using System;
-using System.Net;
-using System.Net.Sockets;
-using UnityEngine;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
+using UnityEngine;
 
 namespace Vamsurlike.Network
 {
-    [RequireComponent(typeof(UnityTransport))]
+    [RequireComponent(typeof(NetworkManager), typeof(UnityTransport))]
     public class GameNetworkManager : MonoBehaviour
     {
+        public const ulong NoLobbyHost = LobbyHostService.NoLobbyHost;
+
+        private const string DefaultClientIp = "127.0.0.1";
+        private const string DefaultServerIp = "0.0.0.0";
+        private const ushort DefaultPort = 7777;
+        private const string DefaultLobbySceneName = "MainMenu";
+        private const string DefaultStageSceneName = "Stage_01";
+
+        [SerializeField] private string lobbySceneName = DefaultLobbySceneName;
+        [SerializeField] private string stageSceneName = DefaultStageSceneName;
+
+        private NetworkManager networkManager;
+        private INetworkSessionService sessionService;
+        private ILobbyHostService lobbyHostService;
+        private IGameStartService gameStartService;
+
         public static GameNetworkManager Instance { get; private set; }
 
         public event Action<ulong> OnClientConnected;
         public event Action<ulong> OnClientDisconnected;
+        public event Action<ulong> OnLobbyHostChanged;
 
-        public string CurrentIp { get; private set; } = "127.0.0.1";
-        public ushort CurrentPort { get; private set; } = 7777;
-
-        public int ConnectedPlayerCount =>
-            NetworkManager.Singleton != null ? NetworkManager.Singleton.ConnectedClients?.Count ?? 0 : 0;
-
-        public bool IsClientConnected =>
-            NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient;
-
-        public bool IsAvailableToStart =>
-            NetworkManager.Singleton != null && !NetworkManager.Singleton.IsListening;
-
-        public bool IsListening =>
-            NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
-
-        public bool IsServer =>
-            NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer;
-
-        public bool IsHost =>
-            NetworkManager.Singleton != null && NetworkManager.Singleton.IsHost;
-
-        public bool IsClientOnly =>
-            NetworkManager.Singleton != null && NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsServer;
-
-        private UnityTransport transport;
+        public string CurrentIp => sessionService?.CurrentIp ?? DefaultClientIp;
+        public ushort CurrentPort => sessionService?.CurrentPort ?? DefaultPort;
+        public ulong LobbyHostClientId => lobbyHostService?.LobbyHostClientId ?? NoLobbyHost;
+        public bool IsLocalLobbyHost => lobbyHostService?.IsLocalLobbyHost ?? false;
+        public int ConnectedPlayerCount => networkManager?.ConnectedClients?.Count ?? 0;
+        public bool IsClientConnected => networkManager != null && networkManager.IsConnectedClient;
+        public bool IsAvailableToStart => networkManager != null && !networkManager.IsListening;
+        public bool IsListening => networkManager != null && networkManager.IsListening;
+        public bool IsServer => networkManager != null && networkManager.IsServer;
+        public bool IsHost => networkManager != null && networkManager.IsHost;
+        public bool IsClientOnly => networkManager != null && networkManager.IsClient && !networkManager.IsServer;
 
         private void Awake()
         {
-            if (Instance != null)
+            if (Instance != null && Instance != this)
             {
+                enabled = false;
                 Destroy(gameObject);
                 return;
             }
+
             Instance = this;
-            transport = GetComponent<UnityTransport>();
+            networkManager = GetComponent<NetworkManager>();
+            UnityTransport transport = GetComponent<UnityTransport>();
+            if (networkManager == null || transport == null)
+            {
+                Debug.LogError($"[{nameof(GameNetworkManager)}] NetworkManager 또는 UnityTransport가 없습니다.", this);
+                enabled = false;
+                return;
+            }
+
+            ValidateSceneNames();
+            sessionService = new NetworkSessionService(networkManager, transport, DefaultClientIp, DefaultPort);
+            lobbyHostService = new LobbyHostService(networkManager);
+            gameStartService = new GameStartService(
+                networkManager,
+                lobbyHostService,
+                lobbySceneName,
+                stageSceneName);
         }
 
-        private void Start()
+        private void OnEnable()
         {
-            if (NetworkManager.Singleton == null) return;
-            ConfigureConnectionApproval();
-            NetworkManager.Singleton.OnClientConnectedCallback    += HandleClientConnected;
-            NetworkManager.Singleton.OnClientDisconnectCallback   += HandleClientDisconnected;
+            if (networkManager == null || sessionService == null || lobbyHostService == null) return;
+
+            sessionService.ConfigureConnectionApproval();
+            networkManager.OnClientConnectedCallback += HandleClientConnected;
+            networkManager.OnClientDisconnectCallback += HandleClientDisconnected;
+            networkManager.OnServerStarted += RegisterMessagingHandlers;
+            networkManager.OnClientStarted += RegisterMessagingHandlers;
+            lobbyHostService.LobbyHostChanged += HandleLobbyHostChanged;
+        }
+
+        private void OnDisable()
+        {
+            if (networkManager != null)
+            {
+                networkManager.OnClientConnectedCallback -= HandleClientConnected;
+                networkManager.OnClientDisconnectCallback -= HandleClientDisconnected;
+                networkManager.OnServerStarted -= RegisterMessagingHandlers;
+                networkManager.OnClientStarted -= RegisterMessagingHandlers;
+            }
+
+            if (lobbyHostService != null)
+                lobbyHostService.LobbyHostChanged -= HandleLobbyHostChanged;
+
+            UnregisterMessagingHandlers();
         }
 
         private void OnDestroy()
         {
+            gameStartService?.Dispose();
+            lobbyHostService?.Dispose();
+            sessionService?.Dispose();
+
             if (Instance == this) Instance = null;
-            if (NetworkManager.Singleton == null) return;
-            NetworkManager.Singleton.OnClientConnectedCallback    -= HandleClientConnected;
-            NetworkManager.Singleton.OnClientDisconnectCallback   -= HandleClientDisconnected;
-            if (NetworkManager.Singleton.ConnectionApprovalCallback == HandleConnectionApproval)
-                NetworkManager.Singleton.ConnectionApprovalCallback = null;
         }
 
-        public bool StartAsHost(string ip = "127.0.0.1", ushort port = 7777)
+        [Obsolete("호스트 모드 미사용. 전용 서버 아키텍처로 전환됨 - StartAsServer() + StartAsClient() 사용.")]
+        public bool StartAsHost(string ip = DefaultClientIp, ushort port = DefaultPort)
         {
-            if (!CanStart("StartAsHost")) return false;
-            ConfigureConnectionApproval();
-
-            const int maxPortAttempts = 16;
-            for (int i = 0; i < maxPortAttempts; i++)
-            {
-                ushort candidatePort = (ushort)(port + i);
-                if (!CanBindUdp(ip, candidatePort))
-                {
-                    Debug.LogWarning($"[GameNetworkManager] {ip}:{candidatePort} 포트가 이미 사용 중입니다. 다음 포트를 시도합니다.");
-                    continue;
-                }
-
-                if (!TrySetTransport(ip, candidatePort)) return false;
-
-                bool ok = NetworkManager.Singleton.StartHost();
-                if (ok)
-                {
-                    Debug.Log($"[GameNetworkManager] Host 시작 — {ip}:{candidatePort} (ok=True)");
-                    return true;
-                }
-
-                Debug.LogWarning($"[GameNetworkManager] Host 시작 실패 — {ip}:{candidatePort}. 다음 포트를 시도합니다.");
-                NetworkManager.Singleton.Shutdown();
-            }
-
-            Debug.LogError($"[GameNetworkManager] Host 시작 실패: {ip}:{port}부터 {maxPortAttempts}개 포트를 사용할 수 없습니다.");
+            Debug.LogError($"[{nameof(GameNetworkManager)}] StartAsHost는 더 이상 사용하지 않습니다.");
             return false;
         }
 
-        // Relay 호스트 — SDK가 transport를 이미 설정했으므로 SetConnectionData 호출 안 함
+        [Obsolete("호스트 모드 미사용. 전용 서버 아키텍처로 전환됨 - StartAsServer() + StartAsRelayClient() 사용.")]
         public bool StartAsRelayHost()
         {
-            if (!CanStart("StartAsRelayHost")) return false;
-            ConfigureConnectionApproval();
-            bool ok = NetworkManager.Singleton.StartHost();
-            Debug.Log($"[GameNetworkManager] Relay Host 시작 (ok={ok})");
-            return ok;
+            Debug.LogError($"[{nameof(GameNetworkManager)}] StartAsRelayHost는 더 이상 사용하지 않습니다.");
+            return false;
         }
 
-        public bool StartAsClient(string ip = "127.0.0.1", ushort port = 7777)
+        public bool StartAsClient(string ip = DefaultClientIp, ushort port = DefaultPort)
         {
-            if (!CanStart("StartAsClient")) return false;
-            if (!TrySetTransport(ip, port)) return false;
-            ConfigureConnectionApproval();
-            bool ok = NetworkManager.Singleton.StartClient();
-            Debug.Log($"[GameNetworkManager] Client 시작 — {ip}:{port} (ok={ok})");
-            return ok;
+            bool started = sessionService?.StartClient(ip, port) ?? false;
+            if (started) RegisterMessagingHandlers();
+            return started;
         }
 
-        // Relay 클라이언트 — SDK가 transport를 이미 설정했으므로 SetConnectionData 호출 안 함
         public bool StartAsRelayClient()
         {
-            if (!CanStart("StartAsRelayClient")) return false;
-            ConfigureConnectionApproval();
-            bool ok = NetworkManager.Singleton.StartClient();
-            Debug.Log($"[GameNetworkManager] Relay Client 시작 (ok={ok})");
-            return ok;
+            bool started = sessionService?.StartRelayClient() ?? false;
+            if (started) RegisterMessagingHandlers();
+            return started;
         }
 
-        public bool StartAsServer(string ip = "0.0.0.0", ushort port = 7777)
+        public bool StartAsServer(string ip = DefaultServerIp, ushort port = DefaultPort)
         {
-            if (!CanStart("StartAsServer")) return false;
-            if (!TrySetTransport(ip, port)) return false;
-            ConfigureConnectionApproval();
-            bool ok = NetworkManager.Singleton.StartServer();
-            Debug.Log($"[GameNetworkManager] Server 시작 — {ip}:{port} (ok={ok})");
-            return ok;
+            bool started = sessionService?.StartServer(ip, port) ?? false;
+            if (started) RegisterMessagingHandlers();
+            return started;
         }
 
         public void Disconnect()
         {
-            if (NetworkManager.Singleton == null) return;
-            NetworkManager.Singleton.Shutdown();
-            Debug.Log("[GameNetworkManager] 연결 종료.");
+            sessionService?.Disconnect();
+            lobbyHostService?.Clear();
         }
 
-        // Singleton null + IsListening 이중 가드
-        private bool CanStart(string caller)
+        public bool RequestStartGame()
         {
-            if (NetworkManager.Singleton == null)
-            {
-                Debug.LogError($"[GameNetworkManager] {caller}: NetworkManager.Singleton이 null입니다.");
-                return false;
-            }
-            if (NetworkManager.Singleton.IsListening)
-            {
-                Debug.LogWarning($"[GameNetworkManager] {caller}: 이미 실행 중 — 무시");
-                return false;
-            }
-            return true;
+            return gameStartService?.RequestStartGame() ?? false;
         }
 
-        // transport 설정 실패 시 false 반환 → 시작 중단
-        private bool TrySetTransport(string ip, ushort port)
+        private void RegisterMessagingHandlers()
         {
-            if (transport == null)
-            {
-                Debug.LogError($"[GameNetworkManager] UnityTransport를 찾을 수 없습니다.");
-                return false;
-            }
-            transport.SetConnectionData(ip, port);
-            CurrentIp = ip;
-            CurrentPort = port;
-            return true;
+            lobbyHostService?.RegisterMessageHandler();
+            gameStartService?.RegisterMessageHandler();
         }
 
-        private bool CanBindUdp(string ip, ushort port)
+        private void UnregisterMessagingHandlers()
         {
-            try
-            {
-                IPAddress address = IPAddress.TryParse(ip, out var parsedAddress) ? parsedAddress : IPAddress.Loopback;
-                using var socket = new UdpClient(new IPEndPoint(address, port));
-                return true;
-            }
-            catch (SocketException)
-            {
-                return false;
-            }
-        }
-
-        private void ConfigureConnectionApproval()
-        {
-            if (NetworkManager.Singleton == null) return;
-
-            NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
-            if (NetworkManager.Singleton.ConnectionApprovalCallback == null)
-                NetworkManager.Singleton.ConnectionApprovalCallback = HandleConnectionApproval;
-            else if (NetworkManager.Singleton.ConnectionApprovalCallback != HandleConnectionApproval)
-                Debug.LogWarning("[GameNetworkManager] 다른 ConnectionApprovalCallback이 이미 등록되어 있습니다.");
-        }
-
-        private void HandleConnectionApproval(
-            NetworkManager.ConnectionApprovalRequest request,
-            NetworkManager.ConnectionApprovalResponse response)
-        {
-            response.Approved = true;
-            response.CreatePlayerObject = false;
-            response.Pending = false;
+            gameStartService?.UnregisterMessageHandler();
+            lobbyHostService?.UnregisterMessageHandler();
         }
 
         private void HandleClientConnected(ulong clientId)
         {
+            lobbyHostService?.HandleClientConnected(clientId);
             OnClientConnected?.Invoke(clientId);
-            Debug.Log($"[GameNetworkManager] 플레이어 {ConnectedPlayerCount}명 접속 (clientId: {clientId})");
+            Debug.Log($"[{nameof(GameNetworkManager)}] 플레이어 {ConnectedPlayerCount}명 접속 (clientId: {clientId})");
         }
 
         private void HandleClientDisconnected(ulong clientId)
         {
+            lobbyHostService?.HandleClientDisconnected(clientId);
             OnClientDisconnected?.Invoke(clientId);
-            Debug.Log($"[GameNetworkManager] clientId {clientId} 종료. 현재 {ConnectedPlayerCount}명");
+            Debug.Log($"[{nameof(GameNetworkManager)}] clientId {clientId} 종료. 현재 {ConnectedPlayerCount}명");
+        }
+
+        private void HandleLobbyHostChanged(ulong clientId)
+        {
+            OnLobbyHostChanged?.Invoke(clientId);
+        }
+
+        private void ValidateSceneNames()
+        {
+            if (string.IsNullOrWhiteSpace(lobbySceneName))
+            {
+                Debug.LogWarning($"[{nameof(GameNetworkManager)}] 로비 씬 이름이 비어 있어 기본값을 사용합니다.", this);
+                lobbySceneName = DefaultLobbySceneName;
+            }
+
+            if (string.IsNullOrWhiteSpace(stageSceneName))
+            {
+                Debug.LogWarning($"[{nameof(GameNetworkManager)}] 스테이지 씬 이름이 비어 있어 기본값을 사용합니다.", this);
+                stageSceneName = DefaultStageSceneName;
+            }
         }
     }
 }

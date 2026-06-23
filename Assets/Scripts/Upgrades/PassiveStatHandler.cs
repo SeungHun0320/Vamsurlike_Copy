@@ -98,7 +98,6 @@ namespace Vamsurlike.Upgrades
                     break;
             }
 
-            Debug.Log($"[{nameof(PassiveStatHandler)}] clientId {OwnerClientId} 업그레이드 적용: {option.upgradeName}");
         }
     }
 }

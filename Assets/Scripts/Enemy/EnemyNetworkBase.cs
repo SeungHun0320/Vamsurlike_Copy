@@ -47,11 +47,7 @@ namespace Vamsurlike.Enemy
                 return;
             }
 
-            if (!IsAlive)
-            {
-                Debug.Log($"[{nameof(EnemyNetworkBase)}] TakeDamage ignored because enemy is dead. enemy={name}, amount={amount}, hp={HP.Value}");
-                return;
-            }
+            if (!IsAlive) return;
 
             if (amount <= 0f)
             {
@@ -65,9 +61,7 @@ namespace Vamsurlike.Enemy
             float defenseRate = defense / (defense + 100f);
             float finalDamage = Mathf.Max(1f, amount * (1f - defenseRate));
 
-            float beforeHP = HP.Value;
             HP.Value = Mathf.Max(0f, HP.Value - finalDamage);
-            Debug.Log($"[{nameof(EnemyNetworkBase)}] {name} TakeDamage raw={amount} final={finalDamage:F1} def={defense}: {beforeHP} -> {HP.Value}");
 
             float offset = data != null ? data.floatingTextHeightOffset : 2f;
             ShowDamageClientRpc(finalDamage, transform.position + Vector3.up * offset);

@@ -1,22 +1,15 @@
-using Unity.Netcode;
 using UnityEngine;
+using Vamsurlike.Network;
 
 namespace Vamsurlike.Player
 {
     [RequireComponent(typeof(PlayerNetworkController))]
     [RequireComponent(typeof(PlayerNetworkStats))]
-    public class PlayerNetworkAnimator : NetworkBehaviour
+    public class PlayerNetworkAnimator : ClientBehaviour
     {
-        private static readonly int SpeedHash = Animator.StringToHash("Speed");
-        private static readonly int DieHash   = Animator.StringToHash("Die");
-
-        private const float SpeedChangeTreshold = 0.01f;
-
-        // 서버가 쓰고 모든 클라이언트가 읽어 로컬 Animator를 업데이트
-        private readonly NetworkVariable<float> netSpeed = new(
-            0f,
-            NetworkVariableReadPermission.Everyone,
-            NetworkVariableWritePermission.Server);
+        private static readonly int SpeedHash   = Animator.StringToHash("Speed");
+        private static readonly int DieHash     = Animator.StringToHash("Die");
+        private static readonly int ReviveHash  = Animator.StringToHash("Revive");
 
         private Animator animator;
         private PlayerNetworkController controller;
@@ -29,36 +22,44 @@ namespace Vamsurlike.Player
             stats      = GetComponent<PlayerNetworkStats>();
         }
 
-        public override void OnNetworkSpawn()
+        protected override void OnClientSpawned()
         {
             if (stats != null)
-                stats.HP.OnValueChanged += OnHPChanged;
+            {
+                stats.HP.OnValueChanged     += OnHPChanged;
+                stats.IsDowned.OnValueChanged += OnIsDownedChanged;
+            }
         }
 
-        public override void OnNetworkDespawn()
+        protected override void OnClientDespawned()
         {
             if (stats != null)
-                stats.HP.OnValueChanged -= OnHPChanged;
+            {
+                stats.HP.OnValueChanged       -= OnHPChanged;
+                stats.IsDowned.OnValueChanged -= OnIsDownedChanged;
+            }
         }
 
         private void Update()
         {
-            if (IsServer && controller != null)
-            {
-                float newSpeed = controller.MoveInputMagnitude;
-                if (Mathf.Abs(newSpeed - netSpeed.Value) > SpeedChangeTreshold)
-                    netSpeed.Value = newSpeed;
-            }
-
-            if (animator != null)
-                animator.SetFloat(SpeedHash, netSpeed.Value);
+            if (animator != null && controller != null)
+                animator.SetFloat(SpeedHash, controller.NetSpeed.Value);
         }
 
-        // HP NetworkVariable 변경은 모든 클라이언트에서 수신 → 로컬 Animator에 Die 트리거
         private void OnHPChanged(float prev, float current)
         {
             if (prev > 0f && current <= 0f && animator != null)
                 animator.SetTrigger(DieHash);
+        }
+
+        private void OnIsDownedChanged(bool prev, bool current)
+        {
+            // 다운 상태에서 살아있는 상태로 복귀 = 부활
+            if (prev && !current && stats.IsAlive && animator != null)
+            {
+                animator.ResetTrigger(DieHash);
+                animator.SetTrigger(ReviveHash);
+            }
         }
     }
 }

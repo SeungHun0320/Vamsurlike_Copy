@@ -55,7 +55,6 @@ namespace Vamsurlike.Network
             networkObject.Spawn(true);
             if (networkObject.TryGetComponent<EnemyNetworkBase>(out var enemyBase))
                 enemyBase.Initialize(data, hpMultiplier, damageMultiplier);
-            Debug.Log($"[{nameof(EnemySpawnManager)}] {data.enemyName} 스폰 완료. position={position}");
         }
 
         private static bool IsServerActive() =>

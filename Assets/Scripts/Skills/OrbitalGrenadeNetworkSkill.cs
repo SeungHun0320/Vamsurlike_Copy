@@ -12,43 +12,28 @@ namespace Vamsurlike.Skills
     public sealed class OrbitalGrenadeSkill : SkillBase
     {
         private const float DefaultSpawnHeight = 0.8f;
-        private const float MinDirSqrMag       = 0.0001f;
 
         public override SkillCastType SupportedCastType => SkillCastType.OrbitalGrenade;
 
-        public override bool TryExecute(in SkillCastContext context)
+        protected override bool Execute(in SkillCastContext context, Vector3 direction, EnemyNetworkBase _)
         {
             SkillDataSO    skill = context.Skill;
             SkillLevelData data  = context.LevelData;
 
-            if (skill == null || data == null || context.CasterTransform == null) return false;
             if (skill.projectilePrefab == null)
             {
                 Debug.LogWarning($"[{nameof(OrbitalGrenadeSkill)}] projectilePrefab 미할당. skill={skill.name}");
                 return false;
             }
 
-            EnemyNetworkBase target = AutoTargeting.FindNearestEnemy(context.CasterTransform.position, data.range);
-            if (target == null)
-            {
-                if (ShouldLogNoTarget())
-                    Debug.Log($"[{nameof(OrbitalGrenadeSkill)}] 범위 내 적 없음. range={data.range}");
-                return false;
-            }
-
             Vector3 spawnPos = context.ProjectileSpawnPoint != null
                 ? context.ProjectileSpawnPoint.position
                 : context.CasterTransform.position + Vector3.up * DefaultSpawnHeight;
-
-            Vector3 dir = target.transform.position - spawnPos;
-            dir.y = 0f;
-            if (dir.sqrMagnitude < MinDirSqrMag) dir = context.CasterTransform.forward;
-            dir.Normalize();
-            spawnPos += dir * context.SpawnForwardOffset;
+            spawnPos += direction * context.SpawnForwardOffset;
 
             Quaternion rot = skill.projectilePrefab.TryGetComponent<NetworkProjectile>(out var tmpl)
-                ? tmpl.GetProjectileRotation(dir)
-                : Quaternion.LookRotation(dir, Vector3.up);
+                ? tmpl.GetProjectileRotation(direction)
+                : Quaternion.LookRotation(direction, Vector3.up);
 
             NetworkObject obj = PoolManager.Instance != null
                 ? PoolManager.Instance.GetNetworkObject(skill.projectilePrefab, spawnPos, rot)
@@ -63,13 +48,9 @@ namespace Vamsurlike.Skills
             float orbitalDamage = context.FinalDamage * Mathf.Max(0f, data.orbitalDamageMultiplier);
 
             if (obj.TryGetComponent(out proj))
-            {
-                proj.Initialize(skill.projectilePrefab, context.OwnerClientId, spawnPos, dir, data, context.FinalDamage, context.SpeedMultiplier);
-            }
+                proj.Initialize(skill.projectilePrefab, context.OwnerClientId, spawnPos, direction, data, context.FinalDamage, context.SpeedMultiplier);
             else
-            {
                 Debug.LogWarning($"[{nameof(OrbitalGrenadeSkill)}] NetworkProjectile 없음. prefab={skill.projectilePrefab.name}");
-            }
 
             obj.Spawn(true);
             if (proj != null)
@@ -83,7 +64,6 @@ namespace Vamsurlike.Skills
                     orbitalDamage);
             }
 
-            Debug.Log($"[{nameof(OrbitalGrenadeSkill)}] 발사. target={target.name}, orbCount={data.orbitalCount}, damage={context.FinalDamage}");
             return true;
         }
     }

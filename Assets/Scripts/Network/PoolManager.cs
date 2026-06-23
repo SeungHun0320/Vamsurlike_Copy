@@ -1,17 +1,12 @@
 using System;
-using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
 namespace Vamsurlike.Network
 {
-    // Bootstrap NetworkManager 오브젝트에 배치.
-    // - GOPool  : 일반 GameObject (VFX, 파티클, UI 등)
-    // - NetPool : NGO NetworkObject (적, 투사체 등) — PrefabHandler 통합
+    [RequireComponent(typeof(NetworkManager))]
     public class PoolManager : MonoBehaviour
     {
-        public static PoolManager Instance { get; private set; }
-
         [Serializable]
         public class GOPoolConfig
         {
@@ -26,235 +21,139 @@ namespace Vamsurlike.Network
             [Min(0)] public int warmupCount = 20;
         }
 
-        [SerializeField] private GOPoolConfig[]      goConfigs;
-        [SerializeField] private NetworkPoolConfig[] networkConfigs;         // Bootstrap 시 즉시 예열 (NavMesh 불필요 — Projectile 등)
-        [SerializeField] private NetworkPoolConfig[] deferredNetworkConfigs; // Stage 로드 후 예열 (NavMeshAgent 포함 — Enemy 등)
+        [SerializeField] private GOPoolConfig[] goConfigs;
+        [SerializeField] private NetworkPoolConfig[] networkConfigs;
+        [SerializeField] private NetworkPoolConfig[] deferredNetworkConfigs;
 
-        private readonly Dictionary<GameObject, Queue<GameObject>>    goPools          = new();
-        private readonly Dictionary<GameObject, Stack<NetworkObject>> netPools         = new();
-        private readonly HashSet<GameObject>                          registeredPrefabs = new();
+        private NetworkManager networkManager;
+        private IGameObjectPool gameObjectPool;
+        private INetworkObjectPool networkObjectPool;
+
+        public static PoolManager Instance { get; private set; }
 
         private void Awake()
         {
-            if (Instance != null) 
-                { Destroy(this); return; }
+            if (Instance != null && Instance != this)
+            {
+                enabled = false;
+                Destroy(this);
+                return;
+            }
+
             Instance = this;
+            networkManager = GetComponent<NetworkManager>();
+            if (networkManager == null)
+            {
+                Debug.LogError($"[{nameof(PoolManager)}] NetworkManager가 없습니다.", this);
+                enabled = false;
+                return;
+            }
+
+            gameObjectPool = new GameObjectPool();
+            networkObjectPool = new NetworkObjectPool(networkManager, transform);
+        }
+
+        private void OnEnable()
+        {
+            if (networkManager == null) return;
+
+            networkManager.OnServerStarted += HandleNetworkStarted;
+            networkManager.OnClientStarted += HandleNetworkStarted;
         }
 
         private void Start()
         {
-            if (goConfigs != null)
-                foreach (var cfg in goConfigs)
-                {
-                    if (cfg == null || cfg.prefab == null) continue;
-                    WarmupGO(cfg.prefab, cfg.warmupCount);
-                }
+            WarmupGameObjectPools();
+        }
 
-            if (NetworkManager.Singleton != null)
-            {
-                NetworkManager.Singleton.OnServerStarted += OnNetworkStarted;
-                NetworkManager.Singleton.OnClientStarted += OnNetworkStarted;
-            }
+        private void OnDisable()
+        {
+            if (networkManager == null) return;
+
+            networkManager.OnServerStarted -= HandleNetworkStarted;
+            networkManager.OnClientStarted -= HandleNetworkStarted;
         }
 
         private void OnDestroy()
         {
+            networkObjectPool?.Dispose();
             if (Instance == this) Instance = null;
-
-            if (NetworkManager.Singleton != null)
-            {
-                NetworkManager.Singleton.OnServerStarted -= OnNetworkStarted;
-                NetworkManager.Singleton.OnClientStarted -= OnNetworkStarted;
-
-                foreach (var prefab in registeredPrefabs)
-                    if (prefab != null)
-                        NetworkManager.Singleton.PrefabHandler.RemoveHandler(prefab);
-            }
-            registeredPrefabs.Clear();
         }
 
-        // ─── 이벤트 ────────────────────────────────────────────────────────────
-
-        private void OnNetworkStarted()
-        {
-            if (networkConfigs != null)
-                foreach (var cfg in networkConfigs)
-                {
-                    if (cfg == null || cfg.prefab == null) continue;
-                    RegisterNetworkPrefab(cfg.prefab, cfg.warmupCount);
-                }
-
-            // deferredNetworkConfigs는 PrefabHandler만 등록, 예열은 WarmupDeferredPools()로 별도 호출
-            if (deferredNetworkConfigs != null)
-                foreach (var cfg in deferredNetworkConfigs)
-                {
-                    if (cfg == null || cfg.prefab == null) continue;
-                    RegisterNetworkPrefab(cfg.prefab, warmupCount: 0);
-                }
-        }
-
-        // Stage 씬 로드 후 NavMesh 준비된 시점에 StageRuntime이 호출
         public void WarmupDeferredPools()
         {
-            if (deferredNetworkConfigs == null ||
-                NetworkManager.Singleton == null ||
-                !NetworkManager.Singleton.IsServer) return;
-            foreach (var cfg in deferredNetworkConfigs)
-            {
-                if (cfg == null || cfg.prefab == null) continue;
-                WarmupNetworkPool(cfg.prefab, cfg.warmupCount);
-            }
-        }
-
-        // ─── 일반 GO 풀 ────────────────────────────────────────────────────────
-
-        public GameObject GetGO(GameObject prefab, Vector3 pos, Quaternion rot)
-        {
-            if (prefab == null) return null;
-            if (goPools.TryGetValue(prefab, out var queue) && queue.Count > 0)
-            {
-                var go = queue.Dequeue();
-                go.transform.SetPositionAndRotation(pos, rot);
-                go.SetActive(true);
-                return go;
-            }
-            return Instantiate(prefab, pos, rot);
-        }
-
-        public void ReturnGO(GameObject prefab, GameObject go)
-        {
-            if(prefab == null || go == null)    
+            if (deferredNetworkConfigs == null || networkManager == null || !networkManager.IsServer)
                 return;
 
-            go.SetActive(false);
-            if (!goPools.TryGetValue(prefab, out var queue))
-                goPools[prefab] = queue = new Queue<GameObject>();
-            queue.Enqueue(go);
+            foreach (NetworkPoolConfig config in deferredNetworkConfigs)
+            {
+                if (!IsValid(config)) continue;
+                networkObjectPool?.Warmup(config.prefab, config.warmupCount);
+            }
         }
 
-        // ─── NetworkObject 풀 ──────────────────────────────────────────────────
+        public GameObject GetGO(GameObject prefab, Vector3 position, Quaternion rotation)
+        {
+            return gameObjectPool?.Get(prefab, position, rotation);
+        }
 
-        // 런타임 추가 등록 (스테이지 로드 시 호출 가능)
-        // 서버에서 호출되면 warmupCount만큼 비활성 인스턴스를 즉시 풀에 채움
+        public void ReturnGO(GameObject prefab, GameObject instance)
+        {
+            gameObjectPool?.Return(prefab, instance);
+        }
+
         public void RegisterNetworkPrefab(GameObject prefab, int warmupCount = 0)
         {
-            if (prefab == null || NetworkManager.Singleton == null) return;
-            if (!netPools.ContainsKey(prefab))
-                netPools[prefab] = new Stack<NetworkObject>();
-
-            // Host 모드에서 OnServerStarted + OnClientStarted가 모두 발화해 이중 등록 방지
-            if (!registeredPrefabs.Add(prefab)) return;
-
-            NetworkManager.Singleton.PrefabHandler.AddHandler(
-                prefab, new NetPrefabHandler(prefab, this));
-
-            // 서버에서만 예열: Instantiate만 하고 풀에 적재 (네트워크 트래픽 없음)
-            if (warmupCount > 0 && NetworkManager.Singleton.IsServer)
-                WarmupNetworkPool(prefab, warmupCount);
+            networkObjectPool?.RegisterPrefab(prefab, warmupCount);
         }
 
-        private void WarmupNetworkPool(GameObject prefab, int count)
+        public NetworkObject GetNetworkObject(GameObject prefab, Vector3 position, Quaternion rotation)
         {
-            if (prefab == null || count <= 0) return;
-
-            if (!netPools.TryGetValue(prefab, out var stack))
-                netPools[prefab] = stack = new Stack<NetworkObject>();
-
-            // active prefab을 Instantiate하면 Awake/OnEnable이 즉시 실행돼
-            // NavMeshAgent가 NavMesh 등록을 시도하며 에러가 발생한다.
-            // 임시로 비활성화해서 컴포넌트 초기화를 풀에서 꺼낼 때까지 미룬다.
-            bool wasActive = prefab.activeSelf;
-            if (wasActive) prefab.SetActive(false);
-
-            try
-            {
-                for (int i = 0; i < count; i++)
-                {
-                    var go = Instantiate(prefab, transform);
-                    if (go.TryGetComponent<NetworkObject>(out var obj))
-                        stack.Push(obj);
-                    else
-                        Destroy(go);
-                }
-            }
-            finally
-            {
-                // 예외 발생 시에도 prefab 원본 활성 상태 반드시 복구
-                if (wasActive) prefab.SetActive(true);
-            }
-
-            Debug.Log($"[PoolManager] Warmed up {count}x {prefab.name}");
+            return networkObjectPool?.Get(prefab, position, rotation);
         }
 
-        public NetworkObject GetNetworkObject(GameObject prefab, Vector3 pos, Quaternion rot)
+        public void ReturnNetworkObject(GameObject prefab, NetworkObject instance)
         {
-            if (prefab == null) return null;
-            if (netPools.TryGetValue(prefab, out var stack))
-            {
-                while (stack.Count > 0)
-                {
-                    var pooled = stack.Pop();
-                    if (pooled == null) continue; // NGO가 파괴한 오브젝트 건너뜀
-                    pooled.transform.SetPositionAndRotation(pos, rot);
-                    pooled.gameObject.SetActive(true);
-                    return pooled;
-                }
-            }
-            return CreateNetworkObject(prefab, pos, rot);
+            networkObjectPool?.Return(prefab, instance);
         }
 
-        public void ReturnNetworkObject(GameObject prefab, NetworkObject obj)
+        private void HandleNetworkStarted()
         {
-            if (prefab == null || obj == null) return;
-            obj.gameObject.SetActive(false);
-            if (!netPools.TryGetValue(prefab, out var stack))
-                netPools[prefab] = stack = new Stack<NetworkObject>();
-            stack.Push(obj);
+            RegisterConfiguredPools(networkConfigs, true);
+            RegisterConfiguredPools(deferredNetworkConfigs, false);
         }
 
-        // ─── 내부 헬퍼 ────────────────────────────────────────────────────────
-
-        private void WarmupGO(GameObject prefab, int count)
+        private void WarmupGameObjectPools()
         {
-            if (prefab == null) return;
-            if (!goPools.ContainsKey(prefab))
-                goPools[prefab] = new Queue<GameObject>();
+            if (goConfigs == null) return;
 
-            for (int i = 0; i < count; i++)
+            foreach (GOPoolConfig config in goConfigs)
             {
-                var go = Instantiate(prefab);
-                go.SetActive(false);
-                goPools[prefab].Enqueue(go);
+                if (!IsValid(config)) continue;
+                gameObjectPool?.Warmup(config.prefab, config.warmupCount);
             }
         }
 
-        private NetworkObject CreateNetworkObject(GameObject prefab, Vector3 pos, Quaternion rot)
+        private void RegisterConfiguredPools(NetworkPoolConfig[] configs, bool warmupImmediately)
         {
-            var go = Instantiate(prefab, pos, rot);
-            if (go.TryGetComponent<NetworkObject>(out var obj)) return obj;
-            Debug.LogError($"[PoolManager] {prefab.name} 에 NetworkObject 없음");
-            Destroy(go);
-            return null;
+            if (configs == null) return;
+
+            foreach (NetworkPoolConfig config in configs)
+            {
+                if (!IsValid(config)) continue;
+                int warmupCount = warmupImmediately ? config.warmupCount : 0;
+                networkObjectPool?.RegisterPrefab(config.prefab, warmupCount);
+            }
         }
 
-        // ─── NGO PrefabHandler ─────────────────────────────────────────────────
-
-        private sealed class NetPrefabHandler : INetworkPrefabInstanceHandler
+        private static bool IsValid(GOPoolConfig config)
         {
-            private readonly GameObject  prefab;
-            private readonly PoolManager pool;
+            return config != null && config.prefab != null && config.warmupCount >= 0;
+        }
 
-            internal NetPrefabHandler(GameObject prefab, PoolManager pool)
-            {
-                this.prefab = prefab;
-                this.pool   = pool;
-            }
-
-            public NetworkObject Instantiate(ulong ownerClientId, Vector3 pos, Quaternion rot)
-                => pool.GetNetworkObject(prefab, pos, rot);
-
-            public void Destroy(NetworkObject obj)
-                => pool.ReturnNetworkObject(prefab, obj);
+        private static bool IsValid(NetworkPoolConfig config)
+        {
+            return config != null && config.prefab != null && config.warmupCount >= 0;
         }
     }
 }
