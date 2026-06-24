@@ -44,6 +44,7 @@ namespace Vamsurlike.Network
             if (!CanStart(nameof(StartClient)) || !TrySetTransport(ip, port)) return false;
 
             ConfigureConnectionApproval();
+            SetVersionPayload();
             bool started = networkManager.StartClient();
             Debug.Log($"[{nameof(NetworkSessionService)}] Client 시작 - {ip}:{port} (ok={started})");
             return started;
@@ -54,6 +55,7 @@ namespace Vamsurlike.Network
             if (!CanStart(nameof(StartRelayClient))) return false;
 
             ConfigureConnectionApproval();
+            SetVersionPayload();
             bool started = networkManager.StartClient();
             Debug.Log($"[{nameof(NetworkSessionService)}] Relay Client 시작 (ok={started})");
             return started;
@@ -120,13 +122,49 @@ namespace Vamsurlike.Network
             return true;
         }
 
+        private void SetVersionPayload()
+        {
+            networkManager.NetworkConfig.ConnectionData =
+                System.BitConverter.GetBytes(CatalogVersionUtility.GetHash());
+        }
+
         private static void HandleConnectionApproval(
             NetworkManager.ConnectionApprovalRequest request,
             NetworkManager.ConnectionApprovalResponse response)
         {
-            response.Approved = true;
+            if (!ValidatePayload(request.Payload, out string reason))
+            {
+                response.Approved = false;
+                response.Reason   = reason;
+                response.Pending  = false;
+                Debug.LogWarning($"[{nameof(NetworkSessionService)}] 접속 거부 (clientId={request.ClientNetworkId}): {reason}");
+                return;
+            }
+
+            response.Approved          = true;
             response.CreatePlayerObject = false;
-            response.Pending = false;
+            response.Pending           = false;
+        }
+
+        private static bool ValidatePayload(byte[] payload, out string reason)
+        {
+            if (payload == null || payload.Length < sizeof(int))
+            {
+                reason = "연결 데이터가 없습니다.";
+                return false;
+            }
+
+            int clientHash = System.BitConverter.ToInt32(payload, 0);
+            int serverHash = CatalogVersionUtility.GetHash();
+
+            if (clientHash != serverHash)
+            {
+                reason = "데이터 버전이 서버와 다릅니다. 클라이언트를 업데이트하세요.";
+                return false;
+            }
+
+            reason = null;
+            return true;
         }
     }
 }

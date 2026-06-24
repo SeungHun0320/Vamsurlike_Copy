@@ -41,6 +41,7 @@ namespace Vamsurlike.Network
         public bool IsServer => networkManager != null && networkManager.IsServer;
         public bool IsHost => networkManager != null && networkManager.IsHost;
         public bool IsClientOnly => networkManager != null && networkManager.IsClient && !networkManager.IsServer;
+        public string LastDisconnectReason => networkManager != null ? networkManager.DisconnectReason : string.Empty;
 
         private void Awake()
         {

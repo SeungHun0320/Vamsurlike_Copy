@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Vamsurlike.Network;
 
 namespace Vamsurlike.Core
 {
@@ -9,6 +10,7 @@ namespace Vamsurlike.Core
 
         private void Start()
         {
+            StartupValidator.ValidateBootstrap(PoolManager.Instance);
             SceneManager.LoadScene(mainMenuSceneName);
         }
     }

@@ -146,6 +146,45 @@ namespace Vamsurlike.Network
             }
         }
 
+        public bool Validate()
+        {
+            bool valid = true;
+            valid &= ValidateConfigs(goConfigs,              nameof(goConfigs));
+            valid &= ValidateConfigs(networkConfigs,         nameof(networkConfigs));
+            valid &= ValidateConfigs(deferredNetworkConfigs, nameof(deferredNetworkConfigs));
+            return valid;
+        }
+
+        private bool ValidateConfigs(GOPoolConfig[] configs, string fieldName)
+        {
+            if (configs == null) return true;
+            bool valid = true;
+            for (int i = 0; i < configs.Length; i++)
+            {
+                if (configs[i] == null || configs[i].prefab == null)
+                {
+                    Debug.LogError($"[{nameof(PoolManager)}] {fieldName}[{i}].prefab이 null입니다.", this);
+                    valid = false;
+                }
+            }
+            return valid;
+        }
+
+        private bool ValidateConfigs(NetworkPoolConfig[] configs, string fieldName)
+        {
+            if (configs == null) return true;
+            bool valid = true;
+            for (int i = 0; i < configs.Length; i++)
+            {
+                if (configs[i] == null || configs[i].prefab == null)
+                {
+                    Debug.LogError($"[{nameof(PoolManager)}] {fieldName}[{i}].prefab이 null입니다.", this);
+                    valid = false;
+                }
+            }
+            return valid;
+        }
+
         private static bool IsValid(GOPoolConfig config)
         {
             return config != null && config.prefab != null && config.warmupCount >= 0;

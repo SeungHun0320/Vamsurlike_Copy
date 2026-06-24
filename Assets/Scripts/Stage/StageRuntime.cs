@@ -1,5 +1,6 @@
 using Unity.Netcode;
 using UnityEngine;
+using Vamsurlike.Core;
 using Vamsurlike.Network;
 
 namespace Vamsurlike.Stage
@@ -28,6 +29,8 @@ namespace Vamsurlike.Stage
         {
             if (Instance != null) { Destroy(this); return; }
             Instance = this;
+
+            StartupValidator.ValidateStage(waveController, dropManager);
         }
 
         public override void OnNetworkSpawn()
@@ -41,8 +44,10 @@ namespace Vamsurlike.Stage
 
             if (PoolManager.Instance != null) PoolManager.Instance.WarmupDeferredPools();
 
-            waveController?.Initialize(Spawn);
-            waveController?.Begin();
+            if (waveController == null || dropManager == null) return;
+
+            waveController.Initialize(Spawn);
+            waveController.Begin();
         }
 
         public override void OnNetworkDespawn()

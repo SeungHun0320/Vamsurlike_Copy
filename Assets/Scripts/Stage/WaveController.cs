@@ -18,6 +18,45 @@ namespace Vamsurlike.Stage
         private EnemySpawnManager spawnManager;
         private int _currentWaveIndex;
 
+        public bool Validate()
+        {
+            if (waves == null || waves.Length == 0)
+            {
+                Debug.LogError($"[{nameof(WaveController)}] waves 배열이 비어 있습니다.", this);
+                return false;
+            }
+
+            bool valid = true;
+            for (int i = 0; i < waves.Length; i++)
+            {
+                if (waves[i] == null)
+                {
+                    Debug.LogError($"[{nameof(WaveController)}] waves[{i}]가 null입니다.", this);
+                    valid = false;
+                    continue;
+                }
+
+                if (waves[i].entries == null) continue;
+                for (int j = 0; j < waves[i].entries.Length; j++)
+                {
+                    var entry = waves[i].entries[j];
+                    if (entry == null || entry.enemyData == null)
+                    {
+                        Debug.LogError($"[{nameof(WaveController)}] waves[{i}].entries[{j}].enemyData가 null입니다.", this);
+                        valid = false;
+                        continue;
+                    }
+
+                    if (entry.enemyData.prefab == null)
+                    {
+                        Debug.LogError($"[{nameof(WaveController)}] waves[{i}].entries[{j}] — {entry.enemyData.name}.prefab이 null입니다.", this);
+                        valid = false;
+                    }
+                }
+            }
+            return valid;
+        }
+
         // StageRuntime.OnNetworkSpawn에서 Initialize → Begin 순으로 호출
         public void Initialize(EnemySpawnManager enemySpawnManager)
         {
