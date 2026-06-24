@@ -17,6 +17,21 @@ namespace Vamsurlike.Player
         private Vector2                 lastSentDir;
         private PlayerReviveHandler     currentReviveTarget;
 
+        protected override void OnOwnerSpawned()
+        {
+            if (playerStats == null) return;
+            playerStats.HP.OnValueChanged       += OnActionStateChanged;
+            playerStats.IsDowned.OnValueChanged += OnActionStateChanged;
+            ForceNextMoveInputSend();
+        }
+
+        protected override void OnOwnerDespawned()
+        {
+            if (playerStats == null) return;
+            playerStats.HP.OnValueChanged       -= OnActionStateChanged;
+            playerStats.IsDowned.OnValueChanged -= OnActionStateChanged;
+        }
+
         private void Awake()
         {
             controller   = GetComponent<PlayerNetworkController>();
@@ -97,6 +112,21 @@ namespace Vamsurlike.Player
             if (worldDir == lastSentDir) return;
             lastSentDir = worldDir;
             controller.SubmitMoveInputServerRpc(worldDir);
+        }
+
+        private void OnActionStateChanged(float _, float __)
+        {
+            ForceNextMoveInputSend();
+        }
+
+        private void OnActionStateChanged(bool _, bool __)
+        {
+            ForceNextMoveInputSend();
+        }
+
+        private void ForceNextMoveInputSend()
+        {
+            lastSentDir = new Vector2(float.NaN, float.NaN);
         }
 
         private static Vector2 ReadMoveInput()

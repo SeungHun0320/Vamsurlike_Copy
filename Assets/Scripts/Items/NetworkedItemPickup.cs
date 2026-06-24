@@ -61,11 +61,11 @@ namespace Vamsurlike.Items
             if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)) return;
             if (client.PlayerObject == null) return;
 
-            // 비-상자 아이템: Playing 상태에서만 허용 (일시정지 중 차단)
-            // 상자는 GameFlowCoordinator 큐에 적재되므로 GameState 무관하게 항상 수거
+            // 비-상자 아이템: Gameplay 흐름에서만 허용 (선택/결과 화면 중 차단)
+            // 상자는 GameFlowCoordinator 큐에 적재되므로 현재 Flow와 무관하게 항상 수거
             if (itemData.itemType != ItemType.Chest &&
                 (GameFlowCoordinator.Instance == null ||
-                 GameFlowCoordinator.Instance.CurrentState.Value != GameState.Playing))
+                 !GameFlowCoordinator.Instance.IsGameplayActive))
             {
                 SendPickupRejected(clientId);
                 return;

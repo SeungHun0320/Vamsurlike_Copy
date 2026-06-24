@@ -1,0 +1,57 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fbda27c793b55fe4e90a2de4cc862d87, type: 3}
+  m_Name: WaveTable
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Stage.WaveTableSO
+  rows:
+  - waveGroupId: 0
+    sequenceIndex: 0
+    entries:
+    - enemyData: {fileID: 11400000, guid: 0c0ecaacbbf42954db3a12cd3b7fab16, type: 2}
+      count: 5
+      spawnInterval: 0.6
+    waveDuration: 20
+    loopFromHere: 0
+    spawnActionName: 
+  - waveGroupId: 0
+    sequenceIndex: 1
+    entries:
+    - enemyData: {fileID: 11400000, guid: 0c0ecaacbbf42954db3a12cd3b7fab16, type: 2}
+      count: 5
+      spawnInterval: 0.5
+    - enemyData: {fileID: 11400000, guid: f9e28cacf7b8ed04eb3f091537a8bcd4, type: 2}
+      count: 4
+      spawnInterval: 0.4
+    waveDuration: 25
+    loopFromHere: 0
+    spawnActionName: 
+  - waveGroupId: 0
+    sequenceIndex: 2
+    entries:
+    - enemyData: {fileID: 11400000, guid: f9e28cacf7b8ed04eb3f091537a8bcd4, type: 2}
+      count: 6
+      spawnInterval: 0.4
+    - enemyData: {fileID: 11400000, guid: 1e87419dddc6b854a9de8b91d5ead860, type: 2}
+      count: 3
+      spawnInterval: 0.8
+    waveDuration: 30
+    loopFromHere: 1
+    spawnActionName: 
+  - waveGroupId: 0
+    sequenceIndex: 3
+    entries:
+    - enemyData: {fileID: 11400000, guid: 1e87419dddc6b854a9de8b91d5ead860, type: 2}
+      count: 8
+      spawnInterval: 0
+    waveDuration: 35
+    loopFromHere: 0
+    spawnActionName: SpawnEliteRing

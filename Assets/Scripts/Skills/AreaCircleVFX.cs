@@ -10,6 +10,7 @@ namespace Vamsurlike.Skills
         [SerializeField] private float heightOffset = 0.05f;
 
         private LineRenderer lineRenderer;
+        private Material runtimeMaterial;
         private Transform followTarget;
         private float duration;
         private float elapsed;
@@ -23,8 +24,8 @@ namespace Vamsurlike.Skills
             lineRenderer.widthMultiplier = lineWidth;
             lineRenderer.positionCount = Mathf.Max(12, segments);
 
-            var material = new Material(Shader.Find("Sprites/Default"));
-            lineRenderer.material = material;
+            runtimeMaterial = new Material(Shader.Find("Sprites/Default"));
+            lineRenderer.material = runtimeMaterial;
         }
 
         public void Initialize(float radius, float lifeTime, Color color, Transform target = null)
@@ -76,6 +77,12 @@ namespace Vamsurlike.Skills
             Vector3 pos = followTarget.position;
             pos.y += heightOffset;
             transform.position = pos;
+        }
+
+        private void OnDestroy()
+        {
+            if (runtimeMaterial != null)
+                Destroy(runtimeMaterial);
         }
     }
 }

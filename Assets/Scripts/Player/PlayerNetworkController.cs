@@ -45,6 +45,8 @@ namespace Vamsurlike.Player
             if (stats != null && !stats.CanAct)
             {
                 moveInput = Vector2.zero;
+                if (NetSpeed.Value != 0f)
+                    NetSpeed.Value = 0f;
                 return;
             }
             MoveServer(Time.fixedDeltaTime);

@@ -187,7 +187,7 @@ namespace Vamsurlike.Skills
         private void Update()
         {
             if (!IsServer || !hasInitialized) return;
-            if (GameFlowCoordinator.Instance == null || GameFlowCoordinator.Instance.CurrentState.Value != GameState.Playing) return;
+            if (GameFlowCoordinator.Instance == null || !GameFlowCoordinator.Instance.IsGameplayActive) return;
 
             activeMode?.Tick(Time.deltaTime);
         }

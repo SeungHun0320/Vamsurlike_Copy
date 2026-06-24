@@ -52,7 +52,7 @@ namespace Vamsurlike.Stage
 
         internal void CheckLevelUp()
         {
-            if (GameFlowCoordinator.Instance == null || GameFlowCoordinator.Instance.CurrentState.Value != GameState.Playing) return;
+            if (GameFlowCoordinator.Instance == null || !GameFlowCoordinator.Instance.IsGameplayActive) return;
 
             int xpNeeded = XPRequired(SharedLevel.Value);
             if (SharedXP.Value < xpNeeded) return;

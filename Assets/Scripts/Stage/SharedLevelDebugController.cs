@@ -28,6 +28,10 @@ namespace Vamsurlike.Stage
         [SerializeField] private bool enableDebugRespawnWaveKey = true;
         [SerializeField] private Key debugRespawnWaveKey = Key.R;
 
+        [Header("Boss Phase")]
+        [SerializeField] private bool enableDebugBossPhaseKey = true;
+        [SerializeField] private Key  debugBossPhaseKey       = Key.T;
+
         private readonly List<ulong> visibleEnemyIds = new();
         private SharedLevelSystem sharedLevelSystem;
         private LevelUpManager levelUpManager;
@@ -57,6 +61,9 @@ namespace Vamsurlike.Stage
 
             if (enableDebugRespawnWaveKey && keyboard[debugRespawnWaveKey].wasPressedThisFrame)
                 RunOrRequestRespawnWave();
+
+            if (enableDebugBossPhaseKey && keyboard[debugBossPhaseKey].wasPressedThisFrame)
+                RunOrRequestBossPhase();
 #endif
         }
 
@@ -73,7 +80,7 @@ namespace Vamsurlike.Stage
         private void RunOrRequestKillVisibleEnemies()
         {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            if (!IsPlaying()) return;
+            if (!IsGameplayActive()) return;
 
             DebugEnemyCommands.CollectVisibleEnemyIds(visibleEnemyIds);
             if (visibleEnemyIds.Count == 0)
@@ -110,6 +117,16 @@ namespace Vamsurlike.Stage
 #endif
         }
 
+        private void RunOrRequestBossPhase()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (IsServer)
+                TriggerBossPhase();
+            else
+                RequestBossPhaseRpc();
+#endif
+        }
+
         [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
         private void RequestDebugLevelUpRpc()
         {
@@ -142,11 +159,19 @@ namespace Vamsurlike.Stage
 #endif
         }
 
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+        private void RequestBossPhaseRpc()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            TriggerBossPhase();
+#endif
+        }
+
         private void GrantDebugLevelUpXP()
         {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             if (!IsServer || sharedLevelSystem == null) return;
-            if (!IsPlaying()) return;
+            if (!IsGameplayActive()) return;
 
             if (levelUpManager == null || !levelUpManager.HasValidCatalog())
             {
@@ -191,12 +216,26 @@ namespace Vamsurlike.Stage
 #endif
         }
 
-        private bool IsPlaying()
+        private void TriggerBossPhase()
         {
-            if (GameFlowCoordinator.Instance != null && GameFlowCoordinator.Instance.CurrentState.Value == GameState.Playing)
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (!IsServer) return;
+
+            if (StageRuntime.Instance == null)
+            {
+                Debug.LogWarning($"[{nameof(SharedLevelDebugController)}] StageRuntime 없음 — 보스 페이즈 스킵 불가");
+                return;
+            }
+            StageRuntime.Instance.DebugTriggerBossPhase();
+#endif
+        }
+
+        private bool IsGameplayActive()
+        {
+            if (GameFlowCoordinator.Instance != null && GameFlowCoordinator.Instance.IsGameplayActive)
                 return true;
 
-            Debug.LogWarning($"[{nameof(SharedLevelDebugController)}] Debug command is only available while Playing.");
+            Debug.LogWarning($"[{nameof(SharedLevelDebugController)}] Debug command is only available during active gameplay.");
             return false;
         }
 

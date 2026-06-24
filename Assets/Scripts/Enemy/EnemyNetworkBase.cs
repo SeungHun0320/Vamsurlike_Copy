@@ -2,6 +2,7 @@ using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Data;
 using Vamsurlike.Network;
+using Vamsurlike.Skills;
 using Vamsurlike.Stage;
 using Vamsurlike.UI;
 
@@ -36,7 +37,21 @@ namespace Vamsurlike.Enemy
             ScaledAttackPower = data.attackPower * Mathf.Max(1f, damageMultiplier);
             // OnNetworkSpawn보다 뒤에 호출되므로 EnemyAI에 데이터를 직접 주입
             if (TryGetComponent<EnemyAI>(out var ai))
+            {
                 ai.ApplyData(data);
+
+                if (data.isBoss)
+                {
+                    var patterns = GetComponent<BossPatternController>();
+                    if (patterns == null) patterns = gameObject.AddComponent<BossPatternController>();
+                    patterns.Configure(this, ai);
+                }
+                else if (TryGetComponent<BossPatternController>(out var patterns))
+                {
+                    patterns.StopPatterns();
+                    patterns.enabled = false;
+                }
+            }
         }
 
         public void TakeDamage(float amount)
@@ -70,12 +85,31 @@ namespace Vamsurlike.Enemy
                 HandleDeath();
         }
 
+        // 서버가 지정한 보스 광역기 범위를 Damage Aura와 같은 원형 VFX로 전 클라이언트에 표시.
+        public void ShowSlamTelegraph(Vector3 center, float radius, float duration)
+        {
+            if (!IsServer) return;
+            ShowSlamTelegraphClientRpc(center, radius, duration);
+        }
+
         protected virtual void HandleDeath()
         {
+            bool wasBoss = data != null && data.isBoss;
+
             TriggerDeathAnimClientRpc();
             PlayDeathVFXClientRpc();
             if (StageRuntime.Instance != null && StageRuntime.Instance.Drops != null)
                 StageRuntime.Instance.Drops.OnEnemyDied(data, transform.position);
+
+            if (TryGetComponent<BossPatternController>(out var patterns))
+            {
+                patterns.StopPatterns();
+                patterns.enabled = false;
+            }
+
+            if (wasBoss && GameFlowCoordinator.Instance != null && GameFlowCoordinator.Instance.IsBossPhase)
+                GameFlowCoordinator.Instance.ForceTransition(GameFlowState.Clear);
+
             NetworkObject.Despawn(false);
         }
 
@@ -92,6 +126,19 @@ namespace Vamsurlike.Enemy
         private void ShowDamageClientRpc(float damage, Vector3 worldPosition)
         {
             FloatingTextManager.Instance?.ShowDamage(damage, worldPosition);
+        }
+
+        [ClientRpc]
+        private void ShowSlamTelegraphClientRpc(Vector3 center, float radius, float duration)
+        {
+            var visual = new GameObject("BossSlamTelegraph");
+            visual.transform.position = center + Vector3.up * 0.05f;
+
+            AreaCircleVFX circle = visual.AddComponent<AreaCircleVFX>();
+            circle.Initialize(
+                radius,
+                duration,
+                new Color(1f, 0.15f, 0.05f, 0.9f));
         }
 
         [ClientRpc]

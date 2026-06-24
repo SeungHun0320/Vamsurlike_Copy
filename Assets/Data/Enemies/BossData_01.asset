@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0c44eb3c800e7524393448d1f97c8141, type: 3}
+  m_Name: BossData_01
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Data.EnemyDataSO
+  enemyName: Boss
+  prefab: {fileID: 6401044532282763269, guid: 41acc0554e31e864ba1a67eeaa8545e6, type: 3}
+  hp: 1000
+  moveSpeed: 3
+  attackPower: 40
+  defense: 10
+  attackRange: 2
+  attackInterval: 1.2
+  xpDrop: 500
+  dropTable: {fileID: 11400000, guid: d1215519f06a3914d94ec25a12f71c2a, type: 2}
+  floatingTextHeightOffset: 4
+  isElite: 0
+  isBoss: 1

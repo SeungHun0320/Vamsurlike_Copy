@@ -9,7 +9,7 @@ using Vamsurlike.Upgrades;
 namespace Vamsurlike.Items
 {
     // Stage 씬의 NetworkObject로 배치.
-    // 상자 픽업 → 전원 스킬 카드 선택 UI → 적용 → Playing 복귀.
+    // 상자 픽업 → 전원 스킬 카드 선택 UI → 적용 → Gameplay 복귀.
     // 유효한 스킬 카드가 없으면 UI 없이 XP만 지급.
     public class ChestRewardManager : NetworkBehaviour
     {
@@ -54,11 +54,11 @@ namespace Vamsurlike.Items
         }
 
         // 서버 전용: NetworkedItemPickup(Chest)에서 호출.
-        // 큐에 적재하고 항상 true 반환 — 상자는 GameState와 무관하게 즉시 소멸.
+        // 큐에 적재하고 항상 true 반환 — 상자는 현재 Flow와 무관하게 즉시 소멸.
         public bool BeginChestReward()
         {
             if (!IsServer) return false;
-            GameFlowCoordinator.Instance?.RequestTransition(GameState.ChestOpening, StartChestFlow);
+            GameFlowCoordinator.Instance?.RequestTransition(GameFlowState.ChestOpening, StartChestFlow);
             return true;
         }
 
@@ -68,7 +68,7 @@ namespace Vamsurlike.Items
             if (catalog == null)
             {
                 Debug.LogError($"[{nameof(ChestRewardManager)}] UpgradeCatalog 없음 — 상자 건너뜀");
-                GameFlowCoordinator.Instance?.ReturnToPlaying();
+                GameFlowCoordinator.Instance?.ReturnToGameplay();
                 return;
             }
 
@@ -106,7 +106,7 @@ namespace Vamsurlike.Items
             }
 
             if (!anyHasCards)
-                GameFlowCoordinator.Instance?.ReturnToPlaying();
+                GameFlowCoordinator.Instance?.ReturnToGameplay();
         }
 
         [ServerRpc(RequireOwnership = false)]
@@ -146,12 +146,12 @@ namespace Vamsurlike.Items
             if (pendingChoices.Count > 0) return;
 
             playerOptions.Clear();
-            // NotifyCompleted를 ReturnToPlaying보다 먼저 전송해야 한다.
-            // ReturnToPlaying이 큐를 즉시 소비하면 StartChestFlow → ShowOptionsClientRpc가
+            // NotifyCompleted를 ReturnToGameplay보다 먼저 전송해야 한다.
+            // ReturnToGameplay가 큐를 즉시 소비하면 StartChestFlow → ShowOptionsClientRpc가
             // 같은 프레임에 전송되어, 클라이언트가 수신 시 ShowOptions → NotifyCompleted 순서로
             // 도착해 두 번째 상자 UI를 즉시 닫아버리는 버그가 발생한다.
             NotifyCompletedClientRpc();
-            GameFlowCoordinator.Instance?.ReturnToPlaying();
+            GameFlowCoordinator.Instance?.ReturnToGameplay();
 
             SharedLevelSystem.Instance?.CheckLevelUp();
         }

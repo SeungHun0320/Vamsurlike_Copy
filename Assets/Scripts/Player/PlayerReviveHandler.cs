@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using Vamsurlike.Stage;
 
 namespace Vamsurlike.Player
 {
@@ -11,7 +12,7 @@ namespace Vamsurlike.Player
     public class PlayerReviveHandler : NetworkBehaviour
     {
         [SerializeField] private float downedDuration = 30f;
-        [SerializeField] private float reviveDuration = 3f;
+        [SerializeField] private float reviveDuration = 2f;
         [SerializeField] private float reviveHPRatio  = 0.3f;
         [SerializeField] private float reviveRadius   = 2.5f;
 
@@ -27,6 +28,7 @@ namespace Vamsurlike.Player
 
         // 클라이언트에서 거리 탐색에 사용하는 전역 인스턴스 목록
         public static readonly List<PlayerReviveHandler> All = new();
+        public float ReviveRadius => reviveRadius;
 
         private PlayerNetworkStats stats;
         private Coroutine          downedCoroutine;
@@ -73,9 +75,14 @@ namespace Vamsurlike.Player
                 DownedTimeRemaining.Value = Mathf.Max(0f, DownedTimeRemaining.Value - 1f);
             }
 
-            // 타이머 만료 → 자동 부활 (HP 30% 복구)
-            // CompleteRevive가 downedCoroutine/reviveCoroutine 정리 + IsDowned 해제를 담당
-            CompleteRevive();
+            // 타이머 만료 → 영구 사망. HP는 이미 0 → IsAlive=false 상태.
+            if (reviveCoroutine != null) { StopCoroutine(reviveCoroutine); reviveCoroutine = null; }
+            downedCoroutine           = null;
+            DownedTimeRemaining.Value = 0f;
+            stats.IsDowned.Value      = false;
+            reviverClientId           = NoReviver;
+
+            StageRuntime.Instance?.CheckGameOver();
         }
 
         // 구조자가 E를 누를 때 호출

@@ -14,6 +14,7 @@ namespace Vamsurlike.Player
         private Animator animator;
         private PlayerNetworkController controller;
         private PlayerNetworkStats stats;
+        private bool isShowingDownedState;
 
         private void Awake()
         {
@@ -26,8 +27,9 @@ namespace Vamsurlike.Player
         {
             if (stats != null)
             {
-                stats.HP.OnValueChanged     += OnHPChanged;
+                stats.HP.OnValueChanged       += OnHPChanged;
                 stats.IsDowned.OnValueChanged += OnIsDownedChanged;
+                SyncLifeAnimation(true);
             }
         }
 
@@ -46,19 +48,36 @@ namespace Vamsurlike.Player
                 animator.SetFloat(SpeedHash, controller.NetSpeed.Value);
         }
 
-        private void OnHPChanged(float prev, float current)
+        private void OnHPChanged(float _, float __)
         {
-            if (prev > 0f && current <= 0f && animator != null)
-                animator.SetTrigger(DieHash);
+            SyncLifeAnimation(false);
         }
 
-        private void OnIsDownedChanged(bool prev, bool current)
+        private void OnIsDownedChanged(bool _, bool __)
         {
-            // 다운 상태에서 살아있는 상태로 복귀 = 부활
-            if (prev && !current && stats.IsAlive && animator != null)
+            SyncLifeAnimation(false);
+        }
+
+        // HP와 IsDowned는 별도 NetworkVariable이므로 어느 콜백이 먼저 와도
+        // 두 값을 합친 현재 상태만 보고 애니메이션을 전환한다.
+        private void SyncLifeAnimation(bool force)
+        {
+            if (animator == null || stats == null) return;
+
+            bool shouldShowDowned = stats.IsDowned.Value || !stats.IsAlive;
+            if (!force && shouldShowDowned == isShowingDownedState) return;
+
+            isShowingDownedState = shouldShowDowned;
+            if (shouldShowDowned)
+            {
+                animator.ResetTrigger(ReviveHash);
+                animator.SetTrigger(DieHash);
+            }
+            else
             {
                 animator.ResetTrigger(DieHash);
-                animator.SetTrigger(ReviveHash);
+                if (!force)
+                    animator.SetTrigger(ReviveHash);
             }
         }
     }

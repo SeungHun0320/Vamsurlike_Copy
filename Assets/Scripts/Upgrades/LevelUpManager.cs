@@ -71,7 +71,7 @@ namespace Vamsurlike.Upgrades
             }
 
             GameFlowCoordinator.Instance?.RequestTransition(
-                GameState.LevelingUp,
+                GameFlowState.LevelingUp,
                 () => StartLevelUpFlow(newLevel));
         }
 
@@ -111,7 +111,7 @@ namespace Vamsurlike.Upgrades
             if (pendingChoices.Count == 0)
             {
                 Debug.LogWarning($"[{nameof(LevelUpManager)}] 연결된 클라이언트 없음 — 레벨업 건너뜀");
-                GameFlowCoordinator.Instance?.ReturnToPlaying();
+                GameFlowCoordinator.Instance?.ReturnToGameplay();
             }
         }
 
@@ -164,9 +164,9 @@ namespace Vamsurlike.Upgrades
         {
             playerOptions.Clear();
             NotifyLevelUpCompletedClientRpc();
-            GameFlowCoordinator.Instance?.ReturnToPlaying();
+            GameFlowCoordinator.Instance?.ReturnToGameplay();
 
-            // ReturnToPlaying 이후 누적 XP 재검사 — 큐 처리 완료 후 다중 레벨 도달 대비
+            // ReturnToGameplay 이후 누적 XP 재검사 — 큐 처리 완료 후 다중 레벨 도달 대비
             if (SharedLevelSystem.Instance != null)
                 SharedLevelSystem.Instance.CheckLevelUp();
         }
