@@ -50,7 +50,7 @@ namespace Vamsurlike.Enemy
         private void Update()
         {
             if (!Base.IsAlive) return;
-            if (StageRuntime.Instance == null || StageRuntime.Instance.CurrentState.Value != GameState.Playing) return;
+            if (GameFlowCoordinator.Instance == null || GameFlowCoordinator.Instance.CurrentState.Value != GameState.Playing) return;
 
             targetUpdateTimer -= Time.deltaTime;
             if (targetUpdateTimer <= 0f)

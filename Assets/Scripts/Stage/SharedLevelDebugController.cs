@@ -193,7 +193,7 @@ namespace Vamsurlike.Stage
 
         private bool IsPlaying()
         {
-            if (StageRuntime.Instance != null && StageRuntime.Instance.CurrentState.Value == GameState.Playing)
+            if (GameFlowCoordinator.Instance != null && GameFlowCoordinator.Instance.CurrentState.Value == GameState.Playing)
                 return true;
 
             Debug.LogWarning($"[{nameof(SharedLevelDebugController)}] Debug command is only available while Playing.");

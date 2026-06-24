@@ -69,6 +69,14 @@ namespace Vamsurlike.Upgrades
                 Debug.LogError($"[{nameof(LevelUpManager)}] 유효한 UpgradeCatalog 옵션 없음 — 레벨업 건너뜀");
                 return;
             }
+
+            GameFlowCoordinator.Instance?.RequestTransition(
+                GameState.LevelingUp,
+                () => StartLevelUpFlow(newLevel));
+        }
+
+        private void StartLevelUpFlow(int newLevel)
+        {
             var catalog = UpgradeCatalog.Instance;
 
             playerOptions.Clear();
@@ -83,7 +91,6 @@ namespace Vamsurlike.Upgrades
                     && s.IsDowned.Value)
                     continue;
 
-                // 플레이어별 보유 스킬에 맞는 옵션 풀로 필터링
                 SkillManager skillManager = GetPlayerSkillManager(clientId);
                 int[] indices = optionPicker.GenerateOptions(
                     catalog,
@@ -104,16 +111,7 @@ namespace Vamsurlike.Upgrades
             if (pendingChoices.Count == 0)
             {
                 Debug.LogWarning($"[{nameof(LevelUpManager)}] 연결된 클라이언트 없음 — 레벨업 건너뜀");
-                return;
-            }
-
-            if (StageRuntime.Instance == null ||
-                !StageRuntime.Instance.TryTransition(GameState.Playing, GameState.LevelingUp))
-            {
-                Debug.LogWarning($"[{nameof(LevelUpManager)}] Playing 상태가 아니라 레벨업 진입 불가");
-                playerOptions.Clear();
-                pendingChoices.Clear();
-                return;
+                GameFlowCoordinator.Instance?.ReturnToPlaying();
             }
         }
 
@@ -165,11 +163,10 @@ namespace Vamsurlike.Upgrades
         private void FinalizeLevelUp()
         {
             playerOptions.Clear();
-            if (StageRuntime.Instance != null)
-                StageRuntime.Instance.TryTransition(GameState.LevelingUp, GameState.Playing);
             NotifyLevelUpCompletedClientRpc();
+            GameFlowCoordinator.Instance?.ReturnToPlaying();
 
-            // Playing 복귀 직후 누적 XP 재검사 — in-flight pickup이나 다중 레벨 도달 대비
+            // ReturnToPlaying 이후 누적 XP 재검사 — 큐 처리 완료 후 다중 레벨 도달 대비
             if (SharedLevelSystem.Instance != null)
                 SharedLevelSystem.Instance.CheckLevelUp();
         }

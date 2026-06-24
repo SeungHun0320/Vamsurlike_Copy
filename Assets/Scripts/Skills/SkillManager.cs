@@ -77,8 +77,8 @@ namespace Vamsurlike.Skills
         {
             if (!IsServer) return;
             if (playerStats != null && !playerStats.CanAct) return;
-            if (StageRuntime.Instance == null
-                || StageRuntime.Instance.CurrentState.Value != GameState.Playing)
+            if (GameFlowCoordinator.Instance == null
+                || GameFlowCoordinator.Instance.CurrentState.Value != GameState.Playing)
                 return;
 
             executionScheduler.Tick(
@@ -151,8 +151,8 @@ namespace Vamsurlike.Skills
         public void ActivateFirstManualSkillServerRpc()
         {
             if (!IsServer) return;
-            if (StageRuntime.Instance == null
-                || StageRuntime.Instance.CurrentState.Value != GameState.Playing)
+            if (GameFlowCoordinator.Instance == null
+                || GameFlowCoordinator.Instance.CurrentState.Value != GameState.Playing)
             {
                 Debug.LogWarning($"[ActivateFirstManualSkillServerRpc] FAIL — GameState이 Playing이 아님.");
                 return;

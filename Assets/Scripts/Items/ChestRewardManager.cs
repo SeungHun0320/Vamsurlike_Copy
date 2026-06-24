@@ -53,23 +53,23 @@ namespace Vamsurlike.Items
             if (Instance == this) Instance = null;
         }
 
-        // 서버 전용: NetworkedItemPickup(Chest)에서 호출. 진입 성공 시 true 반환.
+        // 서버 전용: NetworkedItemPickup(Chest)에서 호출.
+        // 큐에 적재하고 항상 true 반환 — 상자는 GameState와 무관하게 즉시 소멸.
         public bool BeginChestReward()
         {
             if (!IsServer) return false;
+            GameFlowCoordinator.Instance?.RequestTransition(GameState.ChestOpening, StartChestFlow);
+            return true;
+        }
 
-            // 재진입 가드
-            if (pendingChoices.Count > 0)
-            {
-                Debug.LogWarning($"[{nameof(ChestRewardManager)}] 상자 보상 진행 중 — 새 상자 요청 무시");
-                return false;
-            }
-
+        private void StartChestFlow()
+        {
             var catalog = UpgradeCatalog.Instance;
             if (catalog == null)
             {
                 Debug.LogError($"[{nameof(ChestRewardManager)}] UpgradeCatalog 없음 — 상자 건너뜀");
-                return false;
+                GameFlowCoordinator.Instance?.ReturnToPlaying();
+                return;
             }
 
             playerOptions.Clear();
@@ -106,18 +106,7 @@ namespace Vamsurlike.Items
             }
 
             if (!anyHasCards)
-                return true;
-
-            if (StageRuntime.Instance == null ||
-                !StageRuntime.Instance.TryTransition(GameState.Playing, GameState.ChestOpening))
-            {
-                Debug.LogWarning($"[{nameof(ChestRewardManager)}] Playing 상태가 아니라 상자 보상 진입 불가");
-                playerOptions.Clear();
-                pendingChoices.Clear();
-                return false;
-            }
-
-            return true;
+                GameFlowCoordinator.Instance?.ReturnToPlaying();
         }
 
         [ServerRpc(RequireOwnership = false)]
@@ -157,8 +146,7 @@ namespace Vamsurlike.Items
             if (pendingChoices.Count > 0) return;
 
             playerOptions.Clear();
-            if (StageRuntime.Instance != null)
-                StageRuntime.Instance.TryTransition(GameState.ChestOpening, GameState.Playing);
+            GameFlowCoordinator.Instance?.ReturnToPlaying();
             NotifyCompletedClientRpc();
 
             SharedLevelSystem.Instance?.CheckLevelUp();
