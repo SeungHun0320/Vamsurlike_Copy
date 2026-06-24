@@ -13,6 +13,7 @@ namespace Vamsurlike.Player
 
         private PlayerNetworkController controller;
         private Skills.SkillManager     skillManager;
+        private PlayerNetworkStats      playerStats;
         private Vector2                 lastSentDir;
         private PlayerReviveHandler     currentReviveTarget;
 
@@ -20,6 +21,7 @@ namespace Vamsurlike.Player
         {
             controller   = GetComponent<PlayerNetworkController>();
             skillManager = GetComponent<Skills.SkillManager>();
+            playerStats  = GetComponent<PlayerNetworkStats>();
         }
 
         private void Update()
@@ -38,6 +40,9 @@ namespace Vamsurlike.Player
 
         private void TryStartRevive()
         {
+            // 본인이 다운 상태면 타인 부활 시도 불가
+            if (playerStats != null && !playerStats.CanAct) return;
+
             var all = PlayerReviveHandler.All;
             Debug.Log($"[TryStartRevive] E 입력. 등록된 핸들러 수={all.Count}");
 

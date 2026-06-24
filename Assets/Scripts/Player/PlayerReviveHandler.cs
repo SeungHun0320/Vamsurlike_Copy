@@ -73,9 +73,9 @@ namespace Vamsurlike.Player
                 DownedTimeRemaining.Value = Mathf.Max(0f, DownedTimeRemaining.Value - 1f);
             }
 
-            if (reviveCoroutine != null) { StopCoroutine(reviveCoroutine); reviveCoroutine = null; }
-            stats.IsDowned.Value = false;
-            reviverClientId      = NoReviver;
+            // 타이머 만료 → 자동 부활 (HP 30% 복구)
+            // CompleteRevive가 downedCoroutine/reviveCoroutine 정리 + IsDowned 해제를 담당
+            CompleteRevive();
         }
 
         // 구조자가 E를 누를 때 호출
