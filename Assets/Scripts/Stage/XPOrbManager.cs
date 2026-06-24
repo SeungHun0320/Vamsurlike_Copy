@@ -50,10 +50,14 @@ namespace Vamsurlike.Stage
             if (!activeOrbs.TryGetValue(orbId, out var orb)) return false;
             if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)) return false;
 
-            // 서버 권한 거리 검증: 플레이어 스탯의 픽업 반경 기준 + 네트워크 지연 보상(×2)
             if (client.PlayerObject != null)
             {
                 var stats = client.PlayerObject.GetComponent<PlayerNetworkStats>();
+
+                // 사망/다운 상태 플레이어는 XP 획득 불가
+                if (stats != null && !stats.CanAct) return false;
+
+                // 서버 권한 거리 검증: 플레이어 스탯의 픽업 반경 기준 + 네트워크 지연 보상(×2)
                 float pickupRadius = stats != null && stats.PickupRadius.Value > 0f
                     ? stats.PickupRadius.Value : 2f;
                 float maxSqrDist = (pickupRadius * 2f) * (pickupRadius * 2f);
