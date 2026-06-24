@@ -107,7 +107,14 @@ namespace Vamsurlike.Upgrades
                 return;
             }
 
-            StageRuntime.Instance?.SetGameState(GameState.LevelingUp);
+            if (StageRuntime.Instance == null ||
+                !StageRuntime.Instance.TryTransition(GameState.Playing, GameState.LevelingUp))
+            {
+                Debug.LogWarning($"[{nameof(LevelUpManager)}] Playing 상태가 아니라 레벨업 진입 불가");
+                playerOptions.Clear();
+                pendingChoices.Clear();
+                return;
+            }
         }
 
         // 클라이언트 → 서버: 플레이어가 카드를 선택했을 때
@@ -158,7 +165,8 @@ namespace Vamsurlike.Upgrades
         private void FinalizeLevelUp()
         {
             playerOptions.Clear();
-            StageRuntime.Instance?.SetGameState(GameState.Playing);
+            if (StageRuntime.Instance != null)
+                StageRuntime.Instance.TryTransition(GameState.LevelingUp, GameState.Playing);
             NotifyLevelUpCompletedClientRpc();
 
             // Playing 복귀 직후 누적 XP 재검사 — in-flight pickup이나 다중 레벨 도달 대비

@@ -23,6 +23,21 @@ namespace Vamsurlike.Player
             stats = GetComponent<PlayerNetworkStats>();
         }
 
+        private void OnEnable()
+        {
+            NetworkedItemPickup.OnPickupRejected += HandlePickupRejected;
+        }
+
+        private void OnDisable()
+        {
+            NetworkedItemPickup.OnPickupRejected -= HandlePickupRejected;
+        }
+
+        private void HandlePickupRejected(ulong networkObjectId)
+        {
+            pendingPickupRequests.Remove(networkObjectId);
+        }
+
         private void Update()
         {
             checkTimer -= Time.deltaTime;

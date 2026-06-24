@@ -53,23 +53,23 @@ namespace Vamsurlike.Items
             if (Instance == this) Instance = null;
         }
 
-        // 서버 전용: NetworkedItemPickup(Chest)에서 호출
-        public void BeginChestReward()
+        // 서버 전용: NetworkedItemPickup(Chest)에서 호출. 진입 성공 시 true 반환.
+        public bool BeginChestReward()
         {
-            if (!IsServer) return;
+            if (!IsServer) return false;
 
             // 재진입 가드
             if (pendingChoices.Count > 0)
             {
                 Debug.LogWarning($"[{nameof(ChestRewardManager)}] 상자 보상 진행 중 — 새 상자 요청 무시");
-                return;
+                return false;
             }
 
             var catalog = UpgradeCatalog.Instance;
             if (catalog == null)
             {
                 Debug.LogError($"[{nameof(ChestRewardManager)}] UpgradeCatalog 없음 — 상자 건너뜀");
-                return;
+                return false;
             }
 
             playerOptions.Clear();
@@ -106,9 +106,18 @@ namespace Vamsurlike.Items
             }
 
             if (!anyHasCards)
-                return;
+                return true;
 
-            StageRuntime.Instance?.SetGameState(GameState.ChestOpening);
+            if (StageRuntime.Instance == null ||
+                !StageRuntime.Instance.TryTransition(GameState.Playing, GameState.ChestOpening))
+            {
+                Debug.LogWarning($"[{nameof(ChestRewardManager)}] Playing 상태가 아니라 상자 보상 진입 불가");
+                playerOptions.Clear();
+                pendingChoices.Clear();
+                return false;
+            }
+
+            return true;
         }
 
         [ServerRpc(RequireOwnership = false)]
@@ -148,7 +157,8 @@ namespace Vamsurlike.Items
             if (pendingChoices.Count > 0) return;
 
             playerOptions.Clear();
-            StageRuntime.Instance?.SetGameState(GameState.Playing);
+            if (StageRuntime.Instance != null)
+                StageRuntime.Instance.TryTransition(GameState.ChestOpening, GameState.Playing);
             NotifyCompletedClientRpc();
 
             SharedLevelSystem.Instance?.CheckLevelUp();

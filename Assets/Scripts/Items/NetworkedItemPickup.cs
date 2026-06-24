@@ -1,9 +1,11 @@
+using System;
 using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Data;
 using Vamsurlike.Enemy;
 using Vamsurlike.Network;
 using Vamsurlike.Player;
+using Vamsurlike.Stage;
 
 namespace Vamsurlike.Items
 {
@@ -15,6 +17,9 @@ namespace Vamsurlike.Items
         private GameObject sourcePrefab;
         private bool        wasPoolSpawned;
 
+        // 클라이언트: 서버가 픽업 요청을 거절했을 때 발생 — PlayerPickupController가 구독해 pendingPickupRequests 제거
+        public static event Action<ulong> OnPickupRejected;
+
         // 서버 전용 팩토리: DropManager에서 호출
         public static bool SpawnAt(ItemDataSO data, Vector3 position)
         {
@@ -24,7 +29,7 @@ namespace Vamsurlike.Items
             bool usingPool = PoolManager.Instance != null;
             NetworkObject obj = usingPool
                 ? PoolManager.Instance.GetNetworkObject(data.pickupPrefab, position, Quaternion.identity)
-                : Object.Instantiate(data.pickupPrefab, position, Quaternion.identity)
+                : UnityEngine.Object.Instantiate(data.pickupPrefab, position, Quaternion.identity)
                         .GetComponent<NetworkObject>();
 
             if (obj == null)
@@ -56,34 +61,63 @@ namespace Vamsurlike.Items
             if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)) return;
             if (client.PlayerObject == null) return;
 
+            // GameState 검증 — Playing이 아닌 동안 픽업 차단
+            if (StageRuntime.Instance == null ||
+                StageRuntime.Instance.CurrentState.Value != GameState.Playing)
+            {
+                SendPickupRejected(clientId);
+                return;
+            }
+
             // 거리 검증
             const float MaxPickupDist = 4f;
             if (Vector3.SqrMagnitude(client.PlayerObject.transform.position - transform.position)
                 > MaxPickupDist * MaxPickupDist) return;
 
-            ApplyEffect(client.PlayerObject.gameObject, clientId);
-            DespawnToPool();
+            if (ApplyEffect(client.PlayerObject.gameObject))
+                DespawnToPool();
+            else
+                SendPickupRejected(clientId);
         }
 
-        private void ApplyEffect(GameObject playerObject, ulong clientId)
+        // 서버 → 요청 클라이언트: 픽업 거절 통보 (pendingPickupRequests 정리 용도)
+        [ClientRpc]
+        private void NotifyPickupRejectedClientRpc(ClientRpcParams rpcParams = default)
+        {
+            OnPickupRejected?.Invoke(NetworkObjectId);
+        }
+
+        private void SendPickupRejected(ulong clientId)
+        {
+            NotifyPickupRejectedClientRpc(new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
+            });
+        }
+
+        private bool ApplyEffect(GameObject playerObject)
         {
             switch (itemData.itemType)
             {
                 case ItemType.HealthOrb:
                     playerObject.GetComponent<PlayerNetworkStats>()?.Heal(itemData.value);
-                    break;
+                    return true;
 
                 case ItemType.Missile:
                     ApplyMissileAoE();
-                    break;
+                    return true;
 
                 case ItemType.Chest:
                     var chestManager = ChestRewardManager.Instance;
-                    if (chestManager != null)
-                        chestManager.BeginChestReward();
-                    else
+                    if (chestManager == null)
+                    {
                         Debug.LogWarning($"[{nameof(NetworkedItemPickup)}] ChestRewardManager 없음");
-                    break;
+                        return false;
+                    }
+                    return chestManager.BeginChestReward();
+
+                default:
+                    return false;
             }
         }
 
@@ -101,7 +135,6 @@ namespace Vamsurlike.Items
         private void DespawnToPool()
         {
             if (!IsSpawned) return;
-            // 풀에서 꺼낸 경우 destroy=false로 반환 대기, 직접 생성한 경우 즉시 파괴
             NetworkObject.Despawn(!wasPoolSpawned);
         }
 

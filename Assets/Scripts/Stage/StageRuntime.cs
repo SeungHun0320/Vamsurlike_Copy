@@ -64,11 +64,27 @@ namespace Vamsurlike.Stage
             ElapsedTime += Time.deltaTime;
         }
 
-        // 서버 전용: LevelUpManager 등 다른 시스템에서 상태 전환 요청
-        public void SetGameState(GameState newState)
+        // 현재 상태가 expected일 때만 next로 전환. 실패 시 false 반환.
+        // LevelingUp·ChestOpening 등 Playing에서만 시작해야 하는 전환에 사용.
+        public bool TryTransition(GameState expected, GameState next)
+        {
+            if (!IsServer) return false;
+            if (CurrentState.Value != expected)
+            {
+                Debug.LogWarning(
+                    $"[{nameof(StageRuntime)}] 상태 전환 실패: 현재={CurrentState.Value}, " +
+                    $"기대={expected}, 목표={next}");
+                return false;
+            }
+            CurrentState.Value = next;
+            return true;
+        }
+
+        // Clear·GameOver·BossPhase처럼 현재 상태와 무관하게 강제 전환해야 하는 경우에만 사용.
+        public void ForceTransition(GameState next)
         {
             if (!IsServer) return;
-            CurrentState.Value = newState;
+            CurrentState.Value = next;
         }
 
         private void OnGameStateChanged(GameState prev, GameState next)
