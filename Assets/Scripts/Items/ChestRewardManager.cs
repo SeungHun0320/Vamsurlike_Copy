@@ -146,8 +146,12 @@ namespace Vamsurlike.Items
             if (pendingChoices.Count > 0) return;
 
             playerOptions.Clear();
-            GameFlowCoordinator.Instance?.ReturnToPlaying();
+            // NotifyCompleted를 ReturnToPlaying보다 먼저 전송해야 한다.
+            // ReturnToPlaying이 큐를 즉시 소비하면 StartChestFlow → ShowOptionsClientRpc가
+            // 같은 프레임에 전송되어, 클라이언트가 수신 시 ShowOptions → NotifyCompleted 순서로
+            // 도착해 두 번째 상자 UI를 즉시 닫아버리는 버그가 발생한다.
             NotifyCompletedClientRpc();
+            GameFlowCoordinator.Instance?.ReturnToPlaying();
 
             SharedLevelSystem.Instance?.CheckLevelUp();
         }
