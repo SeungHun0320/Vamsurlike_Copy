@@ -33,8 +33,6 @@ namespace Vamsurlike.Core
                 Debug.LogError("[StartupValidator] StageRuntime에 WaveController가 할당되지 않았습니다.");
                 valid = false;
             }
-            else
-                valid &= waveController.Validate();
 
             if (dropManager == null)
             {

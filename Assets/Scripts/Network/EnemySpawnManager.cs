@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
@@ -11,10 +12,18 @@ namespace Vamsurlike.Network
     {
         public static EnemySpawnManager Instance { get; private set; }
 
+        // Inspector에서 모든 EnemyDataSO를 등록. 이름 기반 스폰에 사용됨.
+        [SerializeField] private List<EnemyDataSO> enemyRegistry = new();
+
+        private readonly Dictionary<string, EnemyDataSO> enemyByName = new();
+
         private void Awake()
         {
             if (Instance != null) { Destroy(this); return; }
             Instance = this;
+
+            foreach (var data in enemyRegistry)
+                if (data != null) enemyByName[data.name] = data;
         }
 
         private void OnDestroy()
@@ -55,6 +64,27 @@ namespace Vamsurlike.Network
             networkObject.Spawn(true);
             if (networkObject.TryGetComponent<EnemyNetworkBase>(out var enemyBase))
                 enemyBase.Initialize(data, hpMultiplier, damageMultiplier);
+        }
+
+        // 이름으로 적 스폰 — DataManager 기반 웨이브에서 사용
+        public void SpawnEnemyByName(string enemyName, Vector3 position, float hpMul = 1f, float dmgMul = 1f)
+        {
+            if (!enemyByName.TryGetValue(enemyName, out var data))
+            {
+                Debug.LogError($"[{nameof(EnemySpawnManager)}] '{enemyName}' 미등록. Inspector의 enemyRegistry를 확인하세요.");
+                return;
+            }
+            SpawnEnemy(data, position, hpMul, dmgMul);
+        }
+
+        public void SpawnBossByName(string enemyName)
+        {
+            if (!enemyByName.TryGetValue(enemyName, out var data))
+            {
+                Debug.LogError($"[{nameof(EnemySpawnManager)}] 보스 '{enemyName}' 미등록.");
+                return;
+            }
+            SpawnBoss(data);
         }
 
         // 보스 스폰: NavMesh 위 맵 중앙 또는 플레이어들의 평균 위치 근처에 배치

@@ -1,0 +1,12 @@
+# 스테이지 테이블 (StageTable.csv)
+# 임포트: Vamsurlike > Data > Import StageTable CSV
+#
+# 컬럼 설명:
+#   stageId         - 스테이지 고유 ID (정수, 1부터 시작)
+#   stageName       - 스테이지 이름 (표시용)
+#   durationSeconds - 보스 페이즈 진입까지 생존 시간(초)
+#   waveGroupId     - WaveTable.csv의 waveGroupId와 매칭되는 웨이브 그룹
+#   bossDataName    - Assets/Data/Enemies/ 폴더의 보스 EnemyDataSO 에셋명 (없으면 비워두기)
+#   clearCondition  - TimeSurvival / BossKill / BothRequired
+stageId,stageName,durationSeconds,waveGroupId,bossDataName,clearCondition
+1,Stage 01 — Survival,300,0,BossData_01,BossKill

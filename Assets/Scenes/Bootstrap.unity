@@ -193,6 +193,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b7cbbf7a1b35ce3439bf201759337dc4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Network.GameNetworkManager
+  lobbySceneName: MainMenu
+  stageSceneName: Stage_01
 --- !u!114 &873381298
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -312,6 +314,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c169684adec54344ca4dcd864c4aaba8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Network.EnemySpawnManager
+  enemyRegistry:
+  - {fileID: 11400000, guid: 0c0ecaacbbf42954db3a12cd3b7fab16, type: 2}
+  - {fileID: 11400000, guid: f9e28cacf7b8ed04eb3f091537a8bcd4, type: 2}
+  - {fileID: 11400000, guid: 1e87419dddc6b854a9de8b91d5ead860, type: 2}
+  - {fileID: 11400000, guid: f745ce33e779f03418b3fc88e3128dbb, type: 2}
 --- !u!114 &873381303
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -345,7 +352,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c37173f4da5385843b5a0e7e3960ca76, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Network.ServerConsoleLogger
 --- !u!1 &992708771
 GameObject:

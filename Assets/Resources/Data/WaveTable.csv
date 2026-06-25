@@ -1,0 +1,8 @@
+# 웨이브 테이블
+# entries 형식: 에너미명:수:스폰간격 — 여러 종류는 | 로 구분
+# spawnActionName: SpawnEliteRing / SpawnBossMinions / 비워두면 기본 스폰
+id,waveGroupId,sequenceIndex,waveDuration,loopFromHere,spawnActionName,entries
+0,0,0,20,FALSE,,EnemyData_A:5:0.6
+1,0,1,25,FALSE,,EnemyData_A:5:0.5|EnemyData_B:4:0.4
+2,0,2,30,TRUE,,EnemyData_B:6:0.4|EnemyData_C:3:0.8
+3,0,3,35,FALSE,SpawnEliteRing,EnemyData_C:8:0.0

@@ -1,6 +1,7 @@
 using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Core;
+using Vamsurlike.Data.Runtime;
 using Vamsurlike.Network;
 using Vamsurlike.Player;
 
@@ -12,9 +13,8 @@ namespace Vamsurlike.Stage
     {
         public static StageRuntime Instance { get; private set; }
 
-        [SerializeField] private WaveController  waveController;
-        [SerializeField] private DropManager     dropManager;
-        [SerializeField] private StageTableSO    stageTable;
+        [SerializeField] private WaveController waveController;
+        [SerializeField] private DropManager    dropManager;
 
         public WaveController    Wave  => waveController;
         public DropManager       Drops => dropManager;
@@ -26,9 +26,9 @@ namespace Vamsurlike.Stage
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
 
-        private StageRow activeStage;
-        private bool     stageLoaded;
-        private bool     bossPhaseTriggered;
+        private StageData activeStage;
+        private bool      stageLoaded;
+        private bool      bossPhaseTriggered;
 
         private void Awake()
         {
@@ -42,6 +42,8 @@ namespace Vamsurlike.Stage
         {
             if (!IsServer) return;
 
+            DataManager.Initialize();
+
             if (PoolManager.Instance != null) PoolManager.Instance.WarmupDeferredPools();
 
             if (waveController == null || dropManager == null) return;
@@ -49,7 +51,7 @@ namespace Vamsurlike.Stage
             LoadStage(1);
             if (!stageLoaded) return;
 
-            waveController.Initialize(Spawn, activeStage.waveGroupId);
+            waveController.Initialize(Spawn, activeStage.WaveGroupId);
             waveController.Begin();
         }
 
@@ -72,9 +74,9 @@ namespace Vamsurlike.Stage
         // ─── Stage Loading ──────────────────────────────────────────────
         public void LoadStage(int stageId)
         {
-            if (stageTable == null || !stageTable.TryGetStage(stageId, out activeStage))
+            if (!DataManager.Stages.TryGetValue(stageId, out activeStage))
             {
-                Debug.LogError($"[{nameof(StageRuntime)}] stageId={stageId}를 테이블에서 찾을 수 없습니다.");
+                Debug.LogError($"[{nameof(StageRuntime)}] stageId={stageId}를 DataManager에서 찾을 수 없습니다.");
                 stageLoaded = false;
                 return;
             }
@@ -88,25 +90,25 @@ namespace Vamsurlike.Stage
         private void CheckBossPhase()
         {
             if (!stageLoaded || bossPhaseTriggered) return;
-            if (ElapsedTime.Value < activeStage.durationSeconds) return;
+            if (ElapsedTime.Value < activeStage.DurationSeconds) return;
 
             bossPhaseTriggered = true;
 
-            if (activeStage.bossData == null)
+            if (!activeStage.HasBoss)
             {
-                // 보스 없음 + TimeSurvival → 즉시 클리어
-                if (activeStage.clearCondition == StageClearCondition.TimeSurvival)
-                    GameFlowCoordinator.Instance?.ForceTransition(GameFlowState.Clear);
+                if (activeStage.ClearCondition == StageClearCondition.TimeSurvival)
+                    if (GameFlowCoordinator.Instance != null)
+                        GameFlowCoordinator.Instance.ForceTransition(GameFlowState.Clear);
                 return;
             }
 
-            GameFlowCoordinator.Instance?.SetStagePhase(StagePhase.Boss);
-            EnemySpawnManager.Instance?.SpawnBoss(activeStage.bossData);
+            if (GameFlowCoordinator.Instance != null)
+                GameFlowCoordinator.Instance.SetStagePhase(StagePhase.Boss);
+            if (EnemySpawnManager.Instance != null)
+                EnemySpawnManager.Instance.SpawnBossByName(activeStage.BossEnemyName);
         }
 
         // ─── Game Over Check (서버 전용) ────────────────────────────────
-        // PlayerReviveHandler 다운 타이머 만료 후 호출.
-        // 다운 중(IsDowned=true)인 플레이어는 아직 구출 가능하므로 GameOver 아님.
         public void CheckGameOver()
         {
             if (!IsServer) return;
@@ -121,7 +123,6 @@ namespace Vamsurlike.Stage
                 var stats = client.PlayerObject.GetComponent<PlayerNetworkStats>();
                 if (stats == null) continue;
 
-                // 살아있거나 아직 다운 타이머가 남아있으면 Game Over 아님
                 if (stats.IsAlive || stats.IsDowned.Value) return;
             }
 
@@ -148,18 +149,17 @@ namespace Vamsurlike.Stage
                 Debug.LogWarning($"[{nameof(StageRuntime)}] 이미 보스 페이즈 진입됨");
                 return;
             }
-            if (activeStage.bossData == null)
+            if (!activeStage.HasBoss)
             {
-                Debug.LogWarning($"[{nameof(StageRuntime)}] StageTable.bossData가 null — Setup Stage Assets 메뉴를 실행하세요");
+                Debug.LogWarning($"[{nameof(StageRuntime)}] StageTable.bossEnemyName이 비어 있습니다.");
                 return;
             }
 
             bossPhaseTriggered = true;
-
             if (GameFlowCoordinator.Instance != null)
                 GameFlowCoordinator.Instance.SetStagePhase(StagePhase.Boss);
             if (EnemySpawnManager.Instance != null)
-                EnemySpawnManager.Instance.SpawnBoss(activeStage.bossData);
+                EnemySpawnManager.Instance.SpawnBossByName(activeStage.BossEnemyName);
             Debug.Log($"[{nameof(StageRuntime)}] 디버그: 보스 페이즈 강제 진입");
         }
     }
