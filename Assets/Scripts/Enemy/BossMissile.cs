@@ -4,43 +4,109 @@ using Vamsurlike.Player;
 
 namespace Vamsurlike.Enemy
 {
-    // 보스 전용 미사일. NetworkObject + NetworkTransform으로 모든 클라이언트에 표시됨.
-    // 서버만 이동·충돌을 처리한다.
+    // 보스 전용 미사일. 서버만 이동·충돌을 처리한다.
+    // Linear(SpreadShot) 와 Mortar(포물선 낙하) 두 가지 모드 지원.
     [RequireComponent(typeof(NetworkObject))]
     public sealed class BossMissile : NetworkBehaviour
     {
+        private const float ArcHeight = 9f;
+
         [SerializeField] private float hitRadius = 1.5f;
 
-        private Vector3 moveDirection;
-        private float   speed;
+        private enum Mode { Linear, Mortar }
+        private Mode    mode;
+
+        // Linear 공통
         private float   damage;
-        private float   remainingLife;
         private bool    active;
 
-        // BossPatternController에서 Spawn() 직후 호출
-        public void InitLinear(Vector3 direction, float missilSpeed, float missilDamage, float lifetime)
+        // Linear 전용
+        private Vector3 moveDirection;
+        private float   speed;
+        private float   remainingLife;
+
+        // Mortar 전용
+        private Vector3 startPos;
+        private Vector3 targetPos;
+        private float   flightTime;
+        private float   elapsed;
+        private float   impactRadius;
+
+        // BossPatternController에서 Spawn() 직후 호출 — SpreadShot
+        public void InitLinear(Vector3 direction, float missileSpeed, float missileDamage, float lifetime)
         {
+            mode          = Mode.Linear;
             moveDirection = direction.normalized;
-            speed         = missilSpeed;
-            damage        = missilDamage;
+            speed         = missileSpeed;
+            damage        = missileDamage;
             remainingLife = lifetime;
             active        = true;
 
             transform.rotation = Quaternion.LookRotation(direction.normalized);
         }
 
+        // BossPatternController에서 Spawn() 직후 호출 — Mortar
+        // flightTime 동안 포물선으로 target에 도달 후 blastRadius 범위 AOE 피해
+        public void InitMortar(Vector3 start, Vector3 target, float flight, float missileDamage, float blastRadius)
+        {
+            mode         = Mode.Mortar;
+            startPos     = start;
+            targetPos    = target;
+            flightTime   = Mathf.Max(0.1f, flight);
+            elapsed      = 0f;
+            damage       = missileDamage;
+            impactRadius = blastRadius;
+            active       = true;
+
+            transform.position = start;
+            transform.rotation = Quaternion.LookRotation(Vector3.up);
+        }
+
         private void Update()
         {
             if (!IsServer || !active) return;
 
+            if (mode == Mode.Linear)
+                UpdateLinear();
+            else
+                UpdateMortar();
+        }
+
+        private void UpdateLinear()
+        {
             remainingLife -= Time.deltaTime;
             if (remainingLife <= 0f) { DespawnSelf(); return; }
 
             transform.position += moveDirection * speed * Time.deltaTime;
-            CheckHit();
+            CheckHitLinear();
         }
 
-        private void CheckHit()
+        private void UpdateMortar()
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / flightTime);
+
+            // 포물선 위치: XZ는 선형 보간, Y는 sin 아치
+            Vector3 pos = Vector3.Lerp(startPos, targetPos, t);
+            pos.y += ArcHeight * Mathf.Sin(t * Mathf.PI);
+            transform.position = pos;
+
+            // 진행 방향으로 회전
+            float nextT  = Mathf.Clamp01(t + Time.deltaTime / flightTime);
+            Vector3 next = Vector3.Lerp(startPos, targetPos, nextT);
+            next.y += ArcHeight * Mathf.Sin(nextT * Mathf.PI);
+            Vector3 dir  = next - pos;
+            if (dir.sqrMagnitude > 0.0001f)
+                transform.rotation = Quaternion.LookRotation(dir.normalized);
+
+            if (t >= 1f)
+            {
+                DamageInRadius(targetPos, impactRadius);
+                DespawnSelf();
+            }
+        }
+
+        private void CheckHitLinear()
         {
             var nm = NetworkManager.Singleton;
             if (nm == null) return;
@@ -54,6 +120,21 @@ namespace Vamsurlike.Enemy
                     stats.TakeDamage(damage);
                 DespawnSelf();
                 return;
+            }
+        }
+
+        private void DamageInRadius(Vector3 center, float radius)
+        {
+            var nm = NetworkManager.Singleton;
+            if (nm == null) return;
+
+            float sqrR = radius * radius;
+            foreach (var client in nm.ConnectedClientsList)
+            {
+                if (client.PlayerObject == null) continue;
+                if ((client.PlayerObject.transform.position - center).sqrMagnitude > sqrR) continue;
+                if (client.PlayerObject.TryGetComponent(out PlayerNetworkStats stats))
+                    stats.TakeDamage(damage);
             }
         }
 

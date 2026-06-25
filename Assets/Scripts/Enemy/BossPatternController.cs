@@ -240,7 +240,8 @@ namespace Vamsurlike.Enemy
             yield return new WaitForSeconds(SlamRecovery);
         }
 
-        // 패턴 3: 무작위 위치에 박격포 미사일을 퍼부음. 경고 원 후 착탄 피해.
+        // 패턴 3: 여러 위치에 경고원을 띄우고, 동시에 포물선 미사일을 발사.
+        // 미사일이 flightTime(= MortarTelegraphDuration) 동안 날아 착탄 시 AOE 피해.
         private IEnumerator ExecuteMortar()
         {
             SuspendNormalAI();
@@ -254,13 +255,13 @@ namespace Vamsurlike.Enemy
 
             enemyBase.ShowMortarTelegraph(targets, MortarImpactRadius, MortarTelegraphDuration);
 
-            yield return new WaitForSeconds(MortarTelegraphDuration);
-            if (!CanRunPattern()) yield break;
+            // 경고원과 동시에 발사 — 비행 시간이 경고 지속 시간과 같으므로 경고 끝날 때 착탄
+            Vector3 firePos = transform.position + Vector3.up * 1.5f;
+            float   dmg     = enemyBase.ScaledAttackPower * MortarDamageScale;
+            foreach (var target in targets)
+                SpawnMortarMissile(firePos, target, MortarTelegraphDuration, dmg, MortarImpactRadius);
 
-            foreach (var pos in targets)
-                DamagePlayersInRadius(pos, MortarImpactRadius, enemyBase.ScaledAttackPower * MortarDamageScale);
-
-            yield return new WaitForSeconds(MortarRecovery);
+            yield return new WaitForSeconds(MortarTelegraphDuration + MortarRecovery);
         }
 
         // 패턴 4: 플레이어 방향 ±각도 범위로 미사일을 연속 발사.
@@ -312,6 +313,22 @@ namespace Vamsurlike.Enemy
             if (net.TryGetComponent(out BossMissile missile))
                 missile.InitLinear(direction, SpreadMissileSpeed,
                     enemyBase.ScaledAttackPower * SpreadDamageScale, SpreadMissileLife);
+        }
+
+        private void SpawnMortarMissile(Vector3 firePos, Vector3 target, float flightTime, float dmg, float blastRadius)
+        {
+            if (missilePrefab == null)
+            {
+                Debug.LogWarning($"[{nameof(BossPatternController)}] missilePrefab이 설정되지 않았습니다.");
+                return;
+            }
+
+            var go = Instantiate(missilePrefab, firePos, Quaternion.identity);
+            if (!go.TryGetComponent(out NetworkObject net)) { Destroy(go); return; }
+
+            net.Spawn(true);
+            if (net.TryGetComponent(out BossMissile missile))
+                missile.InitMortar(firePos, target, flightTime, dmg, blastRadius);
         }
 
         private Vector3 GetPlayerClusterCenter()
