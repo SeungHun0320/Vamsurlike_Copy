@@ -92,6 +92,13 @@ namespace Vamsurlike.Enemy
             ShowSlamTelegraphClientRpc(center, radius, duration);
         }
 
+        // 모르타르 패턴: 여러 위치에 경고 원을 동시에 표시.
+        public void ShowMortarTelegraph(Vector3[] positions, float radius, float duration)
+        {
+            if (!IsServer) return;
+            ShowMortarTelegraphClientRpc(positions, radius, duration);
+        }
+
         protected virtual void HandleDeath()
         {
             bool wasBoss = data != null && data.isBoss;
@@ -135,10 +142,20 @@ namespace Vamsurlike.Enemy
             visual.transform.position = center + Vector3.up * 0.05f;
 
             AreaCircleVFX circle = visual.AddComponent<AreaCircleVFX>();
-            circle.Initialize(
-                radius,
-                duration,
-                new Color(1f, 0.15f, 0.05f, 0.9f));
+            circle.Initialize(radius, duration, new Color(1f, 0.15f, 0.05f, 0.9f));
+        }
+
+        [ClientRpc]
+        private void ShowMortarTelegraphClientRpc(Vector3[] positions, float radius, float duration)
+        {
+            foreach (var pos in positions)
+            {
+                var visual = new GameObject("BossMortarTelegraph");
+                visual.transform.position = pos + Vector3.up * 0.05f;
+
+                AreaCircleVFX circle = visual.AddComponent<AreaCircleVFX>();
+                circle.Initialize(radius, duration, new Color(1f, 0.55f, 0f, 0.85f));
+            }
         }
 
         [ClientRpc]

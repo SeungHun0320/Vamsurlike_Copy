@@ -10,18 +10,24 @@ namespace Vamsurlike.Enemy
     // 서버 전용 보스 패턴 실행기. 일반 추적/공격 사이에 AI 제어권을 잠시 가져온다.
     public sealed class BossPatternController : MonoBehaviour
     {
-        private static readonly int SpeedHash  = Animator.StringToHash("Speed");
-        private static readonly int AttackHash = Animator.StringToHash("Attack");
-        private static readonly int TauntHash  = Animator.StringToHash("Taunt");
+        private static readonly int SpeedHash   = Animator.StringToHash("Speed");
+        private static readonly int AttackHash  = Animator.StringToHash("Attack");
+        private static readonly int TauntHash   = Animator.StringToHash("Taunt");
+        private static readonly int BigShotHash = Animator.StringToHash("BigShot");
+        private static readonly int ShotHash    = Animator.StringToHash("Shot");
 
         private const float InitialDelay       = 3f;
         private const float PatternInterval    = 4f;
+
+        // Slam
         private const float SlamTakeoffDelay   = 0.2f;
         private const float SlamJumpDuration   = 0.8f;
         private const float SlamJumpHeight     = 5f;
         private const float SlamRecovery       = 0.5f;
         private const float SlamRadius         = 7f;
         private const float SlamDamageScale    = 1.5f;
+
+        // Charge
         private const float ChargeAimDuration  = 0.5f;
         private const float ChargeDuration     = 1.4f;
         private const float ChargeSpeedScale   = 6f;
@@ -29,6 +35,28 @@ namespace Vamsurlike.Enemy
         private const float ChargeAngularSpeed = 1440f;
         private const float ChargeImpactRadius = 4f;
         private const float ChargeDamageScale  = 2f;
+
+        // Mortar (박격포)
+        private const int   MortarCount             = 6;
+        private const float MortarSpread            = 12f;
+        private const float MortarAimDuration       = 0.6f;
+        private const float MortarTelegraphDuration = 1.8f;
+        private const float MortarImpactRadius      = 3.5f;
+        private const float MortarDamageScale       = 0.8f;
+        private const float MortarRecovery          = 0.5f;
+
+        // SpreadShot (산탄 미사일)
+        private const int   SpreadCount        = 5;
+        private const float SpreadHalfAngle    = 40f;
+        private const float SpreadAimDuration  = 0.4f;
+        private const float SpreadMissileSpeed = 18f;
+        private const float SpreadMissileLife  = 2.5f;
+        private const float SpreadDamageScale  = 1.0f;
+        private const float SpreadInterval     = 0.12f;
+        private const float SpreadRecovery     = 0.6f;
+
+        // EnemyDataSO.bossMissilePrefab에서 Configure() 시점에 주입됨
+        private GameObject missilePrefab;
 
         private EnemyNetworkBase enemyBase;
         private EnemyAI          enemyAI;
@@ -51,10 +79,11 @@ namespace Vamsurlike.Enemy
                 return;
             }
 
-            enemyBase  = owner;
-            enemyAI    = ai;
-            agent      = ai.Agent;
-            animator   = ai.Anim;
+            enemyBase     = owner;
+            enemyAI       = ai;
+            agent         = ai.Agent;
+            animator      = ai.Anim;
+            missilePrefab = owner.Data.bossMissilePrefab;
             normalSpeed = agent != null ? agent.speed : owner.Data.moveSpeed;
             normalAcceleration = agent != null ? agent.acceleration : 0f;
             normalAngularSpeed = agent != null ? agent.angularSpeed : 0f;
@@ -84,15 +113,19 @@ namespace Vamsurlike.Enemy
         {
             yield return new WaitForSeconds(InitialDelay);
 
-            bool useSlam = true;
+            // 순서: Slam → Mortar → Charge → SpreadShot → 반복
+            int index = 0;
             while (CanRunPattern())
             {
-                if (useSlam)
-                    yield return ExecuteSlam();
-                else
-                    yield return ExecuteCharge();
+                yield return index switch
+                {
+                    0 => ExecuteSlam(),
+                    1 => ExecuteMortar(),
+                    2 => ExecuteCharge(),
+                    _ => ExecuteSpreadShot(),
+                };
 
-                useSlam = !useSlam;
+                index = (index + 1) % 4;
                 RestoreNormalAI();
                 yield return new WaitForSeconds(PatternInterval);
             }
@@ -205,6 +238,112 @@ namespace Vamsurlike.Enemy
             animator?.SetTrigger(AttackHash);
             DamagePlayersInRadius(transform.position, ChargeImpactRadius, enemyBase.ScaledAttackPower * ChargeDamageScale);
             yield return new WaitForSeconds(SlamRecovery);
+        }
+
+        // 패턴 3: 무작위 위치에 박격포 미사일을 퍼부음. 경고 원 후 착탄 피해.
+        private IEnumerator ExecuteMortar()
+        {
+            SuspendNormalAI();
+            animator?.SetTrigger(BigShotHash);
+
+            yield return new WaitForSeconds(MortarAimDuration);
+            if (!CanRunPattern()) yield break;
+
+            Vector3   center  = GetPlayerClusterCenter();
+            Vector3[] targets = PickMortarTargets(center, MortarCount, MortarSpread);
+
+            enemyBase.ShowMortarTelegraph(targets, MortarImpactRadius, MortarTelegraphDuration);
+
+            yield return new WaitForSeconds(MortarTelegraphDuration);
+            if (!CanRunPattern()) yield break;
+
+            foreach (var pos in targets)
+                DamagePlayersInRadius(pos, MortarImpactRadius, enemyBase.ScaledAttackPower * MortarDamageScale);
+
+            yield return new WaitForSeconds(MortarRecovery);
+        }
+
+        // 패턴 4: 플레이어 방향 ±각도 범위로 미사일을 연속 발사.
+        private IEnumerator ExecuteSpreadShot()
+        {
+            Transform target = FindClosestAlivePlayer();
+            if (target == null) yield break;
+
+            SuspendNormalAI();
+
+            Vector3 toPlayer = target.position - transform.position;
+            toPlayer.y = 0f;
+            if (toPlayer.sqrMagnitude > 0.0001f)
+                transform.rotation = Quaternion.LookRotation(toPlayer.normalized, Vector3.up);
+
+            if (animator != null) animator.SetTrigger(ShotHash);
+            yield return new WaitForSeconds(SpreadAimDuration);
+            if (!CanRunPattern()) yield break;
+
+            Vector3 baseDir  = toPlayer.sqrMagnitude > 0.0001f ? toPlayer.normalized : transform.forward;
+            Vector3 spawnPos = transform.position + Vector3.up * 1.2f;
+
+            for (int i = 0; i < SpreadCount; i++)
+            {
+                if (!CanRunPattern()) break;
+
+                float   angle = Random.Range(-SpreadHalfAngle, SpreadHalfAngle);
+                Vector3 dir   = Quaternion.Euler(0f, angle, 0f) * baseDir;
+                SpawnMissile(spawnPos, dir);
+
+                yield return new WaitForSeconds(SpreadInterval);
+            }
+
+            yield return new WaitForSeconds(SpreadRecovery);
+        }
+
+        private void SpawnMissile(Vector3 position, Vector3 direction)
+        {
+            if (missilePrefab == null)
+            {
+                Debug.LogWarning($"[{nameof(BossPatternController)}] missilePrefab이 설정되지 않았습니다.");
+                return;
+            }
+
+            var go = Instantiate(missilePrefab, position, Quaternion.LookRotation(direction));
+            if (!go.TryGetComponent(out NetworkObject net)) { Destroy(go); return; }
+
+            net.Spawn(true);
+            if (net.TryGetComponent(out BossMissile missile))
+                missile.InitLinear(direction, SpreadMissileSpeed,
+                    enemyBase.ScaledAttackPower * SpreadDamageScale, SpreadMissileLife);
+        }
+
+        private Vector3 GetPlayerClusterCenter()
+        {
+            var nm = NetworkManager.Singleton;
+            if (nm == null) return transform.position;
+
+            Vector3 sum = Vector3.zero;
+            int     cnt = 0;
+            foreach (var client in nm.ConnectedClientsList)
+            {
+                if (client.PlayerObject == null) continue;
+                if (!client.PlayerObject.TryGetComponent(out PlayerNetworkStats stats) || !stats.IsAlive) continue;
+                sum += client.PlayerObject.transform.position;
+                cnt++;
+            }
+            return cnt > 0 ? sum / cnt : transform.position;
+        }
+
+        private static Vector3[] PickMortarTargets(Vector3 center, int count, float spread)
+        {
+            var positions = new Vector3[count];
+            for (int i = 0; i < count; i++)
+            {
+                Vector2 offset = Random.insideUnitCircle * spread;
+                Vector3 pos    = center + new Vector3(offset.x, 0f, offset.y);
+                if (NavMesh.SamplePosition(pos, out NavMeshHit hit, 5f, NavMesh.AllAreas))
+                    positions[i] = hit.position;
+                else
+                    positions[i] = pos;
+            }
+            return positions;
         }
 
         private void SuspendNormalAI()

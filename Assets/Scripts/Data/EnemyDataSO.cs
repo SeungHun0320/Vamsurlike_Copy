@@ -24,7 +24,8 @@ namespace Vamsurlike.Data
         public float floatingTextHeightOffset = 2f;
 
         [Header("Flags")]
-        public bool isElite;
-        public bool isBoss;
+        public bool       isElite;
+        public bool       isBoss;
+        public GameObject bossMissilePrefab; // isBoss=true일 때 SpreadShot 패턴에서 사용
     }
 }
