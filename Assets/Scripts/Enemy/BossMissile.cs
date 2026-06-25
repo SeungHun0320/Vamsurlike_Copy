@@ -9,7 +9,8 @@ namespace Vamsurlike.Enemy
     [RequireComponent(typeof(NetworkObject))]
     public sealed class BossMissile : NetworkBehaviour
     {
-        private const float ArcHeight = 9f;
+        private const float ArcHeight   = 9f;
+        private static readonly Quaternion ModelOffset = Quaternion.Euler(0f, 90f, 0f);
 
         [SerializeField] private float hitRadius = 1.5f;
 
@@ -42,7 +43,7 @@ namespace Vamsurlike.Enemy
             remainingLife = lifetime;
             active        = true;
 
-            transform.rotation = Quaternion.LookRotation(direction.normalized);
+            transform.rotation = Quaternion.LookRotation(direction.normalized) * ModelOffset;
         }
 
         // BossPatternController에서 Spawn() 직후 호출 — Mortar
@@ -59,7 +60,7 @@ namespace Vamsurlike.Enemy
             active       = true;
 
             transform.position = start;
-            transform.rotation = Quaternion.LookRotation(Vector3.up);
+            transform.rotation = Quaternion.LookRotation(Vector3.up) * ModelOffset;
         }
 
         private void Update()
@@ -97,7 +98,7 @@ namespace Vamsurlike.Enemy
             next.y += ArcHeight * Mathf.Sin(nextT * Mathf.PI);
             Vector3 dir  = next - pos;
             if (dir.sqrMagnitude > 0.0001f)
-                transform.rotation = Quaternion.LookRotation(dir.normalized);
+                transform.rotation = Quaternion.LookRotation(dir.normalized) * ModelOffset;
 
             if (t >= 1f)
             {
