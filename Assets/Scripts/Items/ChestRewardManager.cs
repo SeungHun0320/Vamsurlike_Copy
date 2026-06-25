@@ -79,11 +79,7 @@ namespace Vamsurlike.Items
 
             foreach (ulong clientId in NetworkManager.ConnectedClientsIds)
             {
-                // 다운된 플레이어는 상자 카드 선택에서 제외
-                if (NetworkManager.ConnectedClients.TryGetValue(clientId, out var cl)
-                    && cl.PlayerObject != null
-                    && cl.PlayerObject.TryGetComponent<PlayerNetworkStats>(out var s)
-                    && s.IsDowned.Value)
+                if (!CanClientChooseReward(clientId))
                     continue;
 
                 var skillManager = GetSkillManager(clientId);
@@ -117,6 +113,15 @@ namespace Vamsurlike.Items
             if (!pendingChoices.Contains(clientId))
             {
                 Debug.LogWarning($"[{nameof(ChestRewardManager)}] clientId {clientId}: 대기 목록에 없음");
+                return;
+            }
+
+            if (!CanClientChooseReward(clientId))
+            {
+                Debug.LogWarning($"[{nameof(ChestRewardManager)}] clientId {clientId}: dead/downed player cannot choose reward.");
+                pendingChoices.Remove(clientId);
+                playerOptions.Remove(clientId);
+                CheckAllDone();
                 return;
             }
 
@@ -168,6 +173,21 @@ namespace Vamsurlike.Items
             if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)) return null;
             if (client.PlayerObject == null) return null;
             return client.PlayerObject.GetComponent<Skills.SkillManager>();
+        }
+
+        private bool CanClientChooseReward(ulong clientId)
+        {
+            if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)) return false;
+            if (client.PlayerObject == null) return false;
+
+            var stats = client.PlayerObject.GetComponent<PlayerNetworkStats>();
+            if (stats == null)
+            {
+                Debug.LogWarning($"[{nameof(ChestRewardManager)}] clientId {clientId}: PlayerNetworkStats missing.");
+                return false;
+            }
+
+            return stats.CanAct;
         }
 
         [ClientRpc]

@@ -14,6 +14,13 @@ namespace Vamsurlike.UI
         [SerializeField] private TextMeshProUGUI levelText;  // 현재 레벨 / 현재 수치 표시
         [SerializeField] private Image           iconImage;
         [SerializeField] private Button          selectButton;
+        [Header("Labels")]
+        [SerializeField] private string newSkillLabel = "NEW";
+        [SerializeField] private string skillLevelFormat = "Lv.{0} -> {1}";
+        [SerializeField] private string maxHpFormat = "현재 {0:F0} HP";
+        [SerializeField] private string moveSpeedFormat = "현재 {0:F1}";
+        [SerializeField] private string attackPowerFormat = "현재 x{0:F2}";
+        [SerializeField] private string pickupRadiusFormat = "현재 {0:F1}m";
 
         // currentValue: 스킬 옵션이면 현재 레벨(정수), 패시브 옵션이면 현재 수치, -1이면 표시 없음
         public void Setup(UpgradeOptionSO option, float currentValue, Action onSelect)
@@ -47,25 +54,25 @@ namespace Vamsurlike.UI
             }
         }
 
-        private static string BuildLevelLabel(UpgradeOptionSO option, float currentValue)
+        private string BuildLevelLabel(UpgradeOptionSO option, float currentValue)
         {
             if (currentValue < 0f) return string.Empty;
 
             switch (option.effectType)
             {
                 case UpgradeEffectType.NewSkill:
-                    return "NEW";
+                    return newSkillLabel;
                 case UpgradeEffectType.SkillLevelUp:
                     int lv = Mathf.RoundToInt(currentValue);
-                    return $"Lv.{lv} → {lv + 1}";
+                    return string.Format(skillLevelFormat, lv, lv + 1);
                 case UpgradeEffectType.PassiveMaxHP:
-                    return $"현재 {currentValue:F0} HP";
+                    return string.Format(maxHpFormat, currentValue);
                 case UpgradeEffectType.PassiveMoveSpeed:
-                    return $"현재 {currentValue:F1}";
+                    return string.Format(moveSpeedFormat, currentValue);
                 case UpgradeEffectType.PassiveAttackPower:
-                    return $"현재 ×{currentValue:F2}";
+                    return string.Format(attackPowerFormat, currentValue);
                 case UpgradeEffectType.PassivePickupRadius:
-                    return $"현재 {currentValue:F1}m";
+                    return string.Format(pickupRadiusFormat, currentValue);
                 default:
                     return string.Empty;
             }

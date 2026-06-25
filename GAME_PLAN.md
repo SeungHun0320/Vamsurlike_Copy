@@ -1092,28 +1092,157 @@ private ScalingRow GetCurrentScaling(EnemyScalingTableSO table, float elapsedSec
 - [ ] 승리/패배 `[ClientRpc]` 동기화
 - [ ] 결과 UI (Phase 8에서 정식화, 여기서는 텍스트 표시만)
 
+**Phase 7 정리**
+- [x] Phase 7 임시 Editor 세팅 스크립트 제거 (`SetupPhase7Assets`, `SetupBossMissilePrefab`, `SetupBossAnimator`)
+- [ ] 스테이지 CSV 원본 정책 확정
+  - 런타임 로드는 `Assets/Resources/Data/StageTable.csv` 기준
+  - 편집 원본은 `Assets/Data/Stages/StageTable.csv`로 유지하되, 변경 시 Resources CSV와 동기화 필요
+  - 장기적으로는 CSV 이중 관리를 줄이기 위해 DataTableSO 또는 단일 Import 흐름으로 통합
+
 예상 기간: 6~9일
 
 ---
 
-### Phase 8. UI, 이펙트, 저장, 최적화, 밸런스
+### Phase 8. UI, 이펙트, 오디오, 최적화, 밸런스
 
-Done when: 메인 메뉴 → 방 생성 → 스테이지 → 결과 → 메인 메뉴 루프가 4인 모두 에러 없이 완성된다.
+Done when: HUD/다운·부활/결과/메인 메뉴 UI가 이벤트 기반으로 동작하고, 이펙트·오디오·최적화·밸런스가 붙어 4인 루프가 에러 없이 완성된다.
 
-- [ ] GameEventSO, EventListener 구현
-- [ ] AudioManager 구현 (클라이언트 로컬)
-- [ ] SaveManager 구현 (로컬 세이브: 설정, 통계)
-- [ ] HUDController 구현 (IsLocalPlayer 기준 HP, SharedXP/SharedLevel, 스킬 슬롯)
+완료 검증:
+- 2인 이상에서 HUD, 레벨업, 상자, 보스, 부활, 결과 UI가 중복 표시 없이 동작
+- 씬 전환, 재시작, 호스트 재시작 후 이벤트가 중복 수신되지 않음
+- 다운/완전 사망 플레이어의 UI 상태와 선택 가능 여부가 정상 반영됨
+- 보스 등장/처치, 상자 오픈, 레벨업, 결과 화면이 이벤트 기반으로 갱신됨
+- 콘솔에 `MissingReferenceException`, `NullReferenceException`, 이벤트 중복 구독 경고 없음
+
+#### Phase 8.0 이벤트 기반 구조 리팩터링
+
+- [ ] 기존 직접 참조/정적 이벤트/Manager 직접 구독 경로 목록화
+- [ ] 참조 허용 경계 확정
+  - UI View는 자신의 자식 UI 오브젝트(`Text`, `Image`, `Button`, `Slider`, 슬롯 프리팹 등)를 `[SerializeField]`로 직접 참조해도 된다.
+  - UI View는 Manager, NetworkObject, 다른 플레이어, 다른 시스템 상태를 직접 찾거나 구독하지 않는다.
+  - UI가 아닌 시스템 간 통신(플레이어 간 상태 전달, 스킬/아이템/스테이지/보스 상태 전파, VFX 트리거)은 이벤트 허브 또는 명시적 이벤트 채널을 기본 규칙으로 한다.
+- [ ] 이벤트 남발 금지 기준 확정
+  - 같은 컴포넌트 내부, 같은 View의 부모-자식 UI, 단순 렌더링 참조는 직접 참조한다.
+  - 소유 경계를 넘는 상태 전달, 여러 시스템이 관찰해야 하는 상태 변화, 씬 전환 후에도 구조가 바뀔 수 있는 참조만 이벤트화한다.
+- [ ] 이벤트 허브 범위 분리
+  - `PlayerUIEvents`: 플레이어 HP, 다운/부활, 팀원 상태
+  - `StageUIEvents`: 스테이지 시간, 보스 페이즈, 보스 HP, 결과 상태
+  - `SkillUIEvents`: 스킬 슬롯, 수동 스킬/궁극기 쿨다운
+  - `RewardUIEvents`: 레벨업 카드, 상자 카드, 획득 로그
+  - `FlowUIEvents`: 씬 로딩, 메뉴 전환, 네트워크 연결 상태
+- [ ] 이벤트 payload 정의
+  - `PlayerStatusChanged`: `clientId`, `displayName`, `hp`, `maxHp`, `isDowned`, `isAlive`, `downedTimeRemaining`
+  - `SharedLevelChanged`: `level`, `xp`, `xpRequired`, `normalizedXp`
+  - `SkillSlotsChanged`: `names`, `levels`
+  - `UltimateCooldownChanged`: `remaining`, `duration`, `isReady`
+  - `BossStatusChanged`: `isVisible`, `hp`, `maxHp`, `normalizedHp`
+  - `StageTimerChanged`: `elapsedSeconds`, `bossTimeSeconds`, `remainingToBossSeconds`, `isBossPhase`
+  - `GameFlowChanged`: `previous`, `next`
+  - `RewardOptionsReceived`: `rewardKind`, `optionIndices` 또는 `choices`, `currentLevels`
+  - `AcquisitionLogRequested`: `message`, `icon`, `color`, `duration`
+- [ ] 이벤트 허브 수명 주기 확정
+  - 전역 이벤트 허브는 Bootstrap의 `DontDestroyOnLoad` 오브젝트에서 1회 생성한다.
+  - 스테이지 전용 이벤트/Adapter/Binder는 Stage 씬 진입 시 생성하고 씬 이탈 시 반드시 해제한다.
+  - 정적 이벤트는 씬 전환 전 `Clear()` 또는 명시적 `Reset` 경로를 제공해 이전 구독자를 제거한다.
+  - ViewModel, Binder, Adapter는 `Dispose`/`Unbind`를 구현하고 `OnDisable`/`OnDestroy`에서 반드시 호출한다.
+  - 구독 메서드와 해제 메서드는 한 클래스 안에서 쌍으로 배치한다.
+  - 같은 인스턴스가 중복 구독되지 않도록 Bind 전에 Unbind를 먼저 호출하거나 `_isBound` 가드를 둔다.
+- [ ] 런타임 상태 → 이벤트 발행 Adapter/Binder 계층 추가
+- [ ] 레벨업/상자/부활/스킬 동기화 정적 이벤트를 이벤트 허브 또는 명시적 채널로 래핑
+- [ ] 기존 UI의 Manager/NetworkObject 직접 참조 제거. 단, 같은 View 하위의 UI 자식 객체 직접 참조는 허용
+- [ ] VFX는 게임 로직 직접 참조 없이 이벤트 수신 후 로컬 재생하도록 기준 확정
+- [ ] 이벤트 구독 해제 규칙 통일 (`OnEnable/OnDisable`, `Dispose`, `Unbind`)
+- [ ] 기존 이벤트 마이그레이션 표 기준으로 교체
+  - `LevelUpManager.OnOptionsReceived` → `RewardUIEvents.LevelUpOptionsReceived`
+  - `LevelUpManager.OnLevelUpCompleted` → `RewardUIEvents.LevelUpCompleted`
+  - `ChestRewardManager.OnOptionsReceived` → `RewardUIEvents.ChestOptionsReceived`
+  - `ChestRewardManager.OnChestRewardCompleted` → `RewardUIEvents.ChestRewardCompleted`
+  - `SkillManager.OnSkillsSynced` → `SkillUIEvents.SkillSlotsChanged`
+  - `PlayerReviveHandler.OnReviveProgressUpdated` → `PlayerUIEvents.ReviveProgressChanged`
+  - `PlayerReviveHandler.OnRevived` → `PlayerUIEvents.PlayerRevived`
+- [ ] 리팩터링 순서
+  - 이벤트 payload 구조체 정의
+  - `UIEventHub` 또는 이벤트 채널 구현
+  - `StageResultUI`
+  - `LevelUpUI`
+  - `ChestRewardUI`
+  - `SkillManager.OnSkillsSynced`
+  - `PlayerReviveHandler`
+  - 신규 HUD MVVM 구현
+- [ ] 2인 이상 플레이에서 레벨업, 상자, 보스, 부활 이벤트가 중복/누락 없이 동작하는지 검증
+
+#### Phase 8.1 MVVM UI 기반
+
+- [ ] UI MVVM 기본 구조 확정
+  - View: 자신의 자식 Unity UI 컴포넌트 참조와 렌더링만 담당 (`HUDView`, `CoopStatusView`, `ResultView`)
+  - ViewModel: 표시용 상태, 포맷팅, UI 이벤트 변환 담당 (`HUDViewModel`, `PlayerStatusViewModel`)
+  - Model/Source: `PlayerNetworkStats`, `SharedLevelSystem`, `SkillManager`, `GameFlowCoordinator` 등 기존 런타임 상태
+  - View는 `NetworkVariable`이나 Manager를 직접 구독하지 않고 ViewModel 이벤트에만 바인딩
+  - ViewModel은 런타임 Source를 직접 찾지 않고 `UIEventHub` 또는 이벤트 채널을 통해 상태 변경을 수신
+  - ViewModel은 `Dispose`/`Unbind`로 이벤트 구독을 반드시 해제
+  - 버튼 입력은 View → ViewModel → 기존 Manager/RPC 호출 순서로 전달
+- [ ] UI Prefab 규칙 확정
+  - View 스크립트는 UI 프리팹/패널 루트에만 둔다.
+  - 하위 자식은 표시용 컴포넌트와 버튼/슬롯 단위 View만 둔다.
+  - View는 Inspector에 연결된 자식 컴포넌트만 렌더링하고, 씬 탐색(`FindObjectOfType`, 태그 검색 등)을 하지 않는다.
+  - 버튼 이벤트는 View에서 수신하고 ViewModel 명령 메서드로 전달한다.
+- [ ] UI 이벤트 기반 참조 구조 구현
+  - `PlayerNetworkStats` 변경 → `PlayerStatusChanged` 이벤트 발행
+  - `SharedLevelSystem` 변경 → `SharedLevelChanged` 이벤트 발행
+  - `SkillManager.OnSkillsSynced` → `SkillSlotsChanged` 이벤트로 변환
+  - `GameFlowCoordinator.CurrentFlow` 변경 → `GameFlowChanged` 이벤트 발행
+  - View/ViewModel은 씬 오브젝트 직접 탐색 대신 이벤트 구독으로 상태 수신
+
+#### Phase 8.2 HUD/전투 UI
+
+- [ ] HUD MVVM 1차 구현
+  - 로컬 플레이어 탐색은 전용 Binder/Adapter에서만 수행
+  - `PlayerNetworkStats` 변경 이벤트를 HUDViewModel 상태로 변환
+  - HP/MaxHP fill, 수치 텍스트 갱신
+  - `SharedLevelChanged` 이벤트를 HUDViewModel 상태로 변환
+  - XP fill, 레벨 텍스트 갱신
+  - `SkillSlotsChanged` 이벤트 기반 스킬 슬롯 이름/레벨 표시
+  - 로컬 플레이어 교체/씬 전환 시 재바인딩
+- [ ] 보스 페이즈 타이머 UI 구현 (보스 등장 전: 남은 시간, 보스 페이즈 중: BOSS 상태 표시)
+- [ ] 보스 HP 바 구현 (보스 스폰 시 표시, HP NetworkVariable 이벤트 기반 갱신, 처치/페이즈 종료 시 숨김)
+- [ ] SkillSlotUI, ItemSlotUI 구현
+- [ ] 궁극기 타이머 UI 구현 (수동 스킬 쿨다운, 사용 가능 상태, 입력 키 강조)
+- [ ] 획득 로그 UI 구현 (스킬/패시브/아이템 획득, 진화, 회복 등 짧은 피드백)
+
+#### Phase 8.3 Co-op/다운/부활 UI
+
 - [ ] Co-op HUD 추가 (팀원 HP 미니 표시)
 - [ ] 팀원 다운 표시 — 팀원이 `IsDowned=true`일 때 Co-op HUD 해당 슬롯에 아이콘/색상 강조 (죽은 것처럼 보이지 않도록 구분)
 - [ ] 다운 상태 HUD — 자신이 다운됐을 때 `DownedTimeRemaining` 타이머 표시 (자력 부활 불가 안내 포함)
 - [ ] 부활 진행도 바 — 팀원이 E키를 누르고 있을 때 화면에 진행도 표시 (`PlayerReviveHandler.OnReviveProgressUpdated` 이벤트 구독)
-- [ ] SkillSlotUI, ItemSlotUI 구현
+
+#### Phase 8.4 메뉴/결과 UI
+
 - [ ] ResultUI 구현 (개인 통계: 처치수, 데미지, 생존 시간)
 - [ ] LoadingScreen 구현 (NetworkManager.SceneManager 로딩 이벤트 연동)
 - [ ] MainMenu 구현 (방 만들기/참여 UI 완성)
 - [ ] 설정 UI 구현 (음량, 해상도)
+- [ ] 개발용 네트워크 상태 UI 구현 (Host/Client/Server 모드, 연결 상태, ping/relay 상태 표시)
+
+#### Phase 8.5 이펙트
+
+- [ ] GameEventSO, EventListener 구현
+- [ ] 피격 이펙트 구현 (적/보스 피격 시 짧은 플래시, 히트 스파크, 데미지 텍스트 연동)
+- [ ] 사망 이펙트 구현 (적/보스 사망 VFX, 보스 사망 연출)
+- [ ] 스킬 이펙트 보강 (투사체, 수류탄, 근접, 오라, 진화 스킬별 식별 가능한 VFX)
+- [ ] 아이템/XP 픽업 이펙트 구현 (흡수, 획득, 상자 오픈 피드백)
+- [ ] 보스 패턴 이펙트 보강 (텔레그래프, 미사일 발사, BigShot 연출)
 - [ ] 카메라 쉐이크 (클라이언트 로컬)
+
+#### Phase 8.6 오디오
+
+- [ ] AudioManager 구현 (후순위, 클라이언트 로컬)
+- [ ] SFX 이벤트 채널 정의 (피격, 사망, 스킬, 아이템/XP 획득, 상자 오픈, 보스 패턴)
+- [ ] BGM 전환 구현 (메뉴, 일반 스테이지, 보스 페이즈, 결과 화면)
+- [ ] 설정 UI 음량 슬라이더와 연동
+
+#### Phase 8.7 최적화/밸런스
+
 - [ ] GPU Instancing 적용 (Enemy 대량 렌더링)
 - [ ] Network Profiler + CPU Profiler로 병목 확인
 - [ ] Object Visibility 튜닝 (Phase 3 구현 기반, 가시 범위 수치 조정)
@@ -1132,6 +1261,7 @@ Done when: Windows Server Build를 별도 실행해 서버 역할만 담당하�
 - [ ] 서버 시작 시 자동으로 Relay Allocation → 코드 콘솔 출력
 - [ ] 서버 실행 배치 파일 작성 (클릭 한 번으로 서버 시작)
 - [ ] 서버 로그 파일 출력 (`Application.logMessageReceived` → txt 저장)
+- [ ] SaveManager 구현 (로컬 세이브: 설정, 통계)
 - [ ] LAN 직접 IP 접속 지원 (같은 네트워크면 Relay 없이 연결)
 - [ ] 4인 원격 플레이 안정성 테스트 (30분 생존 스테이지 기준 크래시 없음)
 - [ ] 서버 치트 방지 기초 (속도 검증, 데미지 서버 내부 계산 재확인)
@@ -1159,7 +1289,7 @@ Phase 6: 아이템 & 조합
   ↓
 Phase 7: 스테이지 & 보스
   ↓
-Phase 8: UI / 저장 / 최적화 / 밸런스
+Phase 8: UI / 이펙트 / 오디오 / 최적화 / 밸런스
   ↓
 Phase 9: 로컬 서버 빌드 안정화 (Windows, Relay 코드 공유)
 ```
@@ -1186,10 +1316,14 @@ Phase 9: 로컬 서버 빌드 안정화 (Windows, Relay 코드 공유)
 1. **서버가 진실이다.** 데미지, 스폰, 드랍, 레벨업 결과는 서버에서만 결정한다.
 2. **클라이언트는 의도만 보낸다.** ServerRpc에는 데미지 값, 아이템 획득 결과 같은 게임 상태를 넣지 않는다. 방향, 요청, ID만 전송한다.
 3. **클라이언트는 표현만 한다.** VFX, SFX, 카메라, 로컬 UI는 클라이언트 몫이다.
-4. **IsServer / IsOwner 가드를 빠뜨리지 않는다.** 모든 NetworkBehaviour에 명시적으로 작성한다.
-5. **NGO RPC 문법은 Mirror와 다르다.** `[TargetRpc]`·`NetworkConnection`은 Mirror 용어다. NGO 2.x는 `[Rpc(SendTo.SpecificClients)]`, NGO 1.x는 `ClientRpcParams`를 사용한다.
-6. **Time.timeScale은 전원 참여 선택 화면(LevelingUp·ChestOpening)에만 허용한다.** 두 상태 모두 모든 플레이어가 동시에 멈추고 선택하므로, `GameState.LevelingUp` / `GameState.ChestOpening` 진입/퇴장 시 서버와 전체 클라이언트에서 `Time.timeScale = 0/1` 처리한다. UI 애니메이션은 `unscaledDeltaTime` 사용. 그 외 개인 일시정지 용도로는 사용 금지.
-7. **NetworkObject 수를 최소화한다.** XP 오브처럼 수백 개가 필요한 것은 서버 데이터 + 클라이언트 비주얼 프록시로 처리한다.
-8. **ScriptableObject로 데이터를 관리한다.** 수치는 코드가 아니라 Inspector에서 조정한다. 동종 데이터가 여러 개 필요한 경우(스테이지, 웨이브, 난이도 스케일링 등)는 개별 `.asset` 파일 대신 `DataTableSO<TRow>` 패턴으로 단일 테이블 에셋에 행 단위로 관리한다.
-9. **매 Phase 끝마다 멀티플레이 가능한 상태를 만든다.** Phase 완료 기준은 항상 2인 이상 동작 확인이다.
-10. **Host 모드로 빠르게 반복하되, Server Build 경로를 Phase 1에 smoke test한다.** Windows Server Build 안정화는 Phase 9까지 미룬다. Linux/클라우드 배포는 장기 확장으로 별도 Phase에서 다룬다.
+4. **UI와 VFX는 이벤트 기반으로 연결한다.** View나 이펙트 컴포넌트가 Manager/NetworkObject를 직접 찾아 참조하지 않도록 하고, `UIEventHub`, `GameEventSO`, C# event 같은 채널을 통해 상태 변경을 수신한다. 오디오는 후순위로 구현하되 같은 이벤트 기반 규칙을 따른다.
+5. **UI View는 자식 객체 직접 참조를 허용한다.** 같은 UI 프리팹/Canvas 하위의 `Text`, `Image`, `Button`, `Slider`, 슬롯 프리팹 같은 표시용 컴포넌트는 `[SerializeField]`로 직접 연결해도 된다. 단, View는 Manager, NetworkObject, 다른 플레이어, 다른 시스템 상태를 직접 찾지 않는다.
+6. **UI가 아닌 시스템 간 통신은 이벤트 기반을 기본으로 한다.** 플레이어 간 상태 전달, 스킬/아이템/스테이지/보스 상태 전파, VFX 트리거처럼 소유 경계를 넘는 흐름은 이벤트 허브, 명시적 이벤트 채널, Facade/Adapter를 통해 접근한다.
+7. **이벤트 수명 주기를 명시한다.** 구독과 해제는 한 클래스 안에 쌍으로 두고, ViewModel/Binder/Adapter는 `Dispose` 또는 `Unbind`를 제공한다. 씬 전환, 재시작, 호스트 재시작 후 이전 구독자가 남지 않아야 한다.
+8. **IsServer / IsOwner 가드를 빠뜨리지 않는다.** 모든 NetworkBehaviour에 명시적으로 작성한다.
+9. **NGO RPC 문법은 Mirror와 다르다.** `[TargetRpc]`·`NetworkConnection`은 Mirror 용어다. NGO 2.x는 `[Rpc(SendTo.SpecificClients)]`, NGO 1.x는 `ClientRpcParams`를 사용한다.
+10. **Time.timeScale은 전원 참여 선택 화면(LevelingUp·ChestOpening)에만 허용한다.** 두 상태 모두 모든 플레이어가 동시에 멈추고 선택하므로, `GameState.LevelingUp` / `GameState.ChestOpening` 진입/퇴장 시 서버와 전체 클라이언트에서 `Time.timeScale = 0/1` 처리한다. UI 애니메이션은 `unscaledDeltaTime` 사용. 그 외 개인 일시정지 용도로는 사용 금지.
+11. **NetworkObject 수를 최소화한다.** XP 오브처럼 수백 개가 필요한 것은 서버 데이터 + 클라이언트 비주얼 프록시로 처리한다.
+12. **ScriptableObject로 데이터를 관리한다.** 수치는 코드가 아니라 Inspector에서 조정한다. 동종 데이터가 여러 개 필요한 경우(스테이지, 웨이브, 난이도 스케일링 등)는 개별 `.asset` 파일 대신 `DataTableSO<TRow>` 패턴으로 단일 테이블 에셋에 행 단위로 관리한다.
+13. **매 Phase 끝마다 멀티플레이 가능한 상태를 만든다.** Phase 완료 기준은 항상 2인 이상 동작 확인이다.
+14. **Host 모드로 빠르게 반복하되, Server Build 경로를 Phase 1에 smoke test한다.** Windows Server Build 안정화는 Phase 9까지 미룬다. Linux/클라우드 배포는 장기 확장으로 별도 Phase에서 다룬다.

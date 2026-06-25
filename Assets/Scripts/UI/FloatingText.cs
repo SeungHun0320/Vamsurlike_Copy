@@ -7,6 +7,7 @@ namespace Vamsurlike.UI
     public class FloatingText : MonoBehaviour
     {
         [SerializeField] private TextMeshPro textMesh;
+        [SerializeField] private float spawnHeightOffset = 0.5f;
         [SerializeField] private float moveSpeed = 1.5f;
         [SerializeField] private float lifetime = 1.0f;
         [SerializeField] private AnimationCurve alphaCurve = AnimationCurve.EaseInOut(0f, 1f, 1f, 0f);
@@ -18,7 +19,7 @@ namespace Vamsurlike.UI
 
         public void Initialize(float damage, Vector3 worldPosition, Color? color = null, GameObject sourcePrefab = null)
         {
-            transform.position = worldPosition + Vector3.up * 0.5f;
+            transform.position = worldPosition + Vector3.up * spawnHeightOffset;
             textMesh.text = Mathf.RoundToInt(damage).ToString();
             baseColor = color ?? Color.white;
             textMesh.color = baseColor;

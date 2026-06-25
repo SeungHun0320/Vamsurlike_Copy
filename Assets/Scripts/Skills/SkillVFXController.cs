@@ -13,9 +13,11 @@ namespace Vamsurlike.Skills
     {
         private const float MeleeVisualDuration = 0.5f;
         private const float ParabolaHeightMultiplier = 4f;
+        private const float TelegraphHeightOffset = 0.05f;
 
         private static readonly Color AuraColor = new(0.15f, 0.85f, 1f, 0.75f);
         private static readonly Color BlackHoleColor = new(0.45f, 0.1f, 1f, 0.9f);
+        private static readonly Color GrenadeImpactColor = new(1f, 0.55f, 0f, 0.85f);
 
         [SerializeField] private CharacterDataSO characterData;
         [SerializeField] private GameObject orbitalVisualPrefab;
@@ -92,6 +94,12 @@ namespace Vamsurlike.Skills
         {
             if (!IsServer) return;
             ShowGrenadeClientRpc(from, to, arcHeight, flightTime);
+        }
+
+        public void ShowGrenadeImpactCircle(Vector3 center, float radius, float duration)
+        {
+            if (!IsServer) return;
+            ShowGrenadeImpactCircleClientRpc(center, radius, duration);
         }
 
         public void RemoveSkillVisual(SkillCastType castType)
@@ -184,6 +192,16 @@ namespace Vamsurlike.Skills
         {
             vfxPrefabsByType.TryGetValue(SkillCastType.Grenade, out GameObject prefab);
             StartCoroutine(GrenadeVisualCoroutine(from, to, arcHeight, flightTime, prefab));
+        }
+
+        [ClientRpc]
+        private void ShowGrenadeImpactCircleClientRpc(Vector3 center, float radius, float duration)
+        {
+            var visual = new GameObject("GrenadeImpactTelegraph");
+            visual.transform.position = center + Vector3.up * TelegraphHeightOffset;
+
+            AreaCircleVFX circle = visual.AddComponent<AreaCircleVFX>();
+            circle.Initialize(radius, duration, GrenadeImpactColor);
         }
 
         [ClientRpc]

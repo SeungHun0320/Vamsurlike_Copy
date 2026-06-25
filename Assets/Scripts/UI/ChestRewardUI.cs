@@ -1,5 +1,7 @@
+using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Items;
+using Vamsurlike.Player;
 using Vamsurlike.Upgrades;
 
 namespace Vamsurlike.UI
@@ -27,6 +29,12 @@ namespace Vamsurlike.UI
 
         private void Show(ChestChoiceData[] choices)
         {
+            if (!CanLocalPlayerChoose())
+            {
+                Hide();
+                return;
+            }
+
             currentOptions = choices;
             if (panel != null) panel.SetActive(true);
 
@@ -84,6 +92,12 @@ namespace Vamsurlike.UI
         private void OnCardSelected(int cardIndex)
         {
             if (currentOptions == null || cardIndex >= currentOptions.Length) return;
+            if (!CanLocalPlayerChoose())
+            {
+                Hide();
+                return;
+            }
+
             if (ChestRewardManager.Instance == null)
             {
                 Debug.LogError($"[{nameof(ChestRewardUI)}] ChestRewardManager 인스턴스 없음");
@@ -95,6 +109,13 @@ namespace Vamsurlike.UI
             // 중복 선택 방지: 카드 숨김 — 패널은 서버 완료 이벤트에서 닫힘
             for (int i = 0; i < cards.Length; i++)
                 if (cards[i] != null) cards[i].gameObject.SetActive(false);
+        }
+
+        private static bool CanLocalPlayerChoose()
+        {
+            NetworkObject localPlayer = NetworkManager.Singleton?.LocalClient?.PlayerObject;
+            var stats = localPlayer != null ? localPlayer.GetComponent<PlayerNetworkStats>() : null;
+            return stats != null && stats.CanAct;
         }
 
         private void Hide()

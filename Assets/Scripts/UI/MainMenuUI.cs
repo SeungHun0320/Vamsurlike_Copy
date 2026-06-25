@@ -16,6 +16,23 @@ namespace Vamsurlike.UI
         [SerializeField] private TMP_InputField ipOrCodeInput;
         [SerializeField] private TextMeshProUGUI statusText;
         [SerializeField] private TextMeshProUGUI localIPText;
+        [Header("Connection")]
+        [SerializeField] private ushort defaultServerPort = 7777;
+        [SerializeField, Min(0.5f)] private float connectionTimeoutSeconds = 5f;
+        [SerializeField, Min(50)] private int connectionPollIntervalMs = 200;
+        [SerializeField] private string routeProbeHost = "8.8.8.8";
+        [SerializeField] private int routeProbePort = 65530;
+        [SerializeField] private string fallbackLocalIp = "127.0.0.1";
+        [Header("Labels")]
+        [SerializeField] private string localIpFormat = "내 IP: {0}";
+        [SerializeField] private string emptyAddressMessage = "서버 IP 또는 호스트명을 입력하세요.";
+        [SerializeField] private string invalidAddressMessage = "주소 형식이 올바르지 않습니다. 예: 192.168.0.10:7777";
+        [SerializeField] private string connectingFormat = "접속 중: {0}:{1}";
+        [SerializeField] private string clientStartFailedMessage = "클라이언트 시작 실패.";
+        [SerializeField] private string connectionFailedMessage = "접속 실패: 서버를 찾을 수 없습니다.";
+        [SerializeField] private string lobbyHostStatusFormat = "방장입니다 - 플레이어 {0}명, 게임 시작 가능";
+        [SerializeField] private string lobbyClientStatusFormat = "플레이어 {0}명 접속 중 - 방장 시작 대기";
+        [SerializeField] private string startRequestMessage = "게임 시작 요청 중...";
 
         private bool isBusy;
 
@@ -43,7 +60,7 @@ namespace Vamsurlike.UI
         private void Start()
         {
             if (localIPText != null)
-                localIPText.text = $"내 IP: {GetLocalIP()}";
+                localIPText.text = string.Format(localIpFormat, GetLocalIP());
         }
 
         private static bool IsServerMode()
@@ -56,17 +73,17 @@ namespace Vamsurlike.UI
             return false;
         }
 
-        private static string GetLocalIP()
+        private string GetLocalIP()
         {
             // UDP 소켓으로 실제 라우팅에 사용되는 LAN IP를 가져온다 (패킷 전송 없음)
             try
             {
                 using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-                socket.Connect("8.8.8.8", 65530);
-                return (socket.LocalEndPoint as IPEndPoint)?.Address.ToString() ?? "127.0.0.1";
+                socket.Connect(routeProbeHost, routeProbePort);
+                return (socket.LocalEndPoint as IPEndPoint)?.Address.ToString() ?? fallbackLocalIp;
             }
             catch { }
-            return "127.0.0.1";
+            return fallbackLocalIp;
         }
 
         private void OnEnable()
@@ -94,7 +111,7 @@ namespace Vamsurlike.UI
 
             if (string.IsNullOrEmpty(input))
             {
-                SetStatus("서버 IP 또는 호스트명을 입력하세요.");
+                SetStatus(emptyAddressMessage);
                 return;
             }
 
@@ -103,18 +120,18 @@ namespace Vamsurlike.UI
             {
                 if (!TryParseEndpoint(input, out string ip, out ushort port))
                 {
-                    SetStatus("주소 형식이 올바르지 않습니다. 예: 192.168.0.10:7777");
+                    SetStatus(invalidAddressMessage);
                     return;
                 }
 
-                SetStatus($"접속 중: {ip}:{port}");
+                SetStatus(string.Format(connectingFormat, ip, port));
                 var gnm = GameNetworkManager.Instance;
                 if (gnm == null || !gnm.StartAsClient(ip, port))
                 {
-                    SetStatus("클라이언트 시작 실패.");
+                    SetStatus(clientStartFailedMessage);
                     return;
                 }
-                await WaitForConnectionAsync(timeoutSeconds: 5f);
+                await WaitForConnectionAsync(connectionTimeoutSeconds);
             }
             finally
             {
@@ -132,25 +149,23 @@ namespace Vamsurlike.UI
                     RefreshLobbyControls();
                     return true;
                 }
-                await Task.Delay(200);
-                elapsed += 0.2f;
+                await Task.Delay(connectionPollIntervalMs);
+                elapsed += connectionPollIntervalMs / 1000f;
             }
-            SetStatus("접속 실패: 서버를 찾을 수 없습니다.");
+            SetStatus(connectionFailedMessage);
             GameNetworkManager.Instance?.Disconnect();
             return false;
         }
 
-        private static bool TryParseEndpoint(string input, out string ip, out ushort port)
+        private bool TryParseEndpoint(string input, out string ip, out ushort port)
         {
-            const ushort defaultPort = 7777;
-
             ip = input.Trim();
-            port = defaultPort;
+            port = defaultServerPort;
             if (string.IsNullOrWhiteSpace(ip)) return false;
 
             if (ushort.TryParse(input, out ushort portOnly))
             {
-                ip = "127.0.0.1";
+                ip = fallbackLocalIp;
                 port = portOnly;
                 return true;
             }
@@ -198,14 +213,14 @@ namespace Vamsurlike.UI
 
             int count = gnm.ConnectedPlayerCount;
             SetStatus(isHost
-                ? $"방장입니다 — 플레이어 {count}명, 게임 시작 가능"
-                : $"플레이어 {count}명 접속 중 — 방장 시작 대기");
+                ? string.Format(lobbyHostStatusFormat, count)
+                : string.Format(lobbyClientStatusFormat, count));
         }
 
         private void OnStartGameClicked()
         {
             if (GameNetworkManager.Instance?.RequestStartGame() == true)
-                SetStatus("게임 시작 요청 중...");
+                SetStatus(startRequestMessage);
         }
 
         private void SetStatus(string message)

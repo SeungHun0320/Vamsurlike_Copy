@@ -400,6 +400,10 @@ MonoBehaviour:
       NameHash: 1980192711
       Synchronize: 1
       ParameterType: 9
+    - name: BigShot
+      NameHash: 1616950904
+      Synchronize: 1
+      ParameterType: 9
   AnimatorParametersExpanded: 0
 --- !u!1 &3993902478617832297
 GameObject:

@@ -14,7 +14,6 @@ namespace Vamsurlike.Enemy
         private static readonly int AttackHash  = Animator.StringToHash("Attack");
         private static readonly int TauntHash   = Animator.StringToHash("Taunt");
         private static readonly int BigShotHash = Animator.StringToHash("BigShot");
-        private static readonly int ShotHash    = Animator.StringToHash("Shot");
 
         private const float InitialDelay       = 3f;
         private const float PatternInterval    = 4f;
@@ -55,16 +54,16 @@ namespace Vamsurlike.Enemy
         private const float SpreadInterval     = 0.12f;
         private const float SpreadRecovery     = 0.6f;
 
-        // CircleBurst (360° 난사)
-        private const int   RingCount          = 12;   // 한 바퀴당 발사 수
-        private const int   RingRepeats        = 2;    // 반복 횟수
-        private const float RingMissileSpeed   = 14f;
-        private const float RingMissileLife    = 3.0f;
-        private const float RingDamageScale    = 0.6f;
-        private const float RingInterval       = 0.1f; // 발사 간격
-        private const float RingRoundPause     = 0.4f; // 한 바퀴 완료 후 대기
-        private const float RingAimDuration    = 0.3f;
-        private const float RingRecovery       = 0.5f;
+        // CircleBurst (360° 동시 발사 반복)
+        private const int   RingCount               = 12;   // 한 번에 발사하는 수
+        private const int   RingRepeats             = 2;    // 반복 횟수
+        private const float RingMissileSpeed        = 14f;
+        private const float RingMissileLife         = 3.0f;
+        private const float RingDamageScale         = 0.6f;
+        private const float RingRoundPause          = 0.4f; // 라운드 사이 대기
+        private const float RingAimDuration         = 0.3f;
+        private const float RingRecovery            = 0.5f;
+        private const float RingAngleOffsetPerRound = 360f / RingCount / RingRepeats;
 
         // EnemyDataSO.bossMissilePrefab에서 Configure() 시점에 주입됨
         private GameObject missilePrefab;
@@ -289,7 +288,7 @@ namespace Vamsurlike.Enemy
             if (toPlayer.sqrMagnitude > 0.0001f)
                 transform.rotation = Quaternion.LookRotation(toPlayer.normalized, Vector3.up);
 
-            if (animator != null) animator.SetTrigger(ShotHash);
+            if (animator != null) animator.SetTrigger(BigShotHash);
             yield return new WaitForSeconds(SpreadAimDuration);
             if (!CanRunPattern()) yield break;
 
@@ -310,7 +309,7 @@ namespace Vamsurlike.Enemy
             yield return new WaitForSeconds(SpreadRecovery);
         }
 
-        // 패턴 5: 360° 방향으로 RingInterval마다 1발씩, RingRepeats 바퀴 반복.
+        // 패턴 5: 360° 동시 발사를 반복하되, 매 라운드 시작 각도만 변경.
         private IEnumerator ExecuteCircleBurst()
         {
             SuspendNormalAI();
@@ -324,29 +323,16 @@ namespace Vamsurlike.Enemy
 
             for (int round = 0; round < RingRepeats; round++)
             {
-                // 짝수 바퀴는 0°부터, 홀수 바퀴는 반 스텝 어긋나게 발사
-                float offset = (round % 2 == 0) ? 0f : stepAngle * 0.5f;
+                if (!CanRunPattern()) yield break;
+
+                float offset = round * RingAngleOffsetPerRound;
+                spawnPos = transform.position + Vector3.up * 1.2f;
 
                 for (int i = 0; i < RingCount; i++)
                 {
-                    if (!CanRunPattern()) yield break;
-
                     float   angle = offset + stepAngle * i;
                     Vector3 dir   = Quaternion.Euler(0f, angle, 0f) * Vector3.forward;
-
-                    if (missilePrefab != null)
-                    {
-                        var go = Instantiate(missilePrefab, spawnPos, Quaternion.identity);
-                        if (go.TryGetComponent(out NetworkObject net))
-                        {
-                            net.Spawn(true);
-                            if (net.TryGetComponent(out BossMissile missile))
-                                missile.InitLinear(dir, RingMissileSpeed, dmg, RingMissileLife);
-                        }
-                        else Destroy(go);
-                    }
-
-                    yield return new WaitForSeconds(RingInterval);
+                    SpawnRingMissile(spawnPos, dir, dmg);
                 }
 
                 if (round < RingRepeats - 1)
@@ -354,6 +340,26 @@ namespace Vamsurlike.Enemy
             }
 
             yield return new WaitForSeconds(RingRecovery);
+        }
+
+        private void SpawnRingMissile(Vector3 spawnPos, Vector3 direction, float damage)
+        {
+            if (missilePrefab == null)
+            {
+                Debug.LogWarning($"[{nameof(BossPatternController)}] missilePrefab이 설정되지 않았습니다.");
+                return;
+            }
+
+            var go = Instantiate(missilePrefab, spawnPos, Quaternion.identity);
+            if (!go.TryGetComponent(out NetworkObject net))
+            {
+                Destroy(go);
+                return;
+            }
+
+            net.Spawn(true);
+            if (net.TryGetComponent(out BossMissile missile))
+                missile.InitLinear(direction, RingMissileSpeed, damage, RingMissileLife);
         }
 
         private void SpawnMissile(Vector3 position, Vector3 direction)

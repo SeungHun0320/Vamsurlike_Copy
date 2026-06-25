@@ -50,6 +50,7 @@ namespace Vamsurlike.Skills
             Vector3 target = origin + new Vector3((float)rx * range, 0f, (float)rz * range);
 
             Vector3 spawnPos = origin + Vector3.up * SpawnHeightOffset;
+            vfx?.ShowGrenadeImpactCircle(target, levelData.splashRadius, FlightTime);
             vfx?.ShowGrenade(spawnPos, target, levelData.grenadeArcHeight, FlightTime);
 
             float elapsed = 0f;

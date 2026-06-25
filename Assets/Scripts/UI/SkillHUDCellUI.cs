@@ -10,10 +10,11 @@ namespace Vamsurlike.UI
     {
         [SerializeField] private TextMeshProUGUI labelText;
         [SerializeField] private Image           iconImage;  // 아이콘 연결 시 활성화 예정
+        [SerializeField] private string          skillLabelFormat = "{0}\nLv.{1}";
 
         public void Set(string skillName, int level)
         {
-            if (labelText != null) labelText.text = $"{skillName}\nLv.{level}";
+            if (labelText != null) labelText.text = string.Format(skillLabelFormat, skillName, level);
             if (iconImage != null) iconImage.gameObject.SetActive(false);
         }
 

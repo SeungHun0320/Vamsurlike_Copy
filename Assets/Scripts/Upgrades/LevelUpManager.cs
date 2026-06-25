@@ -84,11 +84,7 @@ namespace Vamsurlike.Upgrades
 
             foreach (ulong clientId in NetworkManager.ConnectedClientsIds)
             {
-                // 다운된 플레이어는 카드 선택에서 제외
-                if (NetworkManager.ConnectedClients.TryGetValue(clientId, out var cl)
-                    && cl.PlayerObject != null
-                    && cl.PlayerObject.TryGetComponent<PlayerNetworkStats>(out var s)
-                    && s.IsDowned.Value)
+                if (!CanClientChooseUpgrade(clientId))
                     continue;
 
                 SkillManager skillManager = GetPlayerSkillManager(clientId);
@@ -124,6 +120,15 @@ namespace Vamsurlike.Upgrades
             if (!pendingChoices.Contains(clientId))
             {
                 Debug.LogWarning($"[{nameof(LevelUpManager)}] clientId {clientId}: 대기 목록에 없음");
+                return;
+            }
+
+            if (!CanClientChooseUpgrade(clientId))
+            {
+                Debug.LogWarning($"[{nameof(LevelUpManager)}] clientId {clientId}: dead/downed player cannot choose upgrade.");
+                pendingChoices.Remove(clientId);
+                playerOptions.Remove(clientId);
+                CheckAllDone();
                 return;
             }
 
@@ -183,6 +188,21 @@ namespace Vamsurlike.Upgrades
             if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)) return null;
             if (client.PlayerObject == null) return null;
             return client.PlayerObject.GetComponent<SkillManager>();
+        }
+
+        private bool CanClientChooseUpgrade(ulong clientId)
+        {
+            if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)) return false;
+            if (client.PlayerObject == null) return false;
+
+            var stats = client.PlayerObject.GetComponent<PlayerNetworkStats>();
+            if (stats == null)
+            {
+                Debug.LogWarning($"[{nameof(LevelUpManager)}] clientId {clientId}: PlayerNetworkStats missing.");
+                return false;
+            }
+
+            return stats.CanAct;
         }
 
         // 서버 → 특정 클라이언트: 해당 플레이어의 업그레이드 옵션 인덱스 + 현재 스킬 레벨 전달

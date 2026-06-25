@@ -13,6 +13,23 @@ namespace Vamsurlike.UI
         [SerializeField] private GameObject panel;
         [SerializeField] private TextMeshProUGUI playerCountText;
         [SerializeField, Min(10)] private int maxVisibleLogLines = 24;
+        [Header("Layout")]
+        [SerializeField] private Vector2 panelSize = new(760f, 520f);
+        [SerializeField] private Vector2 logViewAnchor = new(0.5f, 0.5f);
+        [SerializeField] private Vector2 logViewPosition = new(0f, -40f);
+        [SerializeField] private Vector2 logViewSize = new(700f, 340f);
+        [SerializeField] private Vector2 logTextPaddingMin = new(14f, 10f);
+        [SerializeField] private Vector2 logTextPaddingMax = new(-14f, -10f);
+        [SerializeField] private Vector2 playerCountPosition = new(0f, 210f);
+        [SerializeField, Min(1)] private int disableCameraFramesOnSceneLoad = 5;
+        [Header("Style")]
+        [SerializeField] private Color logBackgroundColor = new(0.035f, 0.045f, 0.06f, 0.94f);
+        [SerializeField] private Color logTextColor = new(0.82f, 0.9f, 1f);
+        [SerializeField, Min(1f)] private float logFontSize = 16f;
+        [Header("Labels")]
+        [SerializeField] private string playerCountFormat = "접속 중: {0}명";
+        [SerializeField] private string sceneLoadedFormat = "{0:HH:mm:ss} [SERVER] 씬 '{1}' 로드";
+        [SerializeField] private string readyMessageFormat = "{0:HH:mm:ss} [SERVER] 관리 화면 준비 완료";
 
         private static ServerAdminUI s_persistent;
 
@@ -101,15 +118,15 @@ namespace Vamsurlike.UI
         {
             int count = GameNetworkManager.Instance?.ConnectedPlayerCount ?? 0;
             if (playerCountText != null)
-                playerCountText.text = $"접속 중: {count}명";
+                playerCountText.text = string.Format(playerCountFormat, count);
         }
 
         // 스테이지 씬 로드 완료 시 카메라를 여러 프레임 동안 강제 비활성화
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             if (scene.name == "MainMenu") return;
-            _disableCameraFrames = 5; // Start/Awake에서 늦게 활성화되는 카메라까지 처리
-            AppendLog($"{System.DateTime.Now:HH:mm:ss} [SERVER] 씬 '{scene.name}' 로드");
+            _disableCameraFrames = disableCameraFramesOnSceneLoad;
+            AppendLog(string.Format(sceneLoadedFormat, System.DateTime.Now, scene.name));
         }
 
         private void CreateLogView()
@@ -121,19 +138,19 @@ namespace Vamsurlike.UI
             }
 
             if (panel.transform is RectTransform panelRect)
-                panelRect.sizeDelta = new Vector2(760f, 520f);
+                panelRect.sizeDelta = panelSize;
 
             GameObject background = new("ServerLogView", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(RectMask2D));
             background.transform.SetParent(panel.transform, false);
 
             RectTransform backgroundRect = (RectTransform)background.transform;
-            backgroundRect.anchorMin = new Vector2(0.5f, 0.5f);
-            backgroundRect.anchorMax = new Vector2(0.5f, 0.5f);
-            backgroundRect.anchoredPosition = new Vector2(0f, -40f);
-            backgroundRect.sizeDelta = new Vector2(700f, 340f);
+            backgroundRect.anchorMin = logViewAnchor;
+            backgroundRect.anchorMax = logViewAnchor;
+            backgroundRect.anchoredPosition = logViewPosition;
+            backgroundRect.sizeDelta = logViewSize;
 
             Image backgroundImage = background.GetComponent<Image>();
-            backgroundImage.color = new Color(0.035f, 0.045f, 0.06f, 0.94f);
+            backgroundImage.color = logBackgroundColor;
             backgroundImage.raycastTarget = false;
 
             GameObject textObject = new("LogText", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
@@ -142,20 +159,20 @@ namespace Vamsurlike.UI
             RectTransform textRect = (RectTransform)textObject.transform;
             textRect.anchorMin = Vector2.zero;
             textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = new Vector2(14f, 10f);
-            textRect.offsetMax = new Vector2(-14f, -10f);
+            textRect.offsetMin = logTextPaddingMin;
+            textRect.offsetMax = logTextPaddingMax;
 
             logText = textObject.GetComponent<TextMeshProUGUI>();
             if (playerCountText != null) logText.font = playerCountText.font;
-            logText.fontSize = 16f;
-            logText.color = new Color(0.82f, 0.9f, 1f);
+            logText.fontSize = logFontSize;
+            logText.color = logTextColor;
             logText.alignment = TextAlignmentOptions.TopLeft;
             logText.textWrappingMode = TextWrappingModes.NoWrap;
             logText.overflowMode = TextOverflowModes.Overflow;
             logText.raycastTarget = false;
 
             if (playerCountText != null)
-                playerCountText.rectTransform.anchoredPosition = new Vector2(0f, 210f);
+                playerCountText.rectTransform.anchoredPosition = playerCountPosition;
         }
 
         private void RestoreBufferedLogs()
@@ -166,7 +183,7 @@ namespace Vamsurlike.UI
                 AppendLog(entries[i]);
 
             if (visibleLogs.Count == 0)
-                AppendLog($"{System.DateTime.Now:HH:mm:ss} [SERVER] 관리 화면 준비 완료");
+                AppendLog(string.Format(readyMessageFormat, System.DateTime.Now));
         }
 
         private void AppendLog(string entry)

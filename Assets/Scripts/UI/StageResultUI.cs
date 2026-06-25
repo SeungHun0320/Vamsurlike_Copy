@@ -11,6 +11,8 @@ namespace Vamsurlike.UI
     {
         [SerializeField] private GameObject resultPanel;
         [SerializeField] private TMP_Text   resultText;
+        [SerializeField] private string clearMessage = "STAGE CLEAR";
+        [SerializeField] private string gameOverMessage = "GAME OVER";
 
         private void Start()
         {
@@ -29,9 +31,9 @@ namespace Vamsurlike.UI
         private void OnStateChanged(GameFlowState _, GameFlowState next)
         {
             if (next == GameFlowState.Clear)
-                ShowResult("STAGE CLEAR");
+                ShowResult(clearMessage);
             else if (next == GameFlowState.GameOver)
-                ShowResult("GAME OVER");
+                ShowResult(gameOverMessage);
             else if (resultPanel != null)
                 resultPanel.SetActive(false);
         }

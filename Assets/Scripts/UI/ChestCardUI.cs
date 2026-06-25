@@ -16,6 +16,12 @@ namespace Vamsurlike.UI
         [SerializeField] private Image           iconImage;
         [SerializeField] private Button          selectButton;
         [SerializeField] private GameObject      evolutionBadge; // 진화 카드임을 표시하는 UI (선택 사항)
+        [Header("Labels")]
+        [SerializeField] private string evolutionNameFormat = "[진화] {0}";
+        [SerializeField] private string evolutionDescriptionFormat = "{0} -> {1}";
+        [SerializeField] private string healthRewardFormat = "HP {0:0} 회복";
+        [SerializeField] private string missileRewardFormat = "모든 적에게 {0:0} 피해";
+        [SerializeField] private string fallbackRewardDescription = "아이템 보상";
 
         public void SetupUpgrade(UpgradeOptionSO option, Action onSelect)
         {
@@ -38,8 +44,9 @@ namespace Vamsurlike.UI
             if (recipe == null || recipe.evolvedSkill == null) { gameObject.SetActive(false); return; }
 
             string evolvedName = recipe.evolvedSkill.skillName;
-            if (nameText != null) nameText.text = $"[진화] {evolvedName}";
-            if (descText != null) descText.text  = $"{recipe.sourceSkill.skillName} → {evolvedName}";
+            string sourceName = recipe.sourceSkill != null ? recipe.sourceSkill.skillName : string.Empty;
+            if (nameText != null) nameText.text = string.Format(evolutionNameFormat, evolvedName);
+            if (descText != null) descText.text = string.Format(evolutionDescriptionFormat, sourceName, evolvedName);
             if (iconImage != null)
             {
                 iconImage.sprite = recipe.evolvedSkill.icon;
@@ -59,9 +66,9 @@ namespace Vamsurlike.UI
             {
                 descText.text = item.itemType switch
                 {
-                    ItemType.HealthOrb => $"HP {item.value:0} 회복",
-                    ItemType.Missile => $"모든 적에게 {item.value:0} 피해",
-                    _ => "아이템 보상"
+                    ItemType.HealthOrb => string.Format(healthRewardFormat, item.value),
+                    ItemType.Missile => string.Format(missileRewardFormat, item.value),
+                    _ => fallbackRewardDescription
                 };
             }
             if (iconImage != null)

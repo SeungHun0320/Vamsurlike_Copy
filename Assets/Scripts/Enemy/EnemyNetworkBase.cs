@@ -10,6 +10,8 @@ namespace Vamsurlike.Enemy
 {
     public class EnemyNetworkBase : NetworkBehaviour
     {
+        private static readonly Color BossTelegraphColor = new(1f, 0.1f, 0.05f, 0.9f);
+
         [SerializeField] private EnemyDataSO data;
 
         public readonly NetworkVariable<float> HP = new(
@@ -142,7 +144,7 @@ namespace Vamsurlike.Enemy
             visual.transform.position = center + Vector3.up * 0.05f;
 
             AreaCircleVFX circle = visual.AddComponent<AreaCircleVFX>();
-            circle.Initialize(radius, duration, new Color(1f, 0.15f, 0.05f, 0.9f));
+            circle.Initialize(radius, duration, BossTelegraphColor);
         }
 
         [ClientRpc]
@@ -154,7 +156,7 @@ namespace Vamsurlike.Enemy
                 visual.transform.position = pos + Vector3.up * 0.05f;
 
                 AreaCircleVFX circle = visual.AddComponent<AreaCircleVFX>();
-                circle.Initialize(radius, duration, new Color(1f, 0.55f, 0f, 0.85f));
+                circle.Initialize(radius, duration, BossTelegraphColor);
             }
         }
 

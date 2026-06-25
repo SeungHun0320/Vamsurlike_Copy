@@ -43,6 +43,7 @@ namespace Vamsurlike.Skills
             Vector3 target = PickRandomTarget(origin, levelData.grenadeRange);
 
             Vector3 spawnPos = origin + Vector3.up * SpawnHeightOffset;
+            vfx?.ShowGrenadeImpactCircle(target, levelData.splashRadius, FlightTime);
             vfx?.ShowGrenade(spawnPos, target, levelData.grenadeArcHeight, FlightTime);
 
             float elapsed = 0f;
@@ -61,6 +62,7 @@ namespace Vamsurlike.Skills
             for (int i = 0; i < levelData.clusterCount; i++)
             {
                 Vector3 subTarget = PickRandomTarget(target, levelData.clusterSpread);
+                vfx?.ShowGrenadeImpactCircle(subTarget, levelData.clusterSplashRadius, SubFlightTime);
                 vfx?.ShowGrenade(
                     target,
                     subTarget,

@@ -30,6 +30,17 @@ namespace Vamsurlike.UI
 
         private void Show(int[] optionIndices, int[] currentLevels)
         {
+            // 로컬 플레이어 스탯 — 패시브 수치 표시용
+            NetworkObject localPlayer = NetworkManager.Singleton?.LocalClient?.PlayerObject;
+            var playerStats = localPlayer != null ? localPlayer.GetComponent<PlayerNetworkStats>() : null;
+            var statHandler = localPlayer != null ? localPlayer.GetComponent<PassiveStatHandler>()  : null;
+
+            if (playerStats == null || !playerStats.CanAct)
+            {
+                Hide();
+                return;
+            }
+
             currentOptionIndices = optionIndices;
             var catalog = UpgradeCatalog.Instance;
 
@@ -38,11 +49,6 @@ namespace Vamsurlike.UI
                 Debug.LogError($"[{nameof(LevelUpUI)}] UpgradeCatalog을 찾을 수 없습니다.");
                 return;
             }
-
-            // 로컬 플레이어 스탯 — 패시브 수치 표시용
-            NetworkObject localPlayer = NetworkManager.Singleton?.LocalClient?.PlayerObject;
-            var playerStats = localPlayer != null ? localPlayer.GetComponent<PlayerNetworkStats>() : null;
-            var statHandler = localPlayer != null ? localPlayer.GetComponent<PassiveStatHandler>()  : null;
 
             if (panel != null) panel.SetActive(true);
 
@@ -95,6 +101,12 @@ namespace Vamsurlike.UI
         private void OnCardSelected(int cardIndex)
         {
             if (currentOptionIndices == null || cardIndex >= currentOptionIndices.Length) return;
+            if (!CanLocalPlayerChoose())
+            {
+                Hide();
+                return;
+            }
+
             if (LevelUpManager.Instance == null)
             {
                 Debug.LogError($"[{nameof(LevelUpUI)}] LevelUpManager 인스턴스 없음");
@@ -103,6 +115,13 @@ namespace Vamsurlike.UI
 
             LevelUpManager.Instance.SubmitChoiceServerRpc(cardIndex);
             Hide();
+        }
+
+        private static bool CanLocalPlayerChoose()
+        {
+            NetworkObject localPlayer = NetworkManager.Singleton?.LocalClient?.PlayerObject;
+            var stats = localPlayer != null ? localPlayer.GetComponent<PlayerNetworkStats>() : null;
+            return stats != null && stats.CanAct;
         }
 
         private void Hide()

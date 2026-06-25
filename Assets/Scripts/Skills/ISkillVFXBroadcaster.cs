@@ -11,6 +11,7 @@ namespace Vamsurlike.Skills
         void ShowUltimate(Vector3 position);
         void ShowMelee(Vector3 position, Vector3 forward);
         void ShowGrenade(Vector3 from, Vector3 to, float arcHeight, float flightTime);
+        void ShowGrenadeImpactCircle(Vector3 center, float radius, float duration);
         void RemoveSkillVisual(SkillCastType castType);
     }
 }
