@@ -146,6 +146,10 @@ namespace Vamsurlike.Network
 
         public void Disconnect()
         {
+            // Shutdown() 전에 호출해야 CustomMessagingManager가 유효한 상태에서 플래그 초기화됨.
+            // Shutdown() 이후엔 CustomMessagingManager가 null이 되어 isMessageHandlerRegistered가
+            // 리셋되지 않고, 다음 연결 시 RegisterMessageHandler()가 스킵되어 방장 정보를 못 받음.
+            UnregisterMessagingHandlers();
             sessionService?.Disconnect();
             lobbyHostService?.Clear();
         }
