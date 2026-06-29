@@ -4,6 +4,7 @@ using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Player;
 using Vamsurlike.Stage;
+using Vamsurlike.UI.Events;
 using Vamsurlike.Upgrades;
 
 namespace Vamsurlike.Items
@@ -193,13 +194,15 @@ namespace Vamsurlike.Items
         [ClientRpc]
         private void ShowOptionsClientRpc(ChestChoiceData[] choices, ClientRpcParams rpcParams = default)
         {
-            OnOptionsReceived?.Invoke(choices);
+            OnOptionsReceived?.Invoke(choices); // 임시 경유지 (Phase 8 마이그레이션 완료 후 제거)
+            UIEventHub.Instance?.Reward.PublishChestOptions(new ChestOptionsPayload(choices));
         }
 
         [ClientRpc]
         private void NotifyCompletedClientRpc()
         {
-            OnChestRewardCompleted?.Invoke();
+            OnChestRewardCompleted?.Invoke(); // 임시 경유지 (Phase 8 마이그레이션 완료 후 제거)
+            UIEventHub.Instance?.Reward.PublishChestRewardCompleted();
         }
     }
 }

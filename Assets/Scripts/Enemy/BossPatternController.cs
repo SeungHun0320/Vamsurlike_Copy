@@ -66,6 +66,8 @@ namespace Vamsurlike.Enemy
         private const float RingAngleOffsetPerRound = 360f / RingCount / RingRepeats;
 
         // EnemyDataSO.bossMissilePrefab에서 Configure() 시점에 주입됨
+        [SerializeField] private int randomSeed = 7321;
+
         private GameObject missilePrefab;
 
         private EnemyNetworkBase enemyBase;
@@ -78,6 +80,7 @@ namespace Vamsurlike.Enemy
         private float             normalAngularSpeed;
         private bool              normalUpdatePosition;
         private bool              normalUpdateRotation;
+        private System.Random     random;
 
         public void Configure(EnemyNetworkBase owner, EnemyAI ai)
         {
@@ -94,6 +97,7 @@ namespace Vamsurlike.Enemy
             agent         = ai.Agent;
             animator      = ai.Anim;
             missilePrefab = owner.Data.bossMissilePrefab;
+            random = new System.Random(unchecked(randomSeed + (int)owner.NetworkObjectId));
             normalSpeed = agent != null ? agent.speed : owner.Data.moveSpeed;
             normalAcceleration = agent != null ? agent.acceleration : 0f;
             normalAngularSpeed = agent != null ? agent.angularSpeed : 0f;
@@ -299,7 +303,7 @@ namespace Vamsurlike.Enemy
             {
                 if (!CanRunPattern()) break;
 
-                float   angle = Random.Range(-SpreadHalfAngle, SpreadHalfAngle);
+                float   angle = NextRandomFloat(-SpreadHalfAngle, SpreadHalfAngle);
                 Vector3 dir   = Quaternion.Euler(0f, angle, 0f) * baseDir;
                 SpawnMissile(spawnPos, dir);
 
@@ -412,12 +416,12 @@ namespace Vamsurlike.Enemy
             return cnt > 0 ? sum / cnt : transform.position;
         }
 
-        private static Vector3[] PickMortarTargets(Vector3 center, int count, float spread)
+        private Vector3[] PickMortarTargets(Vector3 center, int count, float spread)
         {
             var positions = new Vector3[count];
             for (int i = 0; i < count; i++)
             {
-                Vector2 offset = Random.insideUnitCircle * spread;
+                Vector2 offset = NextRandomInsideUnitCircle() * spread;
                 Vector3 pos    = center + new Vector3(offset.x, 0f, offset.y);
                 if (NavMesh.SamplePosition(pos, out NavMeshHit hit, 5f, NavMesh.AllAreas))
                     positions[i] = hit.position;
@@ -425,6 +429,29 @@ namespace Vamsurlike.Enemy
                     positions[i] = pos;
             }
             return positions;
+        }
+
+        private float NextRandomFloat(float minInclusive, float maxInclusive)
+        {
+            random ??= new System.Random(randomSeed);
+            return Mathf.Lerp(minInclusive, maxInclusive, (float)random.NextDouble());
+        }
+
+        private Vector2 NextRandomInsideUnitCircle()
+        {
+            random ??= new System.Random(randomSeed);
+
+            for (int i = 0; i < 16; i++)
+            {
+                float x = NextRandomFloat(-1f, 1f);
+                float y = NextRandomFloat(-1f, 1f);
+                var point = new Vector2(x, y);
+                if (point.sqrMagnitude <= 1f)
+                    return point;
+            }
+
+            double angle = random.NextDouble() * Mathf.PI * 2f;
+            return new Vector2((float)System.Math.Cos(angle), (float)System.Math.Sin(angle));
         }
 
         private void SuspendNormalAI()

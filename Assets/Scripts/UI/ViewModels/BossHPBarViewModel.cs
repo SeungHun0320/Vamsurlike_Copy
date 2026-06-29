@@ -10,8 +10,12 @@ namespace Vamsurlike.UI.ViewModels
 
         protected override void Subscribe()
         {
-            if (UIEventHub.Instance == null) return;
-            UIEventHub.Instance.Stage.BossStatusChanged += Handle;
+            var hub = UIEventHub.Instance;
+            if (hub == null) return;
+
+            hub.Stage.BossStatusChanged += Handle;
+            if (hub.Stage.TryGetLatestBossStatus(out BossStatusPayload payload))
+                Handle(payload);
         }
 
         protected override void Unsubscribe()

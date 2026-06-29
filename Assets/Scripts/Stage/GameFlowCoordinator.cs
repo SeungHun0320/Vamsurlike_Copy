@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using Vamsurlike.UI.Events;
 
 namespace Vamsurlike.Stage
 {
@@ -116,14 +117,17 @@ namespace Vamsurlike.Stage
             CurrentPhase.Value = next;
         }
 
-        private void OnFlowStateChanged(GameFlowState _, GameFlowState next)
+        private void OnFlowStateChanged(GameFlowState prev, GameFlowState next)
         {
-            // LevelingUp·ChestOpening: 선택 UI 동안 일시정지
-            // Clear·GameOver: 결과 화면 동안 일시정지
-            // Gameplay: 정상 진행
+            // LevelingUp·ChestOpening·Clear: UI 동안 일시정지
+            // GameOver·Gameplay: 시간 흐름 유지
             // UI 애니메이션은 Time.unscaledDeltaTime 사용할 것
-            bool shouldPause = next != GameFlowState.Gameplay;
+            bool shouldPause = next is GameFlowState.LevelingUp
+                                    or GameFlowState.ChestOpening
+                                    or GameFlowState.Clear;
             Time.timeScale = shouldPause ? 0f : 1f;
+
+            UIEventHub.Instance?.Flow.PublishGameFlowChanged(new GameFlowPayload(prev, next));
         }
 
         public override void OnDestroy()

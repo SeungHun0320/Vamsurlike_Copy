@@ -19,14 +19,21 @@ namespace Vamsurlike.Enemy
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
 
+        public readonly NetworkVariable<float> MaxHPValue = new(
+            100f,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
+
         public bool IsAlive => HP.Value > 0f;
         public EnemyDataSO Data => data;
+        public float MaxHP => MaxHPValue.Value;
         public float ScaledAttackPower { get; private set; }
 
         public override void OnNetworkSpawn()
         {
             if (!IsServer) return;
-            HP.Value = data != null ? data.hp : 100f;
+            MaxHPValue.Value = data != null ? data.hp : 100f;
+            HP.Value = MaxHPValue.Value;
             EnemyRegistry.Register(this);
         }
 
@@ -35,7 +42,8 @@ namespace Vamsurlike.Enemy
         {
             if (!IsServer) return;
             data = enemyData;
-            HP.Value          = Mathf.Max(1f, data.hp * Mathf.Max(1f, hpMultiplier));
+            MaxHPValue.Value = Mathf.Max(1f, data.hp * Mathf.Max(1f, hpMultiplier));
+            HP.Value          = MaxHPValue.Value;
             ScaledAttackPower = data.attackPower * Mathf.Max(1f, damageMultiplier);
             // OnNetworkSpawn보다 뒤에 호출되므로 EnemyAI에 데이터를 직접 주입
             if (TryGetComponent<EnemyAI>(out var ai))
@@ -172,5 +180,6 @@ namespace Vamsurlike.Enemy
         {
             // Phase 8에서 VFX 연결
         }
+
     }
 }

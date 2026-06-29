@@ -16,9 +16,24 @@ namespace Vamsurlike.UI.ViewModels
 
         protected override void Subscribe()
         {
-            if (UIEventHub.Instance == null) return;
-            UIEventHub.Instance.Player.PlayerStatusChanged += HandlePlayerStatus;
-            UIEventHub.Instance.Stage.SharedLevelChanged   += HandleSharedLevel;
+            var hub = UIEventHub.Instance;
+            if (hub == null) return;
+
+            hub.Player.PlayerStatusChanged += HandlePlayerStatus;
+            hub.Stage.SharedLevelChanged   += HandleSharedLevel;
+
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+            {
+                if (hub.Player.TryGetLatestPlayerStatus(NetworkManager.Singleton.LocalClientId, out PlayerStatusPayload playerStatus))
+                    HandlePlayerStatus(playerStatus);
+            }
+            else if (hub.Player.TryGetAnyLatestPlayerStatus(out PlayerStatusPayload playerStatus))
+            {
+                HandlePlayerStatus(playerStatus);
+            }
+
+            if (hub.Stage.TryGetLatestSharedLevel(out SharedLevelPayload sharedLevel))
+                HandleSharedLevel(sharedLevel);
         }
 
         protected override void Unsubscribe()

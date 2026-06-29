@@ -1,4 +1,4 @@
-using UnityEngine;
+using Unity.Netcode;
 using Vamsurlike.Enemy;
 using Vamsurlike.UI.Events;
 
@@ -6,23 +6,35 @@ namespace Vamsurlike.UI.Adapters
 {
     // 보스 프리팹에 배치.
     // 자신의 EnemyNetworkBase.HP를 구독해 UIEventHub.Stage.BossStatusChanged 발행.
-    public sealed class BossStatusAdapter : MonoBehaviour
+    public sealed class BossStatusAdapter : NetworkBehaviour
     {
         private EnemyNetworkBase enemy;
 
-        private void Start()
+        private void Awake()
         {
             enemy = GetComponent<EnemyNetworkBase>();
+        }
+
+        public override void OnNetworkSpawn()
+        {
+            if (!IsClient) return;
             if (enemy == null) return;
+
             enemy.HP.OnValueChanged += OnHpChanged;
+            enemy.MaxHPValue.OnValueChanged += OnMaxHpChanged;
             Publish();
         }
 
-        private void OnDestroy()
+        public override void OnNetworkDespawn()
         {
-            if (enemy != null)
+            if (IsClient && enemy != null)
+            {
                 enemy.HP.OnValueChanged -= OnHpChanged;
-            PublishHidden();
+                enemy.MaxHPValue.OnValueChanged -= OnMaxHpChanged;
+                PublishHidden();
+            }
+
+            base.OnNetworkDespawn();
         }
 
         private void OnHpChanged(float _, float current)
@@ -31,10 +43,16 @@ namespace Vamsurlike.UI.Adapters
             else               Publish();
         }
 
+        private void OnMaxHpChanged(float _, float __)
+        {
+            if (enemy != null && enemy.HP.Value > 0f)
+                Publish();
+        }
+
         private void Publish()
         {
             if (UIEventHub.Instance == null || enemy == null) return;
-            float maxHp = enemy.Data != null ? enemy.Data.hp : 1f;
+            float maxHp = enemy.MaxHP > 0f ? enemy.MaxHP : 1f;
             UIEventHub.Instance.Stage.PublishBossStatus(
                 new BossStatusPayload(true, enemy.HP.Value, maxHp));
         }

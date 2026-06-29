@@ -11,7 +11,7 @@ namespace Vamsurlike.UI
     public sealed class StageTimerUI : MonoBehaviour
     {
         [SerializeField] private TextMeshProUGUI timerText;
-        [SerializeField] private string          countdownFormat = "{0:0}s";
+        [SerializeField] private string          elapsedFormat   = "{0:00} : {1:00}";
         [SerializeField] private string          bossLabel       = "BOSS";
 
         private StageTimerViewModel viewModel;
@@ -40,7 +40,16 @@ namespace Vamsurlike.UI
 
             timerText.text = p.IsBossPhase
                 ? bossLabel
-                : string.Format(countdownFormat, p.RemainingToBossSeconds);
+                : FormatElapsedTime(p.ElapsedSeconds);
+        }
+
+        private string FormatElapsedTime(float seconds)
+        {
+            int totalSeconds = Mathf.Max(0, Mathf.FloorToInt(seconds));
+            int minutes      = totalSeconds / 60;
+            int remainder    = totalSeconds % 60;
+
+            return string.Format(elapsedFormat, minutes, remainder);
         }
     }
 }

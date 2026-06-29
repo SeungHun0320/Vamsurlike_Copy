@@ -39,10 +39,16 @@ namespace Vamsurlike.Player
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
 
+        // 동료 부활 창 종료 후 자동 부활 대기 중 (이 기간에는 동료 부활 불가)
+        public NetworkVariable<bool> IsDeadWaiting { get; } = new(
+            false,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
+
         public bool IsAlive => HP.Value > 0f;
 
-        // 이동/스킬 사용 가능 여부 (살아있고 다운되지 않음)
-        public bool CanAct => IsAlive && !IsDowned.Value;
+        // 이동/스킬 사용 가능 여부
+        public bool CanAct => IsAlive && !IsDowned.Value && !IsDeadWaiting.Value;
 
         protected override void OnServerSpawned()
         {
@@ -51,6 +57,8 @@ namespace Vamsurlike.Player
 
         public void InitializeFromData(CharacterDataSO data)
         {
+            if (!EnsureServerAuthority(nameof(InitializeFromData))) return;
+
             float maxHP     = data != null ? data.baseHP        : fallbackMaxHP;
             float moveSpeed = data != null ? data.baseMoveSpeed : fallbackMoveSpeed;
 
@@ -62,6 +70,7 @@ namespace Vamsurlike.Player
 
         public void TakeDamage(float amount)
         {
+            if (!EnsureServerAuthority(nameof(TakeDamage))) return;
             if (amount <= 0f || !IsAlive || IsDowned.Value) return;
 
             HP.Value = Mathf.Max(0f, HP.Value - amount);
@@ -72,6 +81,7 @@ namespace Vamsurlike.Player
 
         public void Heal(float amount)
         {
+            if (!EnsureServerAuthority(nameof(Heal))) return;
             if (amount <= 0f || !IsAlive) return;
             HP.Value = Mathf.Min(MaxHP.Value, HP.Value + amount);
         }

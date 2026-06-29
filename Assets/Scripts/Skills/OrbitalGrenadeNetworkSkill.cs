@@ -35,9 +35,11 @@ namespace Vamsurlike.Skills
                 ? tmpl.GetProjectileRotation(direction)
                 : Quaternion.LookRotation(direction, Vector3.up);
 
-            NetworkObject obj = PoolManager.Instance != null
-                ? PoolManager.Instance.GetNetworkObject(skill.projectilePrefab, spawnPos, rot)
-                : Object.Instantiate(skill.projectilePrefab, spawnPos, rot).GetComponent<NetworkObject>();
+            NetworkObject obj = PoolManager.GetOrInstantiateNetworkObject(
+                skill.projectilePrefab,
+                spawnPos,
+                rot,
+                nameof(OrbitalGrenadeSkill));
 
             if (obj == null) return false;
 

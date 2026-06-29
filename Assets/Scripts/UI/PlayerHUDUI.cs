@@ -1,4 +1,5 @@
 using TMPro;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.UI;
 using Vamsurlike.UI.Events;
@@ -6,7 +7,7 @@ using Vamsurlike.UI.ViewModels;
 
 namespace Vamsurlike.UI
 {
-    // Stage 씬 Canvas에 배치. 로컬 플레이어의 HP와 공유 XP/레벨을 표시.
+    // Stage 씬 HUDCanvas에 배치.
     // hpFill / xpFill 은 Image(Filled, Horizontal) 방식으로 연결.
     public sealed class PlayerHUDUI : MonoBehaviour
     {
@@ -30,15 +31,16 @@ namespace Vamsurlike.UI
 
         private void Awake()
         {
+            FilledImageUtility.ConfigureHorizontal(hpFill);
+            FilledImageUtility.ConfigureHorizontal(xpFill);
             viewModel = new HUDViewModel();
         }
 
         private void Start()
         {
-            // 데디케이티드 서버에서는 HUD 전체 비활성화
-            if (Unity.Netcode.NetworkManager.Singleton != null
-                && Unity.Netcode.NetworkManager.Singleton.IsServer
-                && !Unity.Netcode.NetworkManager.Singleton.IsHost)
+            if (NetworkManager.Singleton != null
+                && NetworkManager.Singleton.IsServer
+                && !NetworkManager.Singleton.IsHost)
             {
                 gameObject.SetActive(false);
             }
@@ -63,7 +65,7 @@ namespace Vamsurlike.UI
         private void RenderPlayerStatus(PlayerStatusPayload p)
         {
             float maxHp = p.MaxHp > 0f ? p.MaxHp : 1f;
-            if (hpFill != null) hpFill.fillAmount = p.Hp / maxHp;
+            FilledImageUtility.SetAmount(hpFill, p.Hp / maxHp);
             if (hpText != null) hpText.text       = string.Format(hpFormat, p.Hp, p.MaxHp);
 
             bool isDowned = p.IsDowned;
@@ -77,9 +79,51 @@ namespace Vamsurlike.UI
 
         private void RenderSharedLevel(SharedLevelPayload p)
         {
-            if (xpFill    != null) xpFill.fillAmount = p.NormalizedXp;
+            FilledImageUtility.SetAmount(xpFill, p.NormalizedXp);
             if (xpText    != null) xpText.text       = string.Format(xpFormat, p.Xp, p.XpRequired);
             if (levelText != null) levelText.text    = string.Format(levelFormat, p.Level);
+        }
+    }
+
+    internal static class FilledImageUtility
+    {
+        private static Sprite fallbackSprite;
+
+        public static void ConfigureHorizontal(Image image)
+        {
+            if (image == null) return;
+
+            if (image.sprite == null)
+                image.sprite = GetFallbackSprite();
+
+            image.type = Image.Type.Filled;
+            image.fillMethod = Image.FillMethod.Horizontal;
+            image.fillOrigin = 0;
+            image.fillClockwise = true;
+        }
+
+        public static void SetAmount(Image image, float amount)
+        {
+            if (image == null) return;
+
+            ConfigureHorizontal(image);
+            image.fillAmount = Mathf.Clamp01(amount);
+        }
+
+        private static Sprite GetFallbackSprite()
+        {
+            if (fallbackSprite != null) return fallbackSprite;
+
+            Texture2D texture = Texture2D.whiteTexture;
+            fallbackSprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f),
+                100f);
+            fallbackSprite.name = "Runtime UI Fill Sprite";
+            fallbackSprite.hideFlags = HideFlags.HideAndDontSave;
+
+            return fallbackSprite;
         }
     }
 }

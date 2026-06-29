@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using UnityEngine;
-using Vamsurlike.UI.Events;
 using Vamsurlike.UI.ViewModels;
 
 namespace Vamsurlike.UI
@@ -9,6 +8,9 @@ namespace Vamsurlike.UI
     {
         [SerializeField] private Transform      container;
         [SerializeField] private SkillHUDCellUI cellPrefab;
+        [SerializeField] private Vector2        startOffset = new(34f, 34f);
+        [SerializeField] private Vector2        cellSize = new(280f, 88f);
+        [SerializeField] private float          cellSpacing = 10f;
 
         private readonly List<SkillHUDCellUI> cells = new();
         private SkillHUDViewModel viewModel;
@@ -31,11 +33,12 @@ namespace Vamsurlike.UI
             viewModel.Unbind();
         }
 
-        private void Render(SkillSlotsPayload payload)
+        private void Render(IReadOnlyList<SkillHUDSlotViewData> slots)
         {
-            if (container == null || cellPrefab == null) return;
+            if (container == null) container = transform;
+            if (cellPrefab == null) return;
 
-            int count = payload.Names?.Length ?? 0;
+            int count = slots?.Count ?? 0;
 
             while (cells.Count < count)
                 cells.Add(Instantiate(cellPrefab, container));
@@ -46,8 +49,22 @@ namespace Vamsurlike.UI
             for (int i = 0; i < count; i++)
             {
                 cells[i].gameObject.SetActive(true);
-                cells[i].Set(payload.Names[i], payload.Levels[i]);
+                ApplyCellLayout(cells[i], i);
+                cells[i].Set(slots[i]);
             }
+        }
+
+        private void ApplyCellLayout(SkillHUDCellUI cell, int index)
+        {
+            if (cell == null) return;
+            if (!cell.TryGetComponent(out RectTransform rect)) return;
+
+            rect.anchorMin = new Vector2(1f, 0f);
+            rect.anchorMax = new Vector2(1f, 0f);
+            rect.pivot = new Vector2(1f, 0f);
+            rect.sizeDelta = cellSize;
+            rect.anchoredPosition = new Vector2(-startOffset.x, startOffset.y)
+                + Vector2.up * ((cellSize.y + cellSpacing) * index);
         }
     }
 }

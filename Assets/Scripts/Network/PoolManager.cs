@@ -112,6 +112,30 @@ namespace Vamsurlike.Network
             return networkObjectPool?.Get(prefab, position, rotation);
         }
 
+        public static NetworkObject GetOrInstantiateNetworkObject(
+            GameObject prefab,
+            Vector3 position,
+            Quaternion rotation,
+            string context)
+        {
+            if (prefab == null)
+            {
+                Debug.LogWarning($"[{context}] prefab is null.");
+                return null;
+            }
+
+            if (Instance != null && Instance.networkObjectPool != null)
+                return Instance.GetNetworkObject(prefab, position, rotation);
+
+            GameObject instance = Instantiate(prefab, position, rotation);
+            if (instance.TryGetComponent(out NetworkObject networkObject))
+                return networkObject;
+
+            Debug.LogWarning($"[{context}] prefab has no NetworkObject. prefab={prefab.name}", instance);
+            Destroy(instance);
+            return null;
+        }
+
         public void ReturnNetworkObject(GameObject prefab, NetworkObject instance)
         {
             networkObjectPool?.Return(prefab, instance);

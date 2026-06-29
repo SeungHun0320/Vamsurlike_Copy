@@ -27,10 +27,11 @@ namespace Vamsurlike.Items
             if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return false;
 
             bool usingPool = PoolManager.Instance != null;
-            NetworkObject obj = usingPool
-                ? PoolManager.Instance.GetNetworkObject(data.pickupPrefab, position, Quaternion.identity)
-                : UnityEngine.Object.Instantiate(data.pickupPrefab, position, Quaternion.identity)
-                        .GetComponent<NetworkObject>();
+            NetworkObject obj = PoolManager.GetOrInstantiateNetworkObject(
+                data.pickupPrefab,
+                position,
+                Quaternion.identity,
+                nameof(NetworkedItemPickup));
 
             if (obj == null)
             {

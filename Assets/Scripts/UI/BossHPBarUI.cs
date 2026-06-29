@@ -6,7 +6,6 @@ using Vamsurlike.UI.ViewModels;
 
 namespace Vamsurlike.UI
 {
-    // Stage 씬 Canvas에 배치. 보스 등장 시 표시, 처치/페이즈 종료 시 숨김.
     public sealed class BossHPBarUI : MonoBehaviour
     {
         [SerializeField] private GameObject      panel;
@@ -15,9 +14,18 @@ namespace Vamsurlike.UI
         [SerializeField] private string          hpFormat = "{0:0}/{1:0}";
 
         private BossHPBarViewModel viewModel;
+        private CanvasGroup panelCanvasGroup;
 
-        private void Awake()  { viewModel = new BossHPBarViewModel(); }
-        private void Start()  { if (panel != null) panel.SetActive(false); }
+        private void Awake()
+        {
+            if (panel == null) panel = gameObject;
+            panelCanvasGroup = panel.GetComponent<CanvasGroup>();
+            if (panelCanvasGroup == null) panelCanvasGroup = panel.AddComponent<CanvasGroup>();
+
+            FilledImageUtility.ConfigureHorizontal(hpFill);
+            viewModel = new BossHPBarViewModel();
+            SetVisible(false);
+        }
 
         private void OnEnable()
         {
@@ -35,12 +43,30 @@ namespace Vamsurlike.UI
 
         private void Show(BossStatusPayload p)
         {
-            if (panel != null) panel.SetActive(true);
+            SetVisible(true);
             float maxHp = p.MaxHp > 0f ? p.MaxHp : 1f;
-            if (hpFill != null) hpFill.fillAmount = p.Hp / maxHp;
+            FilledImageUtility.SetAmount(hpFill, p.Hp / maxHp);
             if (hpText != null) hpText.text       = string.Format(hpFormat, p.Hp, p.MaxHp);
         }
 
-        private void Hide() { if (panel != null) panel.SetActive(false); }
+        private void Hide() => SetVisible(false);
+
+        private void SetVisible(bool visible)
+        {
+            if (panel == null) return;
+
+            if (!panel.activeSelf)
+                panel.SetActive(true);
+
+            if (panelCanvasGroup == null)
+                panelCanvasGroup = panel.GetComponent<CanvasGroup>();
+
+            if (panelCanvasGroup == null)
+                return;
+
+            panelCanvasGroup.alpha = visible ? 1f : 0f;
+            panelCanvasGroup.interactable = visible;
+            panelCanvasGroup.blocksRaycasts = visible;
+        }
     }
 }

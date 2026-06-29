@@ -1,19 +1,37 @@
 using System;
+using System.Collections.Generic;
 using Vamsurlike.UI.Events;
 
 namespace Vamsurlike.UI.ViewModels
 {
-    public class SkillHUDViewModel : ViewModelBase
+    public readonly struct SkillHUDSlotViewData
     {
-        public event Action<SkillSlotsPayload> OnSkillsChanged;
+        public readonly string Name;
+        public readonly int Level;
 
-        // 초기 렌더 시 View가 직접 읽는 현재 상태
-        public SkillSlotsPayload Current { get; private set; }
+        public SkillHUDSlotViewData(string name, int level)
+        {
+            Name = string.IsNullOrWhiteSpace(name) ? "-" : name;
+            Level = Math.Max(1, level);
+        }
+    }
+
+    public sealed class SkillHUDViewModel : ViewModelBase
+    {
+        private readonly List<SkillHUDSlotViewData> slots = new();
+
+        public event Action<IReadOnlyList<SkillHUDSlotViewData>> OnSkillsChanged;
+
+        public IReadOnlyList<SkillHUDSlotViewData> Current => slots;
 
         protected override void Subscribe()
         {
-            if (UIEventHub.Instance == null) return;
-            UIEventHub.Instance.Skill.SkillSlotsChanged += Handle;
+            var hub = UIEventHub.Instance;
+            if (hub == null) return;
+
+            hub.Skill.SkillSlotsChanged += Handle;
+            if (hub.Skill.TryGetLatestSkillSlots(out SkillSlotsPayload payload))
+                Handle(payload);
         }
 
         protected override void Unsubscribe()
@@ -24,8 +42,18 @@ namespace Vamsurlike.UI.ViewModels
 
         private void Handle(SkillSlotsPayload payload)
         {
-            Current = payload;
-            OnSkillsChanged?.Invoke(payload);
+            slots.Clear();
+
+            int count = payload.Names?.Length ?? 0;
+            for (int i = 0; i < count; i++)
+            {
+                int level = payload.Levels != null && i < payload.Levels.Length
+                    ? payload.Levels[i]
+                    : 1;
+                slots.Add(new SkillHUDSlotViewData(payload.Names[i], level));
+            }
+
+            OnSkillsChanged?.Invoke(slots);
         }
     }
 }

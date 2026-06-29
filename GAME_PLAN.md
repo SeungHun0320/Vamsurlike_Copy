@@ -578,15 +578,18 @@ Done when: 4명이 Stage_01에 접속하고 WASD 이동이 모든 클라이언�
   - HUD는 `hp.OnValueChanged` 구독으로 갱신 (별도 ClientRpc 불필요)
   - 피격 연출처럼 값과 별개의 이벤트가 필요할 때만 `[ClientRpc]` 추가
 - [ ] PlayerNetworkAnimator 구현 (NetworkAnimator 연동)
-- [ ] `PlayerNetworkStats`에 다운 상태 추가 (Co-op 부활 시스템 기반)
-  - `NetworkVariable<bool>` IsDowned — HP=0 직후 진입하는 부활 가능 상태 (IsAlive=false 영구 사망과 구분)
-  - `NetworkVariable<float>` DownedTimeRemaining — 카운트다운. 만료 시 영구 사망
-  - `CanAct = IsAlive && !IsDowned.Value` — 이동·스킬 발동 조건
+- [ ] `PlayerNetworkStats`에 다운 상태 추가 (2단계 다운 시스템)
+  - `NetworkVariable<bool>` IsDowned — 1단계: HP=0 직후 진입, 동료 부활 가능
+  - `NetworkVariable<bool>` IsDeadWaiting — 2단계: 1단계 타이머 만료 후 진입, 부활 불가·자동 부활 대기 중
+  - `NetworkVariable<float>` DownedTimeRemaining — 1단계 카운트다운 (동료 부활 가능 창)
+  - `CanAct = IsAlive && !IsDowned.Value && !IsDeadWaiting.Value` — 이동·스킬 발동 조건
 - [ ] PlayerReviveHandler 구현 (서버 권한, 부활 흐름 전담)
   - `static List<PlayerReviveHandler> All` — 범위 탐색용 레지스트리 (OnNetworkSpawn/Despawn 자동 등록)
-  - `BeginReviveServerRpc` / `CancelReviveServerRpc` — `RequireOwnership = false` (누구나 호출 가능)
-  - 구조자가 일정 거리 내에 있는 동안 진행도 누적 → 완료 시 `IsDowned=false` + HP 일부 복구
-  - 다운 타이머 만료 → `IsAlive=false` 영구 사망
+  - `BeginReviveServerRpc` / `CancelReviveServerRpc` — `RequireOwnership = false` (1단계 중에만 가능)
+  - 구조자가 일정 거리 내에 있는 동안 진행도 누적 → 완료 시 `IsDowned=false` + HP 일부 복구 (deathCount 증가 없음)
+  - 1단계 타이머 만료 → 2단계(DeadWaiting) 진입: `NetworkVariable<float>` DeadWaitRemaining 카운트다운
+  - 2단계 대기 시간 = `baseDeadWaitDuration × (1 + deathPenaltyRatio)^(deathCount-1)` (사망마다 증가)
+  - 2단계 타이머 만료 → 자동 부활 (HP 일부 복구)
 - [ ] `PlayerNetworkInput`에 E키 부활 상호작용 추가 (`PlayerReviveHandler.All` 레지스트리 순회로 탐색)
 - [ ] 로컬 Cinemachine 설정 (OnNetworkSpawn에서 IsLocalPlayer 기준으로 카메라 활성화)
 - [ ] NetworkPlayerSpawner 구현 (서버가 플레이어 스폰 위치 지정)
@@ -1086,7 +1089,7 @@ private ScalingRow GetCurrentScaling(EnemyScalingTableSO table, float elapsedSec
 - [ ] `BossNetworkBase : EnemyNetworkBase` 구현 (고유 페이즈 전환 로직)
 - [ ] 보스 HP `NetworkVariable<float>` → 전체 클라이언트 HUD 동기화 (`BossHealthBar`)
 - [ ] 보스 처치 → `GameState.Clear`
-- [ ] 전원 영구 사망 → `GameState.GameOver` (다운 상태≠사망. `IsAlive == false` 기준으로 생존자 카운트. `PlayerReviveHandler` 다운 타이머 만료 → `IsAlive=false` 전환 직후 재검사. 다운 중인 플레이어가 있어도 구조 가능한 생존자가 남아있으면 GameOver 아님 — 타이머 자연 소진까지 대기)
+- [ ] 전원 동시 다운 → `GameState.GameOver` (영구 사망 없음. 다운 타이머 만료 시 자동 부활. `BeginDowned()` 직후 `CheckGameOver()` 호출 — `IsDowned == true`인 플레이어가 전원이면 즉시 GameOver. 다운 중이 아닌 플레이어가 한 명이라도 있으면 GameOver 아님)
 
 **결과 화면 (최소)**
 - [ ] 승리/패배 `[ClientRpc]` 동기화
@@ -1115,6 +1118,17 @@ Done when: HUD/다운·부활/결과/메인 메뉴 UI가 이벤트 기반으로 
 - 콘솔에 `MissingReferenceException`, `NullReferenceException`, 이벤트 중복 구독 경고 없음
 
 #### Phase 8.0 이벤트 기반 구조 리팩터링
+
+**이벤트 채널 혼용 전략 (확정)**
+
+| 채널 | 용도 | 특성 |
+|---|---|---|
+| `UIEventHub` (MonoBehaviour, DontDestroyOnLoad) | UI 상태 이벤트 — HP·레벨·보스 HP·GameFlow 등 ViewModel이 구조화된 payload를 소비하는 상태 변화 | 코드 구독, 타입 안전, payload 필수 |
+| `GameEventSO` (ScriptableObject 채널) | 연출 트리거 — VFX·SFX·카메라 쉐이크처럼 Inspector 연결 기반 fire-and-forget | 에디터 연결, payload 없거나 최소화, 여러 리스너 독립 구독 |
+| 기존 `static event` | Phase 8 마이그레이션 임시 경유지 — 기존 구독자 보호용. **새 기능에는 static event 추가 금지** | |
+
+**경계 규칙**: 하나의 게임 사건이 UI 갱신 + 연출을 동시에 유발할 때, UIEventHub와 GameEventSO를 각각 발행한다.
+예) 보스 사망 → `StageUIEvents.BossStatusChanged(isVisible=false)` (UIEventHub) + `BossDeathEvent` (GameEventSO).
 
 - [ ] 기존 직접 참조/정적 이벤트/Manager 직접 구독 경로 목록화
 - [ ] 참조 허용 경계 확정
@@ -1205,7 +1219,7 @@ Done when: HUD/다운·부활/결과/메인 메뉴 UI가 이벤트 기반으로 
   - 로컬 플레이어 교체/씬 전환 시 재바인딩
 - [ ] 보스 페이즈 타이머 UI 구현 (보스 등장 전: 남은 시간, 보스 페이즈 중: BOSS 상태 표시)
 - [ ] 보스 HP 바 구현 (보스 스폰 시 표시, HP NetworkVariable 이벤트 기반 갱신, 처치/페이즈 종료 시 숨김)
-- [ ] SkillSlotUI, ItemSlotUI 구현
+- [ ] SkillSlotUI 교체, ItemSlotUI 구현
 - [ ] 궁극기 타이머 UI 구현 (수동 스킬 쿨다운, 사용 가능 상태, 입력 키 강조)
 - [ ] 획득 로그 UI 구현 (스킬/패시브/아이템 획득, 진화, 회복 등 짧은 피드백)
 
@@ -1214,7 +1228,7 @@ Done when: HUD/다운·부활/결과/메인 메뉴 UI가 이벤트 기반으로 
 - [ ] Co-op HUD 추가 (팀원 HP 미니 표시)
 - [ ] 팀원 다운 표시 — 팀원이 `IsDowned=true`일 때 Co-op HUD 해당 슬롯에 아이콘/색상 강조 (죽은 것처럼 보이지 않도록 구분)
 - [ ] 다운 상태 HUD — 자신이 다운됐을 때 `DownedTimeRemaining` 타이머 표시 (자력 부활 불가 안내 포함)
-- [ ] 부활 진행도 바 — 팀원이 E키를 누르고 있을 때 화면에 진행도 표시 (`PlayerReviveHandler.OnReviveProgressUpdated` 이벤트 구독)
+- [ ] 부활 진행도 바 — 팀원이 범위 안에 들어왔을 때 화면에 진행도 표시 (`PlayerReviveHandler.OnReviveProgressUpdated` 이벤트 구독)
 
 #### Phase 8.4 메뉴/결과 UI
 

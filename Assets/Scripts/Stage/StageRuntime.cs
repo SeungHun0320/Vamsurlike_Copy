@@ -26,6 +26,14 @@ namespace Vamsurlike.Stage
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
 
+        public NetworkVariable<float> StageDurationSeconds { get; } = new(
+            0f,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
+
+        // 어댑터에서 타이머 페이로드 계산 시 사용 (0이면 스테이지 미로드)
+        public float StageDuration => StageDurationSeconds.Value;
+
         private StageData activeStage;
         private bool      stageLoaded;
         private bool      bossPhaseTriggered;
@@ -78,11 +86,13 @@ namespace Vamsurlike.Stage
             {
                 Debug.LogError($"[{nameof(StageRuntime)}] stageId={stageId}를 DataManager에서 찾을 수 없습니다.");
                 stageLoaded = false;
+                StageDurationSeconds.Value = 0f;
                 return;
             }
             stageLoaded        = true;
             bossPhaseTriggered = false;
             ElapsedTime.Value  = 0f;
+            StageDurationSeconds.Value = activeStage.DurationSeconds;
             GameFlowCoordinator.Instance?.SetStagePhase(StagePhase.Waves);
         }
 
@@ -109,6 +119,8 @@ namespace Vamsurlike.Stage
         }
 
         // ─── Game Over Check (서버 전용) ────────────────────────────────
+        // CanAct=true인 플레이어가 한 명이라도 있으면 GameOver 아님.
+        // Downed(1단계)·DeadWaiting(2단계) 모두 CanAct=false이므로 하나의 조건으로 커버.
         public void CheckGameOver()
         {
             if (!IsServer) return;
@@ -120,13 +132,21 @@ namespace Vamsurlike.Stage
                 if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)) continue;
                 if (client.PlayerObject == null) continue;
 
-                var stats = client.PlayerObject.GetComponent<PlayerNetworkStats>();
-                if (stats == null) continue;
+                if (!client.PlayerObject.TryGetComponent(out PlayerNetworkStats stats)) continue;
 
-                if (stats.IsAlive || stats.IsDowned.Value) return;
+                if (stats.CanAct) return;
             }
 
             GameFlowCoordinator.Instance.ForceTransition(GameFlowState.GameOver);
+
+            // GameOver 확정 — 모든 플레이어의 부활 타이머 즉시 중단
+            foreach (ulong clientId in NetworkManager.ConnectedClientsIds)
+            {
+                if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)) continue;
+                if (client.PlayerObject == null) continue;
+                if (client.PlayerObject.TryGetComponent(out PlayerReviveHandler reviveHandler))
+                    reviveHandler.StopAllReviveActivity();
+            }
         }
 
         // ─── Debug ─────────────────────────────────────────────────────

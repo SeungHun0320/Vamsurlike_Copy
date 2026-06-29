@@ -6,6 +6,7 @@ using UnityEngine;
 using Vamsurlike.Data;
 using Vamsurlike.Player;
 using Vamsurlike.Stage;
+using Vamsurlike.UI.Events;
 using Vamsurlike.Upgrades;
 
 namespace Vamsurlike.Skills
@@ -284,7 +285,8 @@ namespace Vamsurlike.Skills
             string[] names = joinedNames.Length > 0
                 ? joinedNames.Split('|')
                 : Array.Empty<string>();
-            OnSkillsSynced?.Invoke(names, levels);
+            OnSkillsSynced?.Invoke(names, levels); // 임시 경유지 (Phase 8 마이그레이션 완료 후 제거)
+            UIEventHub.Instance?.Skill.PublishSkillSlotsChanged(new SkillSlotsPayload(names, levels));
         }
 
         private void BuildExecutorRegistry()

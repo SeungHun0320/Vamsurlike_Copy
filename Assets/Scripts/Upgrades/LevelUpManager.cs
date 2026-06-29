@@ -5,6 +5,7 @@ using UnityEngine;
 using Vamsurlike.Player;
 using Vamsurlike.Skills;
 using Vamsurlike.Stage;
+using Vamsurlike.UI.Events;
 
 namespace Vamsurlike.Upgrades
 {
@@ -209,14 +210,16 @@ namespace Vamsurlike.Upgrades
         [ClientRpc]
         private void ShowLevelUpOptionsClientRpc(int[] optionIndices, int[] currentLevels, ClientRpcParams rpcParams = default)
         {
-            OnOptionsReceived?.Invoke(optionIndices, currentLevels);
+            OnOptionsReceived?.Invoke(optionIndices, currentLevels); // 임시 경유지 (Phase 8 마이그레이션 완료 후 제거)
+            UIEventHub.Instance?.Reward.PublishLevelUpOptions(new LevelUpOptionsPayload(optionIndices, currentLevels));
         }
 
         // 서버 → 전체 클라이언트: 레벨업 완료 통보
         [ClientRpc]
         private void NotifyLevelUpCompletedClientRpc()
         {
-            OnLevelUpCompleted?.Invoke();
+            OnLevelUpCompleted?.Invoke(); // 임시 경유지 (Phase 8 마이그레이션 완료 후 제거)
+            UIEventHub.Instance?.Reward.PublishLevelUpCompleted();
         }
     }
 }

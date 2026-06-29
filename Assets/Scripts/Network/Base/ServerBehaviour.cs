@@ -1,4 +1,5 @@
 using Unity.Netcode;
+using UnityEngine;
 
 namespace Vamsurlike.Network
 {
@@ -28,5 +29,13 @@ namespace Vamsurlike.Network
 
         protected virtual void OnServerSpawned() { }
         protected virtual void OnServerDespawned() { }
+
+        protected bool EnsureServerAuthority(string methodName)
+        {
+            if (IsServer) return true;
+
+            Debug.LogWarning($"[{GetType().Name}] {methodName} ignored on client. owner={OwnerClientId}", this);
+            return false;
+        }
     }
 }

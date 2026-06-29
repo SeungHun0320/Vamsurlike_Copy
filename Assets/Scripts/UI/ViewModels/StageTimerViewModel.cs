@@ -11,8 +11,12 @@ namespace Vamsurlike.UI.ViewModels
 
         protected override void Subscribe()
         {
-            if (UIEventHub.Instance == null) return;
-            UIEventHub.Instance.Stage.StageTimerChanged += Handle;
+            var hub = UIEventHub.Instance;
+            if (hub == null) return;
+
+            hub.Stage.StageTimerChanged += Handle;
+            if (hub.Stage.TryGetLatestStageTimer(out StageTimerPayload payload))
+                Handle(payload);
         }
 
         protected override void Unsubscribe()

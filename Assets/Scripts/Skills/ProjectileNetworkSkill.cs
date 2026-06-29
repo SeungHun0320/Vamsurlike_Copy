@@ -53,9 +53,11 @@ namespace Vamsurlike.Skills
             if (skill.projectilePrefab.TryGetComponent<NetworkProjectile>(out var template))
                 rot = template.GetProjectileRotation(dir);
 
-            NetworkObject obj = PoolManager.Instance != null
-                ? PoolManager.Instance.GetNetworkObject(skill.projectilePrefab, pos, rot)
-                : Object.Instantiate(skill.projectilePrefab, pos, rot).GetComponent<NetworkObject>();
+            NetworkObject obj = PoolManager.GetOrInstantiateNetworkObject(
+                skill.projectilePrefab,
+                pos,
+                rot,
+                nameof(ProjectileSkill));
 
             if (obj == null) return false;
 
