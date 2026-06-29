@@ -1207,20 +1207,25 @@ Done when: HUD/다운·부활/결과/메인 메뉴 UI가 이벤트 기반으로 
   - `GameFlowCoordinator.CurrentFlow` 변경 → `GameFlowChanged` 이벤트 발행
   - View/ViewModel은 씬 오브젝트 직접 탐색 대신 이벤트 구독으로 상태 수신
 
-#### Phase 8.2 HUD/전투 UI
+#### Phase 8.2 HUD/전투 UI ✅
 
-- [ ] HUD MVVM 1차 구현
+- [x] HUD MVVM 1차 구현
   - 로컬 플레이어 탐색은 전용 Binder/Adapter에서만 수행
   - `PlayerNetworkStats` 변경 이벤트를 HUDViewModel 상태로 변환
-  - HP/MaxHP fill, 수치 텍스트 갱신
+  - HP/MaxHP fill, 수치 텍스트 갱신 (바 위에 텍스트 겹침)
   - `SharedLevelChanged` 이벤트를 HUDViewModel 상태로 변환
-  - XP fill, 레벨 텍스트 갱신
+  - XP fill, 레벨 텍스트 갱신 (바 위에 텍스트 겹침)
   - `SkillSlotsChanged` 이벤트 기반 스킬 슬롯 이름/레벨 표시
   - 로컬 플레이어 교체/씬 전환 시 재바인딩
-- [ ] 보스 페이즈 타이머 UI 구현 (보스 등장 전: 남은 시간, 보스 페이즈 중: BOSS 상태 표시)
-- [ ] 보스 HP 바 구현 (보스 스폰 시 표시, HP NetworkVariable 이벤트 기반 갱신, 처치/페이즈 종료 시 숨김)
+- [x] 보스 페이즈 타이머 UI 구현 (보스 등장 전: 경과 시간 MM:SS, 보스 페이즈 중: BOSS 표시)
+- [x] 보스 HP 바 구현 — 세그먼트형 (MapleStory/Lost Ark 스타일)
+  - 화면 최상단 풀 폭 배치, 플레이어 HP UI와 겹침 없음
+  - 10덩어리 세그먼트: 한 덩어리 소진 시 바 리셋 + Gradient 색 변경
+  - Ghost bar: fill 뒤로 다음 덩어리 색 미리 표시
+  - 패널 우측 "보스명  ×N" 텍스트 + 상단 pip 카운터
+  - BossStatusAdapter를 Enemy D.prefab(실제 보스)에 올바르게 배치
 - [x] SkillHUDUI / SkillHUDCellUI 구현 완료. ItemSlotUI 불필요 — 아이템 전량 1회용 즉시효과
-- [x] 궁극기 타이머 UI 구현 (UltimateCooldownUI — Radial360 fill, 키힌트, readyGlow)
+- [x] 궁극기 타이머 UI 구현 (UltimateCooldownUI — Radial360 fill, 키힌트, readyGlow, 하단 중앙 배치)
 - [x] 획득 로그 UI 구현 (AcquisitionLogUI — fire-and-forget, 좌측 스택, fadein/out)
 
 #### Phase 8.3 Co-op/다운/부활 UI
