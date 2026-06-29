@@ -110,6 +110,8 @@ namespace Vamsurlike.UI
             image.fillAmount = Mathf.Clamp01(amount);
         }
 
+        public static Sprite GetOrCreateFallbackSprite() => GetFallbackSprite();
+
         private static Sprite GetFallbackSprite()
         {
             if (fallbackSprite != null) return fallbackSprite;

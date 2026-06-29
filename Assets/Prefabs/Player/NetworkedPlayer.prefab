@@ -424,6 +424,7 @@ GameObject:
   - component: {fileID: 126953368653616146}
   - component: {fileID: 4009276164870669578}
   - component: {fileID: -7378127927719187288}
+  - component: {fileID: 6016951667912047197}
   m_Layer: 6
   m_Name: NetworkedPlayer
   m_TagString: Player
@@ -721,6 +722,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e81c9f90cffa64d428c3756443377264, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Player.PlayerStatusAdapter
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &6016951667912047197
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3346994395623583896}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5403dbe53061cee458631528dfddc322, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Player.ManualSkillAdapter
   ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &3716566736859526982
 GameObject:

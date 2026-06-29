@@ -34,6 +34,12 @@ namespace Vamsurlike.Skills
 
         private float nextMissingExecutorLogTime;
 
+        // Owner 전용 — 수동 스킬 쿨다운 동기화 (UI 표시용)
+        public readonly NetworkVariable<float> ManualCooldownRemaining = new(
+            0f, NetworkVariableReadPermission.Owner, NetworkVariableWritePermission.Server);
+        public readonly NetworkVariable<float> ManualCooldownDuration = new(
+            DefaultManualCooldown, NetworkVariableReadPermission.Owner, NetworkVariableWritePermission.Server);
+
         public static event Action<string[], int[]> OnSkillsSynced;
 
         private void Awake()
@@ -89,6 +95,23 @@ namespace Vamsurlike.Skills
                 TryCast,
                 message => Debug.LogWarning(
                     $"[{nameof(SkillManager)}] {message} object={name}"));
+
+            SyncManualCooldown();
+        }
+
+        private void SyncManualCooldown()
+        {
+            IReadOnlyList<SkillRuntimeState> skills = skillInventory.Skills;
+            for (int i = 0; i < skills.Count; i++)
+            {
+                if (skills[i].Skill == null || !skills[i].Skill.isManual) continue;
+                ManualCooldownRemaining.Value = Mathf.Max(0f, skills[i].CooldownTimer);
+                float levelCooldown = skills[i].Skill.GetLevelData(skills[i].Level)?.cooldown
+                                      ?? DefaultManualCooldown;
+                ManualCooldownDuration.Value = levelCooldown;
+                return;
+            }
+            ManualCooldownRemaining.Value = 0f;
         }
 
         public bool LearnSkill(SkillDataSO skill)

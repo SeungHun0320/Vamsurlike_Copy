@@ -11,6 +11,7 @@ namespace Vamsurlike.UI.Adapters
     public sealed class StageTimerAdapter : MonoBehaviour
     {
         private bool ready;
+        private int  lastPublishedSecond = -1;
 
         private void Update()
         {
@@ -20,6 +21,12 @@ namespace Vamsurlike.UI.Adapters
                 if (UIEventHub.Instance == null) return;
                 ready = true;
             }
+
+            // 표시 단위(초)가 바뀔 때만 Publish — 매 프레임 string alloc 방지
+            int currentSecond = Mathf.FloorToInt(
+                StageRuntime.Instance != null ? StageRuntime.Instance.ElapsedTime.Value : 0f);
+            if (currentSecond == lastPublishedSecond) return;
+            lastPublishedSecond = currentSecond;
 
             Publish();
         }

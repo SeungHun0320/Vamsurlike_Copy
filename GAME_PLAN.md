@@ -1219,9 +1219,9 @@ Done when: HUD/다운·부활/결과/메인 메뉴 UI가 이벤트 기반으로 
   - 로컬 플레이어 교체/씬 전환 시 재바인딩
 - [ ] 보스 페이즈 타이머 UI 구현 (보스 등장 전: 남은 시간, 보스 페이즈 중: BOSS 상태 표시)
 - [ ] 보스 HP 바 구현 (보스 스폰 시 표시, HP NetworkVariable 이벤트 기반 갱신, 처치/페이즈 종료 시 숨김)
-- [ ] SkillSlotUI 교체, ItemSlotUI 구현
-- [ ] 궁극기 타이머 UI 구현 (수동 스킬 쿨다운, 사용 가능 상태, 입력 키 강조)
-- [ ] 획득 로그 UI 구현 (스킬/패시브/아이템 획득, 진화, 회복 등 짧은 피드백)
+- [x] SkillHUDUI / SkillHUDCellUI 구현 완료. ItemSlotUI 불필요 — 아이템 전량 1회용 즉시효과
+- [x] 궁극기 타이머 UI 구현 (UltimateCooldownUI — Radial360 fill, 키힌트, readyGlow)
+- [x] 획득 로그 UI 구현 (AcquisitionLogUI — fire-and-forget, 좌측 스택, fadein/out)
 
 #### Phase 8.3 Co-op/다운/부활 UI
 
