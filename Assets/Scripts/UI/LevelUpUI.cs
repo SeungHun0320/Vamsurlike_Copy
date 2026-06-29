@@ -1,47 +1,45 @@
 using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Player;
+using Vamsurlike.UI.Events;
+using Vamsurlike.UI.ViewModels;
 using Vamsurlike.Upgrades;
 
 namespace Vamsurlike.UI
 {
-    // Stage 씬의 Canvas에 배치 (IsLocalPlayer 기준으로 HUD와 함께 관리).
-    // LevelUpManager의 정적 이벤트를 구독해 동작하므로 플레이어 오브젝트와 분리되어 있어도 됨.
+    // Stage 씬의 Canvas에 배치.
     // Animator의 updateMode = AnimatorUpdateMode.UnscaledTime 으로 설정해야
     // Time.timeScale = 0 중에도 등장/퇴장 애니메이션이 재생됨.
     public class LevelUpUI : MonoBehaviour
     {
-        [SerializeField] private GameObject    panel;
-        [SerializeField] private LevelUpCardUI[] cards; // Inspector에서 카드 3개 연결
+        [SerializeField] private GameObject     panel;
+        [SerializeField] private LevelUpCardUI[] cards;
 
-        private int[] currentOptionIndices;
+        private int[]            currentOptionIndices;
+        private LevelUpViewModel viewModel;
+
+        private void Awake()
+        {
+            viewModel = new LevelUpViewModel();
+        }
 
         private void OnEnable()
         {
-            LevelUpManager.OnOptionsReceived  += Show;
-            LevelUpManager.OnLevelUpCompleted += Hide;
+            viewModel.OnShow += Show;
+            viewModel.OnHide += Hide;
+            viewModel.Bind();
         }
 
         private void OnDisable()
         {
-            LevelUpManager.OnOptionsReceived  -= Show;
-            LevelUpManager.OnLevelUpCompleted -= Hide;
+            viewModel.OnShow -= Show;
+            viewModel.OnHide -= Hide;
+            viewModel.Unbind();
         }
 
-        private void Show(int[] optionIndices, int[] currentLevels)
+        private void Show(LevelUpOptionsPayload payload)
         {
-            // 로컬 플레이어 스탯 — 패시브 수치 표시용
-            NetworkObject localPlayer = NetworkManager.Singleton?.LocalClient?.PlayerObject;
-            var playerStats = localPlayer != null ? localPlayer.GetComponent<PlayerNetworkStats>() : null;
-            var statHandler = localPlayer != null ? localPlayer.GetComponent<PassiveStatHandler>()  : null;
-
-            if (playerStats == null || !playerStats.CanAct)
-            {
-                Hide();
-                return;
-            }
-
-            currentOptionIndices = optionIndices;
+            currentOptionIndices = payload.OptionIndices;
             var catalog = UpgradeCatalog.Instance;
 
             if (catalog == null)
@@ -52,11 +50,17 @@ namespace Vamsurlike.UI
 
             if (panel != null) panel.SetActive(true);
 
+            // TODO: 플레이어 스탯 참조를 ViewModelBase 계층으로 이동 (Phase 8.2)
+            var localPlayer = NetworkManager.Singleton?.LocalClient?.PlayerObject;
+            var playerStats = localPlayer != null ? localPlayer.GetComponent<PlayerNetworkStats>() : null;
+            var statHandler = localPlayer != null ? localPlayer.GetComponent<PassiveStatHandler>()  : null;
+
             for (int i = 0; i < cards.Length; i++)
             {
                 if (cards[i] == null) continue;
 
-                bool hasOption = i < optionIndices.Length && catalog.IsValidIndex(optionIndices[i]);
+                bool hasOption = i < payload.OptionIndices.Length
+                                 && catalog.IsValidIndex(payload.OptionIndices[i]);
                 if (!hasOption)
                 {
                     cards[i].gameObject.SetActive(false);
@@ -64,10 +68,10 @@ namespace Vamsurlike.UI
                 }
 
                 cards[i].gameObject.SetActive(true);
-                var option = catalog.options[optionIndices[i]];
-                float currentValue = ResolveCurrentValue(option, i, currentLevels, playerStats, statHandler);
+                var option = catalog.options[payload.OptionIndices[i]];
+                float currentValue = ResolveCurrentValue(option, i, payload.CurrentLevels, playerStats, statHandler);
                 int captured = i;
-                cards[i].Setup(option, currentValue, () => OnCardSelected(captured));
+                cards[i].Setup(option, currentValue, () => viewModel.SubmitChoice(captured));
             }
         }
 
@@ -96,32 +100,6 @@ namespace Vamsurlike.UI
                 default:
                     return -1f;
             }
-        }
-
-        private void OnCardSelected(int cardIndex)
-        {
-            if (currentOptionIndices == null || cardIndex >= currentOptionIndices.Length) return;
-            if (!CanLocalPlayerChoose())
-            {
-                Hide();
-                return;
-            }
-
-            if (LevelUpManager.Instance == null)
-            {
-                Debug.LogError($"[{nameof(LevelUpUI)}] LevelUpManager 인스턴스 없음");
-                return;
-            }
-
-            LevelUpManager.Instance.SubmitChoiceServerRpc(cardIndex);
-            Hide();
-        }
-
-        private static bool CanLocalPlayerChoose()
-        {
-            NetworkObject localPlayer = NetworkManager.Singleton?.LocalClient?.PlayerObject;
-            var stats = localPlayer != null ? localPlayer.GetComponent<PlayerNetworkStats>() : null;
-            return stats != null && stats.CanAct;
         }
 
         private void Hide()

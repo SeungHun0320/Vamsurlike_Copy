@@ -423,6 +423,7 @@ GameObject:
   - component: {fileID: 3868694679171841}
   - component: {fileID: 126953368653616146}
   - component: {fileID: 4009276164870669578}
+  - component: {fileID: -7378127927719187288}
   m_Layer: 6
   m_Name: NetworkedPlayer
   m_TagString: Player
@@ -689,6 +690,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Player.PlayerReviveHandler
   ShowTopMostFoldoutHeaderGroup: 1
   downedDuration: 30
+  baseDeadWaitDuration: 10
+  deathPenaltyRatio: 0.5
   reviveDuration: 2
   reviveHPRatio: 0.3
   reviveRadius: 2.5
@@ -706,6 +709,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Player.ReviveRangeVisualizer
   ShowTopMostFoldoutHeaderGroup: 1
   rangeColor: {r: 0.15, g: 0.85, b: 1, a: 0.9}
+--- !u!114 &-7378127927719187288
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3346994395623583896}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e81c9f90cffa64d428c3756443377264, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Player.PlayerStatusAdapter
+  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &3716566736859526982
 GameObject:
   m_ObjectHideFlags: 0

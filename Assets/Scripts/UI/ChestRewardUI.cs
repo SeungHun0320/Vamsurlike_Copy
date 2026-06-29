@@ -1,41 +1,43 @@
-using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Items;
-using Vamsurlike.Player;
+using Vamsurlike.UI.Events;
+using Vamsurlike.UI.ViewModels;
 using Vamsurlike.Upgrades;
 
 namespace Vamsurlike.UI
 {
     // Stage 씬 Canvas에 배치 (항상 활성 유지 — OnEnable 구독 보장).
-    // 상자 스킬 카드 선택 UI. 스킬 타입만 표시, 패시브 능력치 제외.
+    // 상자 스킬 카드 선택 UI.
     public class ChestRewardUI : MonoBehaviour
     {
-        [SerializeField] private GameObject  panel;
-        [SerializeField] private ChestCardUI[] cards; // Inspector에서 3개 연결
+        [SerializeField] private GameObject   panel;
+        [SerializeField] private ChestCardUI[] cards;
 
-        private ChestChoiceData[] currentOptions;
+        private ChestChoiceData[]   currentOptions;
+        private ChestRewardViewModel viewModel;
+
+        private void Awake()
+        {
+            viewModel = new ChestRewardViewModel();
+        }
 
         private void OnEnable()
         {
-            ChestRewardManager.OnOptionsReceived    += Show;
-            ChestRewardManager.OnChestRewardCompleted += Hide;
+            viewModel.OnShow += Show;
+            viewModel.OnHide += Hide;
+            viewModel.Bind();
         }
 
         private void OnDisable()
         {
-            ChestRewardManager.OnOptionsReceived    -= Show;
-            ChestRewardManager.OnChestRewardCompleted -= Hide;
+            viewModel.OnShow -= Show;
+            viewModel.OnHide -= Hide;
+            viewModel.Unbind();
         }
 
-        private void Show(ChestChoiceData[] choices)
+        private void Show(ChestOptionsPayload payload)
         {
-            if (!CanLocalPlayerChoose())
-            {
-                Hide();
-                return;
-            }
-
-            currentOptions = choices;
+            currentOptions = payload.Choices;
             if (panel != null) panel.SetActive(true);
 
             var upgradeCatalog = UpgradeCatalog.Instance;
@@ -46,76 +48,35 @@ namespace Vamsurlike.UI
             {
                 if (cards[i] == null) continue;
 
-                if (i >= choices.Length)
+                if (i >= payload.Choices.Length)
                 {
                     cards[i].gameObject.SetActive(false);
                     continue;
                 }
 
-                ChestChoiceData choice = choices[i];
+                ChestChoiceData choice = payload.Choices[i];
                 cards[i].gameObject.SetActive(true);
                 int captured = i;
 
                 if (choice.type == ChestChoiceType.Evolution)
                 {
                     if (recipeCatalog == null || !recipeCatalog.IsValidIndex(choice.index))
-                    {
-                        cards[i].gameObject.SetActive(false);
-                        continue;
-                    }
-
-                    cards[i].SetupEvolution(recipeCatalog.recipes[choice.index], () => OnCardSelected(captured));
+                    { cards[i].gameObject.SetActive(false); continue; }
+                    cards[i].SetupEvolution(recipeCatalog.recipes[choice.index], () => viewModel.SubmitChoice(captured));
                 }
                 else if (choice.type == ChestChoiceType.ItemReward)
                 {
                     if (itemCatalog == null || !itemCatalog.IsValidIndex(choice.index))
-                    {
-                        cards[i].gameObject.SetActive(false);
-                        continue;
-                    }
-
-                    cards[i].SetupItemReward(itemCatalog.rewards[choice.index], () => OnCardSelected(captured));
+                    { cards[i].gameObject.SetActive(false); continue; }
+                    cards[i].SetupItemReward(itemCatalog.rewards[choice.index], () => viewModel.SubmitChoice(captured));
                 }
                 else
                 {
                     if (upgradeCatalog == null || !upgradeCatalog.IsValidIndex(choice.index))
-                    {
-                        cards[i].gameObject.SetActive(false);
-                        continue;
-                    }
-
-                    cards[i].SetupUpgrade(upgradeCatalog.options[choice.index], () => OnCardSelected(captured));
+                    { cards[i].gameObject.SetActive(false); continue; }
+                    cards[i].SetupUpgrade(upgradeCatalog.options[choice.index], () => viewModel.SubmitChoice(captured));
                 }
             }
-        }
-
-        private void OnCardSelected(int cardIndex)
-        {
-            if (currentOptions == null || cardIndex >= currentOptions.Length) return;
-            if (!CanLocalPlayerChoose())
-            {
-                Hide();
-                return;
-            }
-
-            if (ChestRewardManager.Instance == null)
-            {
-                Debug.LogError($"[{nameof(ChestRewardUI)}] ChestRewardManager 인스턴스 없음");
-                return;
-            }
-
-            ChestRewardManager.Instance.SubmitChoiceServerRpc(cardIndex);
-
-            // 중복 선택 방지: 카드 숨김 — 패널은 서버 완료 이벤트에서 닫힘
-            for (int i = 0; i < cards.Length; i++)
-                if (cards[i] != null) cards[i].gameObject.SetActive(false);
-        }
-
-        private static bool CanLocalPlayerChoose()
-        {
-            NetworkObject localPlayer = NetworkManager.Singleton?.LocalClient?.PlayerObject;
-            var stats = localPlayer != null ? localPlayer.GetComponent<PlayerNetworkStats>() : null;
-            return stats != null && stats.CanAct;
         }
 
         private void Hide()
