@@ -40,6 +40,7 @@ namespace Vamsurlike.UI
         private BossHPBarViewModel viewModel;
         private CanvasGroup        panelCanvasGroup;
         private Image[]            pips;
+        private TextMeshProUGUI    chunkText;
         private int                lastChunk = -1;
         private bool               visualsBuilt;
 
@@ -153,20 +154,39 @@ namespace Vamsurlike.UI
                 pips[i] = img;
             }
 
-            if (hpFill  != null) hpFill.transform.SetAsFirstSibling();
-            if (hpText  != null) hpText.transform.SetAsLastSibling();
+            // ×N 카운터 텍스트 — 패널 오른쪽에 동적 생성
+            var ctGO = new GameObject("ChunkCountText");
+            ctGO.transform.SetParent(panel.transform, false);
+            chunkText = ctGO.AddComponent<TextMeshProUGUI>();
+            chunkText.fontSize    = 28f;
+            chunkText.fontStyle   = FontStyles.Bold;
+            chunkText.color       = new Color(1f, 1f, 1f, 0.9f);
+            chunkText.alignment   = TextAlignmentOptions.MidlineLeft;
+
+            var ctRt = ctGO.GetComponent<RectTransform>();
+            ctRt.anchorMin        = new Vector2(1f, 0f);
+            ctRt.anchorMax        = new Vector2(1f, 1f);
+            ctRt.pivot            = new Vector2(0f, 0.5f);
+            ctRt.sizeDelta        = new Vector2(80f, 0f);
+            ctRt.anchoredPosition = new Vector2(6f, 0f);
+
+            if (hpFill != null) hpFill.transform.SetAsFirstSibling();
+            if (hpText != null) hpText.transform.SetAsLastSibling();
         }
 
         private void UpdatePips(int remaining)
         {
-            if (pips == null) return;
-            for (int i = 0; i < pips.Length; i++)
+            if (pips != null)
             {
-                if (pips[i] == null) continue;
-                // pip 0 = 마지막 덩어리, pip N-1 = 첫 덩어리
-                // remaining 개수만큼 활성화 (왼쪽부터)
-                pips[i].color = i < remaining ? pipActive : pipDepleted;
+                for (int i = 0; i < pips.Length; i++)
+                {
+                    if (pips[i] == null) continue;
+                    pips[i].color = i < remaining ? pipActive : pipDepleted;
+                }
             }
+
+            if (chunkText != null)
+                chunkText.text = $"×{remaining}";  // ×N
         }
 
         // ── 패널 표시 제어 ────────────────────────────────────
