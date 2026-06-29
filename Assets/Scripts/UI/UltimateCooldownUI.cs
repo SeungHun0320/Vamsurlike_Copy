@@ -15,7 +15,7 @@ namespace Vamsurlike.UI
         [SerializeField] private Image           cooldownFill;
         [SerializeField] private TextMeshProUGUI timerText;
         [SerializeField] private GameObject      readyGlow;
-        [SerializeField] private string          keyHint = "Q";
+        [SerializeField] private string          keyHint = "SPACE";
 
         private UltimateCooldownViewModel viewModel;
         private string                    lastText;

@@ -25,8 +25,11 @@ namespace Vamsurlike.Player
             float remaining = skillManager.ManualCooldownRemaining.Value;
             float duration  = skillManager.ManualCooldownDuration.Value;
 
+            // IsReady 상태 전환(쿨다운 완료)은 임계값 무시 — 0.0 고정 방지
+            bool readyStateChanged = (remaining <= 0f) != (lastRemaining <= 0f);
+
             // 0.05s 미만 변화 무시 — 매 프레임 string alloc 방지
-            if (Mathf.Abs(remaining - lastRemaining) < 0.05f && duration == lastDuration) return;
+            if (!readyStateChanged && Mathf.Abs(remaining - lastRemaining) < 0.05f && duration == lastDuration) return;
 
             lastRemaining = remaining;
             lastDuration  = duration;
