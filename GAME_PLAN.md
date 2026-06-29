@@ -1237,7 +1237,72 @@ Done when: HUD/다운·부활/결과/메인 메뉴 UI가 이벤트 기반으로 
 
 #### Phase 8.4 메뉴/결과 UI
 
-- [ ] ResultUI 구현 (개인 통계: 처치수, 데미지, 생존 시간)
+---
+
+##### PlayerMatchStats — 처치수 / 데미지 / 생존 시간
+
+개인 전투 통계를 서버 권한으로 누적하는 전담 컴포넌트. `PlayerNetworkStats`(실시간 HP·상태)와 역할 분리.
+
+**컴포넌트 배치**: `NetworkedPlayer` 프리팹에 `PlayerMatchStats : NetworkBehaviour` 추가.
+
+```csharp
+public class PlayerMatchStats : NetworkBehaviour
+{
+    // Owner만 읽으면 되므로 ReadPermission = Owner
+    public NetworkVariable<int>   KillCount     = new(0, NetworkVariableReadPermission.Owner, NetworkVariableWritePermission.Server);
+    public NetworkVariable<float> TotalDamage   = new(0f, NetworkVariableReadPermission.Owner, NetworkVariableWritePermission.Server);
+    public NetworkVariable<float> SurvivalTime  = new(0f, NetworkVariableReadPermission.Owner, NetworkVariableWritePermission.Server);
+
+    // 서버에서 외부 호출
+    public void AddKill()                     { if (IsServer) KillCount.Value++; }
+    public void AddDamage(float amount)       { if (IsServer) TotalDamage.Value += amount; }
+    public void SetSurvivalTime(float time)   { if (IsServer) SurvivalTime.Value = time; }
+}
+```
+
+**처치·데미지 귀속 — `EnemyNetworkBase.TakeDamage` 서명 변경**
+
+```csharp
+// Before
+public void TakeDamage(float amount)
+
+// After
+public void TakeDamage(float amount, ulong attackerClientId = ulong.MaxValue)
+```
+
+- 데미지 발생 시 해당 플레이어의 `PlayerMatchStats.AddDamage(actual)` 호출 (actual = 실제 깎인 HP)
+- HP=0 되어 처치 시 → `PlayerMatchStats.AddKill()` 호출
+- `attackerClientId` 는 스킬·발사체에서 `OwnerClientId` 로 전달. 연결 방법:
+  - `NetworkProjectile`, `GrenadeNetworkSkill`, `MeleeNetworkSkill` 등 → 생성 시 `attackerClientId` 필드 저장
+  - `AuraNetworkSkill`, `OrbitalNetworkSkill` → 틱 데미지 시 `TakeDamage(dmg, ownerClientId)` 전달
+
+**생존 시간 — `StageRuntime`에서 관리**
+
+- 스테이지 시작 시 `ElapsedTime` 누적 (이미 존재)
+- `GameState.Clear` 또는 `GameState.GameOver` 진입 시 → 살아있던 플레이어 = `ElapsedTime`, 죽었던 플레이어 = 개인 사망 시각 기록
+- 단순 구현: 스테이지 종료 시 `PlayerReviveHandler.IsDeadWaiting == false`이면 `ElapsedTime` 그대로, 아니면 마지막 `BeginDowned` 호출 시각 사용
+
+**Result UI 데이터 수집 (서버→클라이언트)**
+
+- 서버가 `GameState.Clear/GameOver` 진입 시 `[ClientRpc]`로 전원에게 결과 payload 전송
+  ```csharp
+  struct MatchResultEntry { ulong clientId; string displayName; int kills; float damage; float survivalTime; }
+  [ClientRpc] void SendMatchResultClientRpc(MatchResultEntry[] entries) { ... }
+  ```
+- `NetworkVariable`은 Owner만 읽을 수 있으므로 결과 화면에서 타인 통계를 보려면 위 RPC 방식으로 수집
+
+---
+
+##### 구현 항목
+
+- [ ] `PlayerMatchStats` NetworkBehaviour 구현 및 `NetworkedPlayer` 프리팹에 추가
+- [ ] `EnemyNetworkBase.TakeDamage(float amount, ulong attackerClientId)` 서명 변경
+  - 데미지 적용 후 공격자 `PlayerMatchStats.AddDamage(actual)` 호출
+  - 처치 시 공격자 `PlayerMatchStats.AddKill()` 호출
+- [ ] 스킬·발사체에 `attackerClientId` 전달 (`NetworkProjectile`, `AuraNetworkSkill`, `OrbitalNetworkSkill`, `MeleeNetworkSkill`, `GrenadeNetworkSkill` 등)
+- [ ] `StageRuntime`에 생존 시간 기록 로직 추가 (스테이지 종료 시 각 플레이어 `SetSurvivalTime()`)
+- [ ] `SendMatchResultClientRpc` 구현 (GameState.Clear/GameOver 진입 시 서버가 전원에게 브로드캐스트)
+- [ ] ResultUI 구현 (처치수, 데미지, 생존 시간 테이블)
 - [ ] LoadingScreen 구현 (NetworkManager.SceneManager 로딩 이벤트 연동)
 - [ ] MainMenu 구현 (방 만들기/참여 UI 완성)
 - [ ] 설정 UI 구현 (음량, 해상도)
