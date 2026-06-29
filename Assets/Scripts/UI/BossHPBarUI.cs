@@ -20,15 +20,20 @@ namespace Vamsurlike.UI
         [SerializeField] private string bossName = "BOSS";
 
         [Header("Segments")]
-        [SerializeField] private int     segmentCount = 5;
-        // index 0 = 마지막 덩어리(빨강), index N-1 = 첫 덩어리(보라)
+        [SerializeField] private int     segmentCount = 10;
+        // index 0 = 마지막 덩어리, index 9 = 첫 덩어리
         [SerializeField] private Color[] chunkColors  = new Color[]
         {
-            new Color(0.95f, 0.20f, 0.15f, 1f),  // 마지막 — 빨강
-            new Color(1.00f, 0.50f, 0.05f, 1f),  // 주황
-            new Color(1.00f, 0.80f, 0.10f, 1f),  // 노랑
-            new Color(0.70f, 0.20f, 0.90f, 1f),  // 보라
-            new Color(0.40f, 0.10f, 0.85f, 1f),  // 처음  — 진보라
+            new Color(0.90f, 0.10f, 0.10f, 1f),  // 0: 마지막 — 순수 빨강
+            new Color(1.00f, 0.30f, 0.05f, 1f),  // 1: 주황빨강
+            new Color(1.00f, 0.55f, 0.05f, 1f),  // 2: 주황
+            new Color(1.00f, 0.80f, 0.05f, 1f),  // 3: 황금
+            new Color(0.90f, 0.85f, 0.10f, 1f),  // 4: 노랑
+            new Color(0.85f, 0.20f, 0.70f, 1f),  // 5: 마젠타
+            new Color(0.75f, 0.15f, 0.85f, 1f),  // 6: 보라-마젠타
+            new Color(0.60f, 0.10f, 0.90f, 1f),  // 7: 보라
+            new Color(0.45f, 0.08f, 0.88f, 1f),  // 8: 진보라
+            new Color(0.30f, 0.05f, 0.80f, 1f),  // 9: 처음  — 인디고
         };
 
         [Header("Pip Counter")]
