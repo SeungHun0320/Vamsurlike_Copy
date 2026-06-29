@@ -6,14 +6,15 @@ using Vamsurlike.UI.Events;
 
 namespace Vamsurlike.UI
 {
-    // 다운 상태에서 팀원이 부활 중일 때 플레이어 머리 위에 떠오르는 월드 스페이스 진행도 바.
-    // IsOwner(로컬 플레이어)일 때만 캔버스를 생성하고 이벤트에 구독한다.
+    // 다운된 플레이어 머리 위에 떠오르는 월드 스페이스 부활 진행도 바.
+    // 모든 클라이언트 인스턴스가 이벤트를 수신하되, DownedClientId == OwnerClientId 인 경우에만 표시.
+    // 구조체에 DownedClientId가 있으므로 IsOwner 제한 없이 다운된 플레이어 위에 정확히 렌더됨.
     public sealed class WorldReviveProgressUI : NetworkBehaviour
     {
-        [SerializeField] private Vector3 offset      = new Vector3(0f, 2.5f, 0f);
-        [SerializeField] private Vector2 canvasSize  = new Vector2(300f, 48f);
-        [SerializeField] private float   worldScale  = 0.01f;
-        [SerializeField] private Color   fillColor   = new Color(0.2f, 0.8f, 0.4f, 1f);
+        [SerializeField] private Vector3 offset     = new Vector3(0f, 2.5f, 0f);
+        [SerializeField] private Vector2 canvasSize = new Vector2(300f, 48f);
+        [SerializeField] private float   worldScale = 0.01f;
+        [SerializeField] private Color   fillColor  = new Color(0.2f, 0.8f, 0.4f, 1f);
 
         private Transform       barRoot;
         private Image           progressFill;
@@ -22,39 +23,46 @@ namespace Vamsurlike.UI
 
         public override void OnNetworkSpawn()
         {
-            if (!IsOwner) return;
             BuildBar();
+
             if (UIEventHub.Instance != null)
+            {
                 UIEventHub.Instance.Player.ReviveProgressChanged += OnReviveProgress;
+                UIEventHub.Instance.Player.PlayerRevived         += HideBar;
+            }
         }
 
         public override void OnNetworkDespawn()
         {
             if (UIEventHub.Instance != null)
+            {
                 UIEventHub.Instance.Player.ReviveProgressChanged -= OnReviveProgress;
+                UIEventHub.Instance.Player.PlayerRevived         -= HideBar;
+            }
         }
 
         // 빌보드: 카메라를 향해 회전
         private void LateUpdate()
         {
-            if (barRoot == null || !IsOwner) return;
-            if (Camera.main != null)
-                barRoot.rotation = Camera.main.transform.rotation;
+            if (barRoot == null || Camera.main == null) return;
+            barRoot.rotation = Camera.main.transform.rotation;
         }
 
         private void OnReviveProgress(ReviveProgressPayload p)
         {
-            if (cg == null) return;
+            // 이 인스턴스가 다운된 플레이어인 경우에만 표시
+            if (p.DownedClientId != OwnerClientId) return;
 
-            if (p.Progress < 0f)
-            {
-                cg.alpha = 0f;
-                return;
-            }
+            if (p.Progress < 0f) { HideBar(); return; }
 
-            cg.alpha = 1f;
-            if (progressFill != null) progressFill.fillAmount = p.Progress;
+            if (cg != null) cg.alpha = 1f;
+            if (progressFill != null) FilledImageUtility.SetAmount(progressFill, p.Progress);
             if (progressText != null) progressText.text = $"부활 중... {p.Progress * 100f:0}%";
+        }
+
+        private void HideBar()
+        {
+            if (cg != null) cg.alpha = 0f;
         }
 
         private void BuildBar()
@@ -68,18 +76,17 @@ namespace Vamsurlike.UI
             canvas.renderMode  = RenderMode.WorldSpace;
             canvas.worldCamera = Camera.main;
 
-            var scaler = go.AddComponent<CanvasScaler>();
-            scaler.dynamicPixelsPerUnit = 1f;
+            go.AddComponent<CanvasScaler>().dynamicPixelsPerUnit = 1f;
 
-            var rt = go.GetComponent<RectTransform>();
+            var rt       = go.GetComponent<RectTransform>();
             rt.sizeDelta = canvasSize;
 
-            cg        = go.AddComponent<CanvasGroup>();
-            cg.alpha  = 0f;
-            barRoot   = go.transform;
+            cg       = go.AddComponent<CanvasGroup>();
+            cg.alpha = 0f;
+            barRoot  = go.transform;
 
             // 배경
-            var bgGO  = new GameObject("BG");
+            var bgGO = new GameObject("BG");
             bgGO.transform.SetParent(go.transform, false);
             bgGO.AddComponent<Image>().color = new Color(0.05f, 0.05f, 0.05f, 0.85f);
             Stretch(bgGO);
@@ -87,11 +94,9 @@ namespace Vamsurlike.UI
             // 채우기 바
             var fillGO = new GameObject("Fill");
             fillGO.transform.SetParent(go.transform, false);
-            progressFill            = fillGO.AddComponent<Image>();
-            progressFill.color      = fillColor;
-            progressFill.type       = Image.Type.Filled;
-            progressFill.fillMethod = Image.FillMethod.Horizontal;
-            progressFill.fillOrigin = 0;
+            progressFill = fillGO.AddComponent<Image>();
+            progressFill.color = fillColor;
+            FilledImageUtility.ConfigureHorizontal(progressFill);
             progressFill.fillAmount = 0f;
             Stretch(fillGO);
 
@@ -109,12 +114,11 @@ namespace Vamsurlike.UI
 
         private static void Stretch(GameObject go)
         {
-            var rt        = go.GetComponent<RectTransform>();
-            rt.anchorMin  = Vector2.zero;
-            rt.anchorMax  = Vector2.one;
-            rt.sizeDelta  = Vector2.zero;
-            rt.offsetMin  = Vector2.zero;
-            rt.offsetMax  = Vector2.zero;
+            var rt       = go.GetComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
         }
     }
 }

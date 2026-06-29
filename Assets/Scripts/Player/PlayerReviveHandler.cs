@@ -201,12 +201,7 @@ namespace Vamsurlike.Player
                     }
                 }
 
-                SendReviveProgressClientRpc(
-                    Mathf.Clamp01(elapsed / reviveDuration),
-                    new ClientRpcParams
-                    {
-                        Send = new ClientRpcSendParams { TargetClientIds = new[] { rescuerClientId } }
-                    });
+                SendReviveProgressClientRpc(Mathf.Clamp01(elapsed / reviveDuration), OwnerClientId);
 
                 yield return null;
             }
@@ -232,10 +227,7 @@ namespace Vamsurlike.Player
         {
             if (reviveCoroutine != null) { StopCoroutine(reviveCoroutine); reviveCoroutine = null; }
             reviverClientId = NoReviver;
-            CancelReviveProgressClientRpc(new ClientRpcParams
-            {
-                Send = new ClientRpcSendParams { TargetClientIds = new[] { rescuerClientId } }
-            });
+            CancelReviveProgressClientRpc(OwnerClientId);
         }
 
         private bool IsRescuerInRange(ulong rescuerClientId)
@@ -246,18 +238,19 @@ namespace Vamsurlike.Player
             return Vector3.Distance(transform.position, client.PlayerObject.transform.position) <= reviveRadius;
         }
 
+        // broadcast: 모든 클라이언트가 수신 → WorldReviveProgressUI가 DownedClientId로 필터링
         [ClientRpc]
-        private void SendReviveProgressClientRpc(float progress, ClientRpcParams rpc = default)
+        private void SendReviveProgressClientRpc(float progress, ulong downedClientId)
         {
             OnReviveProgressUpdated?.Invoke(progress); // 임시 경유지 (Phase 8 마이그레이션 완료 후 제거)
-            UIEventHub.Instance?.Player.PublishReviveProgress(new ReviveProgressPayload(progress));
+            UIEventHub.Instance?.Player.PublishReviveProgress(new ReviveProgressPayload(progress, downedClientId));
         }
 
         [ClientRpc]
-        private void CancelReviveProgressClientRpc(ClientRpcParams rpc = default)
+        private void CancelReviveProgressClientRpc(ulong downedClientId)
         {
             OnReviveProgressUpdated?.Invoke(-1f); // 임시 경유지 (Phase 8 마이그레이션 완료 후 제거)
-            UIEventHub.Instance?.Player.PublishReviveProgress(new ReviveProgressPayload(-1f));
+            UIEventHub.Instance?.Player.PublishReviveProgress(new ReviveProgressPayload(-1f, downedClientId));
         }
 
         [ClientRpc]

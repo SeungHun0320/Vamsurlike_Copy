@@ -11,7 +11,7 @@ namespace Vamsurlike.UI
     // LocalClientId 제외. PlayerStatusChanged 이벤트 수신 시 슬롯 자동 생성/갱신.
     public sealed class CoopHUDUI : MonoBehaviour
     {
-        [SerializeField] private float slotHeight  = 52f;
+        [SerializeField] private float slotHeight  = 64f;
         [SerializeField] private float slotSpacing = 6f;
         [SerializeField] private Color aliveColor  = new Color(0.2f, 0.8f, 0.2f, 1f);
         [SerializeField] private Color downedColor = new Color(0.9f, 0.3f, 0.1f, 1f);
@@ -54,7 +54,7 @@ namespace Vamsurlike.UI
             if (slot.hpFill != null)
             {
                 float normalized = p.MaxHp > 0f ? p.Hp / p.MaxHp : 0f;
-                slot.hpFill.fillAmount = Mathf.Clamp01(normalized);
+                FilledImageUtility.SetAmount(slot.hpFill, normalized);
                 slot.hpFill.color = p.IsDowned ? downedColor : p.IsAlive ? aliveColor : deadColor;
             }
 
@@ -94,7 +94,7 @@ namespace Vamsurlike.UI
             nameGO.transform.SetParent(root.transform, false);
             var nameText = nameGO.AddComponent<TextMeshProUGUI>();
             nameText.text      = string.IsNullOrEmpty(displayName) ? $"P{clientId}" : displayName;
-            nameText.fontSize  = 18f;
+            nameText.fontSize  = 22f;
             nameText.color     = Color.white;
             nameText.fontStyle = FontStyles.Bold;
             nameText.alignment = TextAlignmentOptions.MidlineLeft;

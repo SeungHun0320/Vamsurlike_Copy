@@ -47,8 +47,14 @@ namespace Vamsurlike.UI.Events
     {
         // 0~1 진행도, -1 = 취소
         public readonly float Progress;
+        // 다운된 플레이어의 ClientId (WorldReviveProgressUI가 올바른 오브젝트에만 표시하기 위함)
+        public readonly ulong DownedClientId;
 
-        public ReviveProgressPayload(float progress) => Progress = progress;
+        public ReviveProgressPayload(float progress, ulong downedClientId = ulong.MaxValue)
+        {
+            Progress      = progress;
+            DownedClientId = downedClientId;
+        }
     }
 
     public readonly struct PlayerStatusPayload
