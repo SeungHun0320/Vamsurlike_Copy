@@ -1228,12 +1228,12 @@ Done when: HUD/다운·부활/결과/메인 메뉴 UI가 이벤트 기반으로 
 - [x] 궁극기 타이머 UI 구현 (UltimateCooldownUI — Radial360 fill, 키힌트, readyGlow, 하단 중앙 배치)
 - [x] 획득 로그 UI 구현 (AcquisitionLogUI — fire-and-forget, 좌측 스택, fadein/out)
 
-#### Phase 8.3 Co-op/다운/부활 UI
+#### Phase 8.3 Co-op/다운/부활 UI ✅
 
-- [ ] Co-op HUD 추가 (팀원 HP 미니 표시)
-- [ ] 팀원 다운 표시 — 팀원이 `IsDowned=true`일 때 Co-op HUD 해당 슬롯에 아이콘/색상 강조 (죽은 것처럼 보이지 않도록 구분)
-- [ ] 다운 상태 HUD — 자신이 다운됐을 때 `DownedTimeRemaining` 타이머 표시 (자력 부활 불가 안내 포함)
-- [ ] 부활 진행도 바 — 팀원이 범위 안에 들어왔을 때 화면에 진행도 표시 (`PlayerReviveHandler.OnReviveProgressUpdated` 이벤트 구독)
+- [x] Co-op HUD 추가 (팀원 HP 미니 표시)
+- [x] 팀원 다운 표시 — 팀원이 `IsDowned=true`일 때 Co-op HUD 해당 슬롯에 아이콘/색상 강조 (죽은 것처럼 보이지 않도록 구분)
+- [x] 다운 상태 HUD — 자신이 다운됐을 때 `DownedTimeRemaining` 타이머 표시 (자력 부활 불가 안내 포함)
+- [x] 부활 진행도 바 — 팀원이 범위 안에 들어왔을 때 화면에 진행도 표시 (`PlayerReviveHandler.OnReviveProgressUpdated` 이벤트 구독)
 
 #### Phase 8.4 메뉴/결과 UI
 
