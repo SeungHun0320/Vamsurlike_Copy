@@ -6,9 +6,19 @@ using Vamsurlike.Upgrades;
 
 namespace Vamsurlike.UI.ViewModels
 {
+    public readonly struct LevelUpCardViewData
+    {
+        public readonly bool            IsValid;
+        public readonly UpgradeOptionSO Option;
+        public readonly float           CurrentValue;
+
+        public LevelUpCardViewData(UpgradeOptionSO option, float currentValue)
+        { IsValid = true; Option = option; CurrentValue = currentValue; }
+    }
+
     public class LevelUpViewModel : ViewModelBase
     {
-        public event Action<LevelUpOptionsPayload> OnShow;
+        public event Action<LevelUpCardViewData[]> OnShow;
         public event Action                        OnHide;
 
         protected override void Subscribe()
@@ -28,23 +38,61 @@ namespace Vamsurlike.UI.ViewModels
         private void HandleShow(LevelUpOptionsPayload payload)
         {
             if (!CanLocalPlayerChoose()) { OnHide?.Invoke(); return; }
-            OnShow?.Invoke(payload);
+
+            var catalog = UpgradeCatalog.Instance;
+            if (catalog == null) { OnHide?.Invoke(); return; }
+
+            var localPlayer = NetworkManager.Singleton?.LocalClient?.PlayerObject;
+            var playerStats = localPlayer?.GetComponent<PlayerNetworkStats>();
+            var statHandler = localPlayer?.GetComponent<PassiveStatHandler>();
+
+            int count = payload.OptionIndices?.Length ?? 0;
+            var cards = new LevelUpCardViewData[count];
+            for (int i = 0; i < count; i++)
+            {
+                if (!catalog.IsValidIndex(payload.OptionIndices[i])) continue;
+                var option = catalog.options[payload.OptionIndices[i]];
+                float current = ResolveCurrentValue(option, i, payload.CurrentLevels, playerStats, statHandler);
+                cards[i] = new LevelUpCardViewData(option, current);
+            }
+            OnShow?.Invoke(cards);
+        }
+
+        private static float ResolveCurrentValue(
+            UpgradeOptionSO option, int cardIndex, int[] currentLevels,
+            PlayerNetworkStats playerStats, PassiveStatHandler statHandler)
+        {
+            switch (option.effectType)
+            {
+                case UpgradeEffectType.SkillLevelUp:
+                case UpgradeEffectType.NewSkill:
+                    return currentLevels != null && cardIndex < currentLevels.Length ? currentLevels[cardIndex] : 0f;
+                case UpgradeEffectType.PassiveMaxHP:
+                    return playerStats != null ? playerStats.MaxHP.Value : -1f;
+                case UpgradeEffectType.PassiveMoveSpeed:
+                    return playerStats != null ? playerStats.MoveSpeed.Value : -1f;
+                case UpgradeEffectType.PassivePickupRadius:
+                    return playerStats != null ? playerStats.PickupRadius.Value : -1f;
+                case UpgradeEffectType.PassiveAttackPower:
+                    return statHandler != null ? statHandler.AttackMultiplier.Value : -1f;
+                default:
+                    return -1f;
+            }
         }
 
         private void HandleHide() => OnHide?.Invoke();
 
-        // View → 카드 선택 시 호출하는 커맨드
         public void SubmitChoice(int cardIndex)
         {
             if (!CanLocalPlayerChoose()) return;
             LevelUpManager.Instance?.SubmitChoiceServerRpc(cardIndex);
-            OnHide?.Invoke(); // 서버 응답 대기 없이 즉시 닫기 (낙관적 업데이트)
+            OnHide?.Invoke();
         }
 
         private static bool CanLocalPlayerChoose()
         {
             var localPlayer = NetworkManager.Singleton?.LocalClient?.PlayerObject;
-            var stats = localPlayer != null ? localPlayer.GetComponent<PlayerNetworkStats>() : null;
+            var stats = localPlayer?.GetComponent<PlayerNetworkStats>();
             return stats != null && stats.CanAct;
         }
     }
