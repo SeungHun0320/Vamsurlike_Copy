@@ -77,7 +77,12 @@ namespace Vamsurlike.UI
             UpdateBar(p.NormalizedHp);
         }
 
-        private void Hide() => SetVisible(false);
+        private void Hide()
+        {
+            SetVisible(false);
+            lastChunk  = -1;
+            lastRemain = -1;
+        }
 
         // ── 바 업데이트 ───────────────────────────────────────
 
