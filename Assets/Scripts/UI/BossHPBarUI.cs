@@ -6,43 +6,46 @@ using Vamsurlike.UI.ViewModels;
 
 namespace Vamsurlike.UI
 {
-    // 세그먼트형 보스 HP 바.
-    // 전체 HP를 segmentCount 덩어리로 나누고, 큰 바 하나가 한 덩어리를 표시한다.
-    // 한 덩어리가 소진되면 바가 즉시 꽉 찬 상태로 리셋되며 색이 바뀐다.
-    // 남은 덩어리 수는 chunkText와 pip 아이콘으로 표시.
+    // 세그먼트형 보스 HP 바 (MapleStory / Lost Ark 스타일).
+    // 큰 바 하나 = 한 덩어리. 소진 시 즉시 리셋 + 색 변경.
+    // fill 뒤에 다음 덩어리 색이 ghost로 미리 보임.
     public sealed class BossHPBarUI : MonoBehaviour
     {
         [Header("References")]
         [SerializeField] private GameObject      panel;
         [SerializeField] private Image           hpFill;
-        [SerializeField] private TextMeshProUGUI hpText;
+        [SerializeField] private TextMeshProUGUI hpText;   // 런타임에 "보스명  ×N"으로 교체
+
+        [Header("Boss Info")]
+        [SerializeField] private string bossName = "BOSS";
 
         [Header("Segments")]
         [SerializeField] private int     segmentCount = 5;
+        // index 0 = 마지막 덩어리(빨강), index N-1 = 첫 덩어리(보라)
         [SerializeField] private Color[] chunkColors  = new Color[]
         {
-            new Color(0.95f, 0.20f, 0.15f, 1f),  // chunk 1 (마지막, 빨강)
-            new Color(1.00f, 0.50f, 0.05f, 1f),  // chunk 2
-            new Color(1.00f, 0.80f, 0.10f, 1f),  // chunk 3
-            new Color(0.70f, 0.20f, 0.90f, 1f),  // chunk 4
-            new Color(0.40f, 0.10f, 0.85f, 1f),  // chunk 5 (처음, 보라)
+            new Color(0.95f, 0.20f, 0.15f, 1f),  // 마지막 — 빨강
+            new Color(1.00f, 0.50f, 0.05f, 1f),  // 주황
+            new Color(1.00f, 0.80f, 0.10f, 1f),  // 노랑
+            new Color(0.70f, 0.20f, 0.90f, 1f),  // 보라
+            new Color(0.40f, 0.10f, 0.85f, 1f),  // 처음  — 진보라
         };
 
         [Header("Pip Counter")]
-        [SerializeField] private float pipSize    = 14f;
-        [SerializeField] private float pipSpacing = 4f;
-        [SerializeField] private Color pipActive  = new Color(1f, 1f, 1f, 0.85f);
-        [SerializeField] private Color pipDepleted= new Color(0.3f, 0.3f, 0.3f, 0.5f);
-
-        [Header("Format")]
-        [SerializeField] private string hpFormat = "{0:0} / {1:0}";
+        [SerializeField] private float pipSize     = 10f;
+        [SerializeField] private float pipSpacing  = 3f;
+        [SerializeField] private Color pipActive   = new Color(1f,   1f,   1f,   0.85f);
+        [SerializeField] private Color pipDepleted = new Color(0.3f, 0.3f, 0.3f, 0.50f);
 
         private BossHPBarViewModel viewModel;
         private CanvasGroup        panelCanvasGroup;
+        private Image              hpGhost;   // 다음 덩어리 색 미리보기
         private Image[]            pips;
-        private TextMeshProUGUI    chunkText;
-        private int                lastChunk = -1;
+        private int                lastChunk  = -1;
+        private int                lastRemain = -1;
         private bool               visualsBuilt;
+
+        // ── 생명주기 ──────────────────────────────────────────
 
         private void Awake()
         {
@@ -72,16 +75,13 @@ namespace Vamsurlike.UI
             viewModel.Unbind();
         }
 
+        // ── Show / Hide ───────────────────────────────────────
+
         private void Show(BossStatusPayload p)
         {
             SetVisible(true);
-
-            if (!visualsBuilt) BuildPips();
-
+            if (!visualsBuilt) BuildVisuals();
             UpdateBar(p.NormalizedHp);
-
-            if (hpText != null)
-                hpText.text = string.Format(hpFormat, p.Hp, p.MaxHp);
         }
 
         private void Hide() => SetVisible(false);
@@ -95,98 +95,121 @@ namespace Vamsurlike.UI
             if (normalizedHp <= 0f)
             {
                 hpFill.fillAmount = 0f;
+                if (hpGhost != null) hpGhost.color = Color.clear;
+                SetLabelText(0);
                 UpdatePips(0);
                 return;
             }
 
-            // 현재 덩어리 인덱스 (0 = 마지막 덩어리, segmentCount-1 = 첫 덩어리)
-            int chunk = Mathf.Clamp(
-                Mathf.FloorToInt(normalizedHp * segmentCount),
-                0, segmentCount - 1);
-
-            // 해당 덩어리 안에서의 진행도 (0→1)
+            int chunk    = Mathf.Clamp(Mathf.FloorToInt(normalizedHp * segmentCount), 0, segmentCount - 1);
             float progress = normalizedHp * segmentCount - chunk;
 
             hpFill.fillAmount = progress;
 
-            // 덩어리가 바뀔 때만 색 업데이트
             if (chunk != lastChunk)
             {
                 lastChunk = chunk;
-                // chunkColors 인덱스: 처음 덩어리(segmentCount-1)가 마지막 색상
-                int colorIdx = Mathf.Clamp(segmentCount - 1 - chunk, 0, chunkColors.Length - 1);
-                hpFill.color = chunkColors[colorIdx];
+                hpFill.color = GetChunkColor(chunk);
+
+                // ghost = 다음(chunk-1) 덩어리 색
+                if (hpGhost != null)
+                    hpGhost.color = chunk > 0 ? GetChunkColor(chunk - 1) : Color.clear;
             }
 
-            // chunk + 1 = 남은 덩어리 수
-            UpdatePips(chunk + 1);
+            int remaining = chunk + 1;
+            SetLabelText(remaining);
+            UpdatePips(remaining);
         }
 
-        // ── Pip 생성 / 업데이트 ───────────────────────────────
+        private Color GetChunkColor(int chunkIndex)
+        {
+            if (chunkColors == null || chunkColors.Length == 0) return Color.red;
+            return chunkColors[Mathf.Clamp(chunkIndex, 0, chunkColors.Length - 1)];
+        }
 
-        private void BuildPips()
+        // ── 텍스트 ────────────────────────────────────────────
+
+        private void SetLabelText(int remaining)
+        {
+            if (hpText == null) return;
+            if (lastRemain == remaining) return;
+            lastRemain = remaining;
+            hpText.text = remaining > 0 ? $"{bossName}  ×{remaining}" : bossName;
+        }
+
+        // ── Pip ──────────────────────────────────────────────
+
+        private void UpdatePips(int remaining)
+        {
+            if (pips == null) return;
+            for (int i = 0; i < pips.Length; i++)
+            {
+                if (pips[i] == null) continue;
+                pips[i].color = i < remaining ? pipActive : pipDepleted;
+            }
+        }
+
+        // ── 비주얼 빌드 (보스 최초 등장 시) ──────────────────
+
+        private void BuildVisuals()
         {
             visualsBuilt = true;
-            if (panel == null) return;
 
+            // 1. Ghost bar — hpFill 바로 앞에 삽입 (렌더링 순서: ghost → fill → 텍스트)
+            if (hpFill != null)
+            {
+                var ghostGO = new GameObject("HpGhost");
+                ghostGO.transform.SetParent(panel.transform, false);
+                hpGhost = ghostGO.AddComponent<Image>();
+                hpGhost.color = Color.clear;
+
+                var rt = ghostGO.GetComponent<RectTransform>();
+                rt.anchorMin = Vector2.zero;
+                rt.anchorMax = Vector2.one;
+                rt.sizeDelta = Vector2.zero;
+                rt.anchoredPosition = Vector2.zero;
+
+                ghostGO.transform.SetSiblingIndex(hpFill.transform.GetSiblingIndex());
+            }
+
+            // 2. Pip 아이콘 (패널 상단, 바 바깥)
             pips = new Image[segmentCount];
-            float totalWidth = segmentCount * pipSize + (segmentCount - 1) * pipSpacing;
-            float startX     = -totalWidth * 0.5f + pipSize * 0.5f;
+            float totalW = segmentCount * pipSize + (segmentCount - 1) * pipSpacing;
+            float startX = -totalW * 0.5f + pipSize * 0.5f;
 
             for (int i = 0; i < segmentCount; i++)
             {
                 var go  = new GameObject($"Pip{i}");
                 go.transform.SetParent(panel.transform, false);
-
                 var img = go.AddComponent<Image>();
                 img.color = pipActive;
 
                 var rt = go.GetComponent<RectTransform>();
-                // 패널 상단 중앙에 가로로 나열
                 rt.anchorMin        = new Vector2(0.5f, 1f);
                 rt.anchorMax        = new Vector2(0.5f, 1f);
-                rt.pivot            = new Vector2(0.5f, 1f);
-                rt.sizeDelta        = new Vector2(pipSize, pipSize * 0.5f);
-                rt.anchoredPosition = new Vector2(
-                    startX + i * (pipSize + pipSpacing),
-                    -2f);
+                rt.pivot            = new Vector2(0.5f, 0f);
+                rt.sizeDelta        = new Vector2(pipSize, pipSize * 0.4f);
+                rt.anchoredPosition = new Vector2(startX + i * (pipSize + pipSpacing), 3f);
 
                 pips[i] = img;
             }
 
-            // ×N 카운터 텍스트 — 패널 오른쪽에 동적 생성
-            var ctGO = new GameObject("ChunkCountText");
-            ctGO.transform.SetParent(panel.transform, false);
-            chunkText = ctGO.AddComponent<TextMeshProUGUI>();
-            chunkText.fontSize    = 28f;
-            chunkText.fontStyle   = FontStyles.Bold;
-            chunkText.color       = new Color(1f, 1f, 1f, 0.9f);
-            chunkText.alignment   = TextAlignmentOptions.MidlineLeft;
-
-            var ctRt = ctGO.GetComponent<RectTransform>();
-            ctRt.anchorMin        = new Vector2(1f, 0f);
-            ctRt.anchorMax        = new Vector2(1f, 1f);
-            ctRt.pivot            = new Vector2(0f, 0.5f);
-            ctRt.sizeDelta        = new Vector2(80f, 0f);
-            ctRt.anchoredPosition = new Vector2(6f, 0f);
-
-            if (hpFill != null) hpFill.transform.SetAsFirstSibling();
-            if (hpText != null) hpText.transform.SetAsLastSibling();
-        }
-
-        private void UpdatePips(int remaining)
-        {
-            if (pips != null)
+            // 3. hpText → 바 위에 겹쳐서 "보스명  ×N" 표시
+            if (hpText != null)
             {
-                for (int i = 0; i < pips.Length; i++)
-                {
-                    if (pips[i] == null) continue;
-                    pips[i].color = i < remaining ? pipActive : pipDepleted;
-                }
-            }
+                hpText.fontSize  = 32f;
+                hpText.fontStyle = FontStyles.Bold;
+                hpText.color     = Color.white;
+                hpText.alignment = TextAlignmentOptions.Midline;
 
-            if (chunkText != null)
-                chunkText.text = $"×{remaining}";  // ×N
+                var rt = hpText.GetComponent<RectTransform>();
+                rt.anchorMin        = Vector2.zero;
+                rt.anchorMax        = Vector2.one;
+                rt.pivot            = new Vector2(0.5f, 0.5f);
+                rt.sizeDelta        = Vector2.zero;
+                rt.anchoredPosition = Vector2.zero;
+                hpText.transform.SetAsLastSibling();
+            }
         }
 
         // ── 패널 표시 제어 ────────────────────────────────────
