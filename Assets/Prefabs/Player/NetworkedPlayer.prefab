@@ -750,9 +750,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.UI.WorldReviveProgressUI
   ShowTopMostFoldoutHeaderGroup: 1
-  offset: {x: 0, y: 2.5, z: 0}
+  offset: {x: 0, y: 6, z: 0}
   canvasSize: {x: 300, y: 48}
-  worldScale: 0.01
+  worldScale: 0.015
   fillColor: {r: 0.2, g: 0.8, b: 0.4, a: 1}
 --- !u!1 &3716566736859526982
 GameObject:

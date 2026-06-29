@@ -21,11 +21,15 @@ namespace Vamsurlike.UI
         [Header("Downed")]
         [SerializeField] private GameObject      downedOverlay;
         [SerializeField] private TextMeshProUGUI downedTimerText;
+        [Header("Dead (자동 부활 대기)")]
+        [SerializeField] private GameObject      deadOverlay;
+        [SerializeField] private TextMeshProUGUI deadTimerText;
         [Header("Formats")]
-        [SerializeField] private string hpFormat     = "{0:0}/{1:0}";
-        [SerializeField] private string xpFormat     = "{0:0}/{1:0}";
-        [SerializeField] private string levelFormat  = "Lv.{0}";
-        [SerializeField] private string downedFormat = "{0:0.0}s";
+        [SerializeField] private string hpFormat       = "{0:0}/{1:0}";
+        [SerializeField] private string xpFormat       = "{0:0}/{1:0}";
+        [SerializeField] private string levelFormat    = "Lv.{0}";
+        [SerializeField] private string downedFormat   = "{0:0.0}s";
+        [SerializeField] private string deadWaitFormat = "{0:0}초 후 부활";
 
         private HUDViewModel viewModel;
 
@@ -66,14 +70,22 @@ namespace Vamsurlike.UI
         {
             float maxHp = p.MaxHp > 0f ? p.MaxHp : 1f;
             FilledImageUtility.SetAmount(hpFill, p.Hp / maxHp);
-            if (hpText != null) hpText.text       = string.Format(hpFormat, p.Hp, p.MaxHp);
+            if (hpText != null) hpText.text = string.Format(hpFormat, p.Hp, p.MaxHp);
 
-            bool isDowned = p.IsDowned;
-            if (downedOverlay   != null) downedOverlay.SetActive(isDowned);
+            // 1단계: 다운 (팀원 부활 가능)
+            if (downedOverlay != null) downedOverlay.SetActive(p.IsDowned);
             if (downedTimerText != null)
             {
-                downedTimerText.gameObject.SetActive(isDowned && p.DownedTimeRemaining > 0f);
-                if (isDowned) downedTimerText.text = string.Format(downedFormat, p.DownedTimeRemaining);
+                downedTimerText.gameObject.SetActive(p.IsDowned && p.DownedTimeRemaining > 0f);
+                if (p.IsDowned) downedTimerText.text = string.Format(downedFormat, p.DownedTimeRemaining);
+            }
+
+            // 2단계: 사망 대기 (자동 부활)
+            if (deadOverlay != null) deadOverlay.SetActive(p.IsDeadWaiting);
+            if (deadTimerText != null)
+            {
+                deadTimerText.gameObject.SetActive(p.IsDeadWaiting && p.DeadWaitRemaining > 0f);
+                if (p.IsDeadWaiting) deadTimerText.text = string.Format(deadWaitFormat, p.DeadWaitRemaining);
             }
         }
 

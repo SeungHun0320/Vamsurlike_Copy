@@ -17,7 +17,7 @@ namespace Vamsurlike.Player
     public class PlayerReviveHandler : NetworkBehaviour
     {
         [SerializeField] private float downedDuration       = 30f;  // 1단계: 동료 부활 가능 시간
-        [SerializeField] private float baseDeadWaitDuration = 10f;  // 2단계: 첫 번째 자동 부활 대기 시간
+        [SerializeField] private float baseDeadWaitDuration = 15f;  // 2단계: 첫 번째 자동 부활 대기 시간
         [SerializeField] private float deathPenaltyRatio    = 0.5f; // 사망마다 2단계 대기 시간 증가 비율
         [SerializeField] private float reviveDuration       = 2f;   // 동료 부활에 걸리는 시간
         [SerializeField] private float reviveHPRatio        = 0.3f;
