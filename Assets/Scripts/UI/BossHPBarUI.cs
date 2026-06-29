@@ -6,38 +6,29 @@ using Vamsurlike.UI.ViewModels;
 
 namespace Vamsurlike.UI
 {
-    // 보스 HP 바 — 화면 최상단 풀 폭 배치.
-    // segmentCount 단위로 HP를 나눠 각 단계마다 fill 색상을 변경.
-    // 세그먼트 경계선은 Show() 최초 호출 시 동적으로 생성한다.
+    // 보스 HP를 N개 줄로 분할해 동시에 표시 (MapleStory / Lost Ark 스타일).
+    // 각 줄은 총 HP의 1/segmentCount 에 해당하며, 위 줄부터 먼저 깎인다.
+    // 줄들은 Show() 최초 호출 시 panel 안에 동적으로 생성된다.
     public sealed class BossHPBarUI : MonoBehaviour
     {
         [Header("References")]
         [SerializeField] private GameObject      panel;
-        [SerializeField] private Image           hpFill;
+        [SerializeField] private Image           hpFill;   // CreateHUD 호환용 — 런타임에 숨김
         [SerializeField] private TextMeshProUGUI hpText;
 
         [Header("Segments")]
-        [SerializeField] private int     segmentCount = 10;
-        [SerializeField] private Color[] tierColors   = new Color[]
-        {
-            new Color(0.95f, 0.15f, 0.15f, 1f),  // 빨강  (90-100%)
-            new Color(1.00f, 0.45f, 0.05f, 1f),  // 주황  (60-90%)
-            new Color(1.00f, 0.85f, 0.10f, 1f),  // 노랑  (30-60%)
-            new Color(0.75f, 0.15f, 0.90f, 1f),  // 보라  (0-30%)
-        };
-
-        [Header("Dividers")]
-        [SerializeField] private bool  showDividers = true;
-        [SerializeField] private Color dividerColor = new Color(0f, 0f, 0f, 0.55f);
-        [SerializeField] private float dividerWidth = 2f;
+        [SerializeField] private int   segmentCount = 5;
+        [SerializeField] private float gapFraction  = 0.15f;
+        [SerializeField] private Color segBgColor   = new Color(0.12f, 0.04f, 0.04f, 0.9f);
+        [SerializeField] private Color segFillColor = new Color(0.95f, 0.25f, 0.15f, 1f);
 
         [Header("Format")]
         [SerializeField] private string hpFormat = "{0:0} / {1:0}";
 
         private BossHPBarViewModel viewModel;
         private CanvasGroup        panelCanvasGroup;
-        private int                lastSegment  = -1;
-        private bool               dividersBuilt;
+        private Image[]            segFills;
+        private bool               barsBuilt;
 
         private void Awake()
         {
@@ -46,7 +37,6 @@ namespace Vamsurlike.UI
             if (panelCanvasGroup == null)
                 panelCanvasGroup = panel.AddComponent<CanvasGroup>();
 
-            FilledImageUtility.ConfigureHorizontal(hpFill);
             viewModel = new BossHPBarViewModel();
             SetVisible(false);
         }
@@ -69,84 +59,90 @@ namespace Vamsurlike.UI
         {
             SetVisible(true);
 
-            float maxHp = p.MaxHp > 0f ? p.MaxHp : 1f;
-            float norm  = Mathf.Clamp01(p.Hp / maxHp);
+            if (!barsBuilt) BuildSegmentBars();
 
-            FilledImageUtility.SetAmount(hpFill, norm);
-            if (hpText != null) hpText.text = string.Format(hpFormat, p.Hp, p.MaxHp);
+            UpdateFills(p.NormalizedHp);
 
-            UpdateTierColor(norm);
-
-            if (showDividers && !dividersBuilt)
-                BuildDividers();
+            if (hpText != null)
+                hpText.text = string.Format(hpFormat, p.Hp, p.MaxHp);
         }
 
         private void Hide() => SetVisible(false);
 
-        // ── 세그먼트 색 변경 ───────────────────────────────────
+        // ── 줄 생성 ───────────────────────────────────────────
 
-        private void UpdateTierColor(float normalizedHp)
+        private void BuildSegmentBars()
         {
-            if (hpFill == null || tierColors == null || tierColors.Length == 0) return;
+            barsBuilt = true;
 
-            int segment = Mathf.Clamp(
-                Mathf.FloorToInt(normalizedHp * segmentCount),
-                0, segmentCount - 1);
+            // CreateHUD가 만든 단일 fill 이미지를 숨긴다
+            if (hpFill != null) hpFill.gameObject.SetActive(false);
 
-            if (segment == lastSegment) return;
-            lastSegment = segment;
+            segFills = new Image[segmentCount];
 
-            // segment가 낮을수록(HP 적을수록) tierColors 뒤쪽 색상 사용
-            int colorIndex = Mathf.Clamp(
-                Mathf.FloorToInt((1f - (float)segment / segmentCount) * tierColors.Length),
-                0, tierColors.Length - 1);
+            for (int i = 0; i < segmentCount; i++)
+            {
+                // i=0 이 맨 아래(마지막에 깎임), i=segmentCount-1 이 맨 위(먼저 깎임)
+                float yMin    = (float)i / segmentCount;
+                float yMax    = (float)(i + 1) / segmentCount;
+                float halfGap = (yMax - yMin) * gapFraction * 0.5f;
 
-            hpFill.color = tierColors[colorIndex];
+                // 배경
+                var bgGO = new GameObject($"Seg{i}Bg");
+                bgGO.transform.SetParent(panel.transform, false);
+                var bg = bgGO.AddComponent<Image>();
+                bg.color = segBgColor;
+
+                var bgRt = bgGO.GetComponent<RectTransform>();
+                bgRt.anchorMin        = new Vector2(0f, yMin + halfGap);
+                bgRt.anchorMax        = new Vector2(1f, yMax - halfGap);
+                bgRt.pivot            = new Vector2(0.5f, 0.5f);
+                bgRt.sizeDelta        = Vector2.zero;
+                bgRt.anchoredPosition = Vector2.zero;
+
+                // 채움
+                var fillGO = new GameObject($"Seg{i}Fill");
+                fillGO.transform.SetParent(bgGO.transform, false);
+                var fill = fillGO.AddComponent<Image>();
+                fill.color = segFillColor;
+                FilledImageUtility.ConfigureHorizontal(fill);
+
+                var fillRt = fillGO.GetComponent<RectTransform>();
+                fillRt.anchorMin        = Vector2.zero;
+                fillRt.anchorMax        = Vector2.one;
+                fillRt.pivot            = new Vector2(0.5f, 0.5f);
+                fillRt.sizeDelta        = Vector2.zero;
+                fillRt.anchoredPosition = Vector2.zero;
+
+                segFills[i] = fill;
+            }
+
+            // 텍스트가 줄 위에 렌더링되도록 최상위 sibling으로 이동
+            if (hpText != null)
+                hpText.transform.SetAsLastSibling();
         }
 
-        // ── 세그먼트 구분선 ────────────────────────────────────
+        // ── 채움 업데이트 ─────────────────────────────────────
 
-        private void BuildDividers()
+        private void UpdateFills(float normalizedHp)
         {
-            if (hpFill == null) return;
-            dividersBuilt = true;
-
-            var container = new GameObject("SegmentDividers").AddComponent<RectTransform>();
-            container.transform.SetParent(hpFill.transform.parent, false);
-            container.anchorMin        = Vector2.zero;
-            container.anchorMax        = Vector2.one;
-            container.sizeDelta        = Vector2.zero;
-            container.anchoredPosition = Vector2.zero;
-
-            for (int i = 1; i < segmentCount; i++)
+            if (segFills == null) return;
+            for (int i = 0; i < segFills.Length; i++)
             {
-                float t   = (float)i / segmentCount;
-                var divGO = new GameObject($"Div_{i}");
-                divGO.transform.SetParent(container.transform, false);
-
-                var img   = divGO.AddComponent<Image>();
-                img.color = dividerColor;
-
-                var rt = divGO.GetComponent<RectTransform>();
-                rt.anchorMin        = new Vector2(t, 0f);
-                rt.anchorMax        = new Vector2(t, 1f);
-                rt.pivot            = new Vector2(0.5f, 0.5f);
-                rt.sizeDelta        = new Vector2(dividerWidth, 0f);
-                rt.anchoredPosition = Vector2.zero;
+                if (segFills[i] == null) continue;
+                // 줄 i 는 HP 범위 [i/N, (i+1)/N] 을 담당
+                // 0 → 완전 비어있음(이미 깎임), 1 → 꽉 참
+                segFills[i].fillAmount = Mathf.Clamp01(normalizedHp * segmentCount - i);
             }
         }
 
-        // ── 패널 표시 제어 ─────────────────────────────────────
+        // ── 패널 표시 제어 ────────────────────────────────────
 
         private void SetVisible(bool visible)
         {
             if (panel == null) return;
             if (!panel.activeSelf) panel.SetActive(true);
-
-            if (panelCanvasGroup == null)
-                panelCanvasGroup = panel.GetComponent<CanvasGroup>();
             if (panelCanvasGroup == null) return;
-
             panelCanvasGroup.alpha          = visible ? 1f : 0f;
             panelCanvasGroup.interactable   = visible;
             panelCanvasGroup.blocksRaycasts = visible;
