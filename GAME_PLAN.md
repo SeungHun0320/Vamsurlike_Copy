@@ -1267,60 +1267,101 @@ public class PlayerMatchStats : NetworkBehaviour
 public void TakeDamage(float amount)
 
 // After
-public void TakeDamage(float amount, ulong attackerClientId = ulong.MaxValue)
+public void TakeDamage(float amount, ulong attackerClientId = ulong.MaxValue, string skillTag = null)
 ```
 
-- 데미지 발생 시 해당 플레이어의 `PlayerMatchStats.AddDamage(actual)` 호출 (actual = 실제 깎인 HP)
-- HP=0 되어 처치 시 → `PlayerMatchStats.AddKill()` 호출
-- `attackerClientId` 는 스킬·발사체에서 `OwnerClientId` 로 전달. 연결 방법:
-  - `NetworkProjectile`, `GrenadeNetworkSkill`, `MeleeNetworkSkill` 등 → 생성 시 `attackerClientId` 필드 저장
-  - `AuraNetworkSkill`, `OrbitalNetworkSkill` → 틱 데미지 시 `TakeDamage(dmg, ownerClientId)` 전달
+귀속 규칙:
+- **플레이어 귀속**: `attackerClientId = OwnerClientId` 전달 → `AddDamage` / kill 시 `AddKill` 호출
+- **비귀속**: `attackerClientId = ulong.MaxValue` (환경 데미지, 자폭, 디버그 커맨드) → 통계 누적 없음
 
-**생존 시간 — `StageRuntime`에서 관리**
+`attackerClientId` 전달이 필요한 전체 호출처:
 
-- 스테이지 시작 시 `ElapsedTime` 누적 (이미 존재)
-- `GameState.Clear` 또는 `GameState.GameOver` 진입 시 → 살아있던 플레이어 = `ElapsedTime`, 죽었던 플레이어 = 개인 사망 시각 기록
-- 단순 구현: 스테이지 종료 시 `PlayerReviveHandler.IsDeadWaiting == false`이면 `ElapsedTime` 그대로, 아니면 마지막 `BeginDowned` 호출 시각 사용
+| 클래스 | 방식 |
+|---|---|
+| `NetworkProjectile` | 생성 시 `attackerClientId` 필드 저장 |
+| `OrbitingProjectileMode` | 생성 시 저장 |
+| `AuraNetworkSkill` | 틱마다 `ownerClientId` 전달 |
+| `BlackHoleNetworkSkill` | 틱마다 `ownerClientId` 전달 |
+| `ClusterGrenadeNetworkSkill` | 생성 시 저장 |
+| `GrenadeNetworkSkill` | 생성 시 저장 |
+| `MeleeNetworkSkill` | 틱마다 `ownerClientId` 전달 |
+| `OrbitalNetworkSkill` | 틱마다 `ownerClientId` 전달 |
+| `ChestRewardApplier` | `ulong.MaxValue` (아이템 비귀속) |
+| `DebugEnemyCommands` | `ulong.MaxValue` (디버그 비귀속) |
 
-**Result UI 데이터 수집 (서버→클라이언트)**
+**처치 판정 — `lastAttackerClientId` 방식**
 
-- 서버가 `GameState.Clear/GameOver` 진입 시 `[ClientRpc]`로 전원에게 결과 payload 전송
-  ```csharp
-  struct MatchResultEntry
-  {
-      ulong  clientId;
-      string displayName;
-      int    kills;
-      float  damage;
-      float  survivalTime;
-      int    level;                   // 스테이지 종료 시점 플레이어 레벨
-      // 획득 아이템 목록: 아이템 이름 + 해당 아이템으로 기여한 데미지
-      ItemResultEntry[] items;
-  }
-  struct ItemResultEntry { string itemName; float damageContribution; }
-  [ClientRpc] void SendMatchResultClientRpc(MatchResultEntry[] entries) { ... }
-  ```
-- `NetworkVariable`은 Owner만 읽을 수 있으므로 결과 화면에서 타인 통계를 보려면 위 RPC 방식으로 수집
-- **아이템별 데미지 귀속**: `TakeDamage`에 `skillId` 또는 `itemTag`를 추가로 전달하거나, 스킬별 누적 딕셔너리를 `PlayerMatchStats`에 유지하는 방식 중 선택
-  - 단순안: 스킬 종류별로 `Dictionary<string, float> DamagePerSkill` 누적 후 결과 전송 시 직렬화
-  - 정밀안: 각 발사체·틱에 `skillTag` 부착 → `TakeDamage(amount, attackerId, skillTag)` 서명 확장
+- `EnemyNetworkBase`에 `lastAttackerClientId` 필드 유지 (데미지 입을 때마다 갱신)
+- HP=0 시 `lastAttackerClientId`로 kill 귀속
+- 도트/오라/블랙홀처럼 지속 피해도 소유자 유지되므로 자연스럽게 처리
+- 자폭·환경 데미지(`ulong.MaxValue`)는 kill 미귀속
+
+**아이템별 데미지 — `skillTag` 방식**
+
+- `TakeDamage(amount, attackerId, skillTag)` 서명으로 스킬 식별자 전달
+- `PlayerMatchStats`에 `Dictionary<string, float> DamagePerSkill` 누적
+- 결과 전송 시 `ItemResultEntry[]`로 직렬화
+
+**생존 시간 기준**
+
+- 스테이지 종료 시 `CanAct == true`이면 `StageRuntime.ElapsedTime` 그대로 사용
+- 최종적으로 `CanAct == false`인 채 Clear/GameOver를 맞은 경우만 "마지막 행동 가능 시각" 사용
+  - (다운 후 부활하면 생존 시간이 끊기지 않도록, `BeginDowned` 시각이 아닌 최종 `CanAct=false` 전환 시각 기준)
+
+**통계 수집·전송 — `GameFlowCoordinator`에서 일원화**
+
+실제 종료 상태 전환은 `GameFlowCoordinator.ForceTransition(Clear/GameOver)`가 담당하므로 여기서 한 번만 브로드캐스트해 중복 전송 방지.
+
+```
+GameFlowCoordinator.ForceTransition(Clear/GameOver)
+  └─ StageResultBroadcaster.Broadcast()   // 서버 전용 헬퍼
+       ├─ BuildEntries()                   // 각 플레이어 PlayerMatchStats 수집
+       └─ SendMatchResultClientRpc(entries)
+```
+
+```csharp
+struct MatchResultEntry
+{
+    ulong            clientId;
+    string           displayName;
+    int              level;          // 종료 시점 플레이어 레벨
+    int              kills;
+    float            totalDamage;
+    float            survivalTime;
+    ItemResultEntry[] items;         // 스킬별 데미지 기여
+}
+struct ItemResultEntry { string skillTag; float damage; }
+```
+
+**Result UI — 기존 `StageResultUI` 확장**
+
+현재 `StageResultUI`는 Clear/GameOver 텍스트만 보여주는 뼈대가 있으므로 새 UI를 별도 생성하지 않고 확장한다.
+
+```
+StageResultViewModel.OnResultReceived(MatchResultEntry[])
+StageResultUI
+  ├─ Clear / GameOver 헤더
+  └─ 플레이어별 행 (row prefab): 이름 / 레벨 / 처치수 / 총 데미지 / 생존 시간
+       └─ 펼치면: 스킬별 데미지 기여 목록 (ItemResultEntry[])
+```
 
 ---
 
 ##### 구현 항목
 
 - [ ] `PlayerMatchStats` NetworkBehaviour 구현 및 `NetworkedPlayer` 프리팹에 추가
-- [ ] `EnemyNetworkBase.TakeDamage(float amount, ulong attackerClientId)` 서명 변경
-  - 데미지 적용 후 공격자 `PlayerMatchStats.AddDamage(actual)` 호출
-  - 처치 시 공격자 `PlayerMatchStats.AddKill()` 호출
-- [ ] 스킬·발사체에 `attackerClientId` 전달 (`NetworkProjectile`, `AuraNetworkSkill`, `OrbitalNetworkSkill`, `MeleeNetworkSkill`, `GrenadeNetworkSkill` 등)
-- [ ] `StageRuntime`에 생존 시간 기록 로직 추가 (스테이지 종료 시 각 플레이어 `SetSurvivalTime()`)
-- [ ] `PlayerMatchStats`에 레벨 필드 추가 — `SharedLevelSystem`에서 스테이지 종료 시 `SetLevel(int)` 호출
-- [ ] `PlayerMatchStats`에 아이템별 데미지 누적 구조 추가 (`Dictionary<string, float> DamagePerSkill` 또는 `skillTag` 서명 확장 방식 결정 필요)
-- [ ] `SendMatchResultClientRpc` 구현 (GameState.Clear/GameOver 진입 시 서버가 전원에게 브로드캐스트)
-- [ ] ResultUI 구현
-  - 플레이어별 행: 이름 / 레벨 / 처치수 / 총 데미지 / 생존 시간
-  - 플레이어 행 펼치면: 스킬(아이템)별 데미지 기여 목록
+  - `KillCount`, `TotalDamage`, `SurvivalTime`, `Level`, `DamagePerSkill` 필드
+  - `lastAttackerClientId` 필드 포함
+- [ ] `EnemyNetworkBase.TakeDamage(float amount, ulong attackerClientId, string skillTag)` 서명 변경
+  - `lastAttackerClientId` 갱신 (비귀속 `ulong.MaxValue` 제외)
+  - 데미지 적용 후 공격자 `PlayerMatchStats.AddDamage(actual, skillTag)` 호출
+  - HP=0 시 `lastAttackerClientId`로 `AddKill()` 호출
+- [ ] 전체 호출처에 `attackerClientId` + `skillTag` 전달 (표 참조: NetworkProjectile / OrbitingProjectileMode / AuraNetworkSkill / BlackHoleNetworkSkill / ClusterGrenadeNetworkSkill / GrenadeNetworkSkill / MeleeNetworkSkill / OrbitalNetworkSkill / ChestRewardApplier / DebugEnemyCommands)
+- [ ] `PlayerMatchStats`에 레벨 필드 추가 — `SharedLevelSystem`에서 종료 시 `SetLevel(int)` 호출
+- [ ] `StageRuntime`에 "최종 CanAct=false 전환 시각" 기록 로직 추가 (`SetSurvivalTime` 판단 기준)
+- [ ] `StageResultBroadcaster` 구현 — `GameFlowCoordinator.ForceTransition` 호출 시 `BuildEntries()` + `SendMatchResultClientRpc(entries)` 일원화
+- [ ] `StageResultViewModel`에 `OnResultReceived(MatchResultEntry[])` 추가
+- [ ] `StageResultUI` 확장 — row prefab 연결, 스킬별 데미지 기여 펼침 표시
 - [ ] LoadingScreen 구현 (NetworkManager.SceneManager 로딩 이벤트 연동)
 - [ ] MainMenu 구현 (방 만들기/참여 UI 완성)
 - [ ] 설정 UI 구현 (음량, 해상도)
