@@ -36,7 +36,7 @@ namespace Vamsurlike.Skills
                 if (toEnemy.sqrMagnitude < MinToEnemySqrMagnitude) continue;
                 if (Vector3.Angle(forward, toEnemy.normalized) > halfArc) continue;
 
-                enemy.TakeDamage(damage);
+                enemy.TakeDamage(damage, context.OwnerClientId, context.Skill.name);
                 count++;
             }
 

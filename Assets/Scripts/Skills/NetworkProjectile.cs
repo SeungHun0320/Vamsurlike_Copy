@@ -27,6 +27,7 @@ namespace Vamsurlike.Skills
         private bool hasInitialized;
 
         internal ulong ProjectileOwnerClientId { get; private set; }
+        internal string SkillTag { get; private set; }
         internal Vector3 Direction { get; set; }
         internal float Speed { get; private set; }
         internal float Damage { get; set; }
@@ -80,7 +81,8 @@ namespace Vamsurlike.Skills
             Vector3 fireDirection,
             SkillLevelData levelData,
             float finalDamage = -1f,
-            float speedMultiplier = 1f)
+            float speedMultiplier = 1f,
+            string skillTag = null)
         {
             if (levelData == null) return;
 
@@ -88,6 +90,7 @@ namespace Vamsurlike.Skills
 
             sourcePrefab = projectilePrefab;
             ProjectileOwnerClientId = owner;
+            SkillTag = skillTag;
             currentLevelData = levelData;
             SpeedMultiplier = Mathf.Max(0.1f, speedMultiplier);
             Direction = fireDirection.sqrMagnitude > 0.0001f ? fireDirection.normalized : Vector3.forward;
@@ -162,7 +165,7 @@ namespace Vamsurlike.Skills
             if (target == null) return false;
 
             hitEnemyIds.Add(target.NetworkObjectId);
-            target.TakeDamage(Damage);
+            target.TakeDamage(Damage, ProjectileOwnerClientId, SkillTag);
 
             if (PierceRemaining <= 0)
                 return true;

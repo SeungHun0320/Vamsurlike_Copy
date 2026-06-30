@@ -25,12 +25,12 @@ namespace Vamsurlike.Skills
 
             context.VFX?.ShowBlackHole(center, data.duration, pullRadius);
             context.CoroutineRunner.StartSkillCoroutine(
-                RunBlackHole(center, data, context.FinalDamage));
+                RunBlackHole(center, data, context.FinalDamage, context.OwnerClientId, context.Skill.name));
 
             return true;
         }
 
-        private static IEnumerator RunBlackHole(Vector3 center, SkillLevelData d, float damage)
+        private static IEnumerator RunBlackHole(Vector3 center, SkillLevelData d, float damage, ulong ownerClientId, string skillTag)
         {
             var   targets    = new List<EnemyNetworkBase>();
             float elapsed    = 0f;
@@ -63,7 +63,7 @@ namespace Vamsurlike.Skills
                 {
                     tickTimer -= d.tickInterval;
                     for (int i = 0; i < count; i++)
-                        targets[i]?.TakeDamage(damage);
+                        targets[i]?.TakeDamage(damage, ownerClientId, skillTag);
                 }
 
                 yield return null;

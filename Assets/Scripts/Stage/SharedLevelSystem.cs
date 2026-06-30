@@ -1,5 +1,6 @@
 using Unity.Netcode;
 using UnityEngine;
+using Vamsurlike.Player;
 using Vamsurlike.Upgrades;
 
 namespace Vamsurlike.Stage
@@ -65,7 +66,18 @@ namespace Vamsurlike.Stage
 
             SharedXP.Value -= xpNeeded;
             SharedLevel.Value++;
+            SyncLevelToPlayers(SharedLevel.Value);
             levelUpManager.BeginLevelUp(SharedLevel.Value);
+        }
+
+        private static void SyncLevelToPlayers(int level)
+        {
+            foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
+            {
+                if (client.PlayerObject == null) continue;
+                if (client.PlayerObject.TryGetComponent<PlayerMatchStats>(out var matchStats))
+                    matchStats.SetLevel(level);
+            }
         }
 
         public static int XPRequired(int level) =>

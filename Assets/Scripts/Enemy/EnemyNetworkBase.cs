@@ -2,6 +2,7 @@ using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Data;
 using Vamsurlike.Network;
+using Vamsurlike.Player;
 using Vamsurlike.Skills;
 using Vamsurlike.Stage;
 using Vamsurlike.UI;
@@ -28,6 +29,9 @@ namespace Vamsurlike.Enemy
         public EnemyDataSO Data => data;
         public float MaxHP => MaxHPValue.Value;
         public float ScaledAttackPower { get; private set; }
+
+        private const ulong NoAttacker = ulong.MaxValue;
+        private ulong lastAttackerClientId = NoAttacker;
 
         public override void OnNetworkSpawn()
         {
@@ -64,7 +68,9 @@ namespace Vamsurlike.Enemy
             }
         }
 
-        public void TakeDamage(float amount)
+        // attackerClientId: 플레이어 귀속 시 OwnerClientId, 환경/디버그 비귀속 시 ulong.MaxValue
+        // skillTag: 스킬/아이템 식별자 (SkillDataSO.name). 비귀속 시 null
+        public void TakeDamage(float amount, ulong attackerClientId = NoAttacker, string skillTag = null)
         {
             if (!IsServer)
             {
@@ -88,11 +94,33 @@ namespace Vamsurlike.Enemy
 
             HP.Value = Mathf.Max(0f, HP.Value - finalDamage);
 
+            if (attackerClientId != NoAttacker)
+            {
+                lastAttackerClientId = attackerClientId;
+                GetPlayerMatchStats(attackerClientId)?.AddDamage(finalDamage, skillTag);
+                GetSkillManager(attackerClientId)?.AddUltimateGaugeForDamage(finalDamage);
+            }
+
             float offset = data != null ? data.floatingTextHeightOffset : 2f;
             ShowDamageClientRpc(finalDamage, transform.position + Vector3.up * offset);
 
             if (HP.Value <= 0f)
                 HandleDeath();
+        }
+
+        private PlayerMatchStats GetPlayerMatchStats(ulong clientId)
+        {
+            if (NetworkManager.Singleton == null) return null;
+            if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client)) return null;
+            return client.PlayerObject?.GetComponent<PlayerMatchStats>();
+        }
+
+        private SkillManager GetSkillManager(ulong clientId)
+        {
+            if (NetworkManager.Singleton == null) return null;
+            if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client)) return null;
+            if (client.PlayerObject == null) return null;
+            return client.PlayerObject.GetComponent<SkillManager>();
         }
 
         // 서버가 지정한 보스 광역기 범위를 Damage Aura와 같은 원형 VFX로 전 클라이언트에 표시.
@@ -112,6 +140,15 @@ namespace Vamsurlike.Enemy
         protected virtual void HandleDeath()
         {
             bool wasBoss = data != null && data.isBoss;
+
+            if (lastAttackerClientId != NoAttacker)
+            {
+                PlayerMatchStats matchStats = GetPlayerMatchStats(lastAttackerClientId);
+                if (matchStats != null) matchStats.AddKill();
+
+                SkillManager skillManager = GetSkillManager(lastAttackerClientId);
+                if (skillManager != null) skillManager.AddUltimateGaugeForKill();
+            }
 
             TriggerDeathAnimClientRpc();
             PlayDeathVFXClientRpc();

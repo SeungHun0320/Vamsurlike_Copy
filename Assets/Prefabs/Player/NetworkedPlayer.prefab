@@ -427,6 +427,7 @@ GameObject:
   - component: {fileID: 6016951667912047197}
   - component: {fileID: 8754471975496554189}
   - component: {fileID: 1654411906502870172}
+  - component: {fileID: 8866134540715001967}
   m_Layer: 6
   m_Name: NetworkedPlayer
   m_TagString: Player
@@ -768,14 +769,27 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.UI.WorldDownedTimerUI
   ShowTopMostFoldoutHeaderGroup: 1
-  offset: {x: 0, y: 2.8, z: 0}
+  offset: {x: 0, y: 4, z: 0}
   canvasRadius: 80
-  worldScale: 0.015
+  worldScale: 0.025
   downedDuration: 15
   circleSprite: {fileID: 21300000, guid: 577b9450cfb671b48860d54206cfe948, type: 3}
   bgColor: {r: 0.8, g: 0.1, b: 0.05, a: 0.75}
   fillColor: {r: 0.9, g: 0.25, b: 0.1, a: 1}
   textColor: {r: 1, g: 1, b: 1, a: 1}
+--- !u!114 &8866134540715001967
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3346994395623583896}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d6cf3656f2937d74a8f5913d6cb51cde, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Player.PlayerMatchStats
+  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &3716566736859526982
 GameObject:
   m_ObjectHideFlags: 0

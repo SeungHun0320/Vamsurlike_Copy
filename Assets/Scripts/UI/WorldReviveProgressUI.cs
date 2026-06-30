@@ -94,10 +94,14 @@ namespace Vamsurlike.UI
             // 채우기 바
             var fillGO = new GameObject("Fill");
             fillGO.transform.SetParent(go.transform, false);
-            progressFill = fillGO.AddComponent<Image>();
-            progressFill.color = fillColor;
-            FilledImageUtility.ConfigureHorizontal(progressFill);
-            progressFill.fillAmount = 0f;
+            progressFill              = fillGO.AddComponent<Image>();
+            progressFill.color        = fillColor;
+            progressFill.sprite       = Resources.Load<Sprite>("Sprites/UI/WhiteSquare");
+            progressFill.type         = UnityEngine.UI.Image.Type.Filled;
+            progressFill.fillMethod   = UnityEngine.UI.Image.FillMethod.Horizontal;
+            progressFill.fillOrigin   = 0;
+            progressFill.fillClockwise = true;
+            progressFill.fillAmount   = 0f;
             Stretch(fillGO);
 
             // 텍스트

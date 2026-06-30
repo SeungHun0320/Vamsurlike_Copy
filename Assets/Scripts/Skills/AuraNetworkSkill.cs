@@ -44,7 +44,7 @@ namespace Vamsurlike.Skills
 
             float damage = context.FinalDamage;
             for (int i = 0; i < targets.Count; i++)
-                targets[i].TakeDamage(damage);
+                targets[i].TakeDamage(damage, context.OwnerClientId, context.Skill.name);
 
             return true;
         }

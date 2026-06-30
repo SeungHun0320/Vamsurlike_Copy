@@ -123,7 +123,7 @@ namespace Vamsurlike.Skills
                     && cooldownUntil > Time.time) continue;
 
                 hitCooldownUntil[enemy.NetworkObjectId] = Time.time + Projectile.OrbitHitCooldown;
-                enemy.TakeDamage(Projectile.Damage);
+                enemy.TakeDamage(Projectile.Damage, Projectile.ProjectileOwnerClientId, Projectile.SkillTag);
             }
         }
 

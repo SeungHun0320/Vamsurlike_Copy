@@ -35,8 +35,6 @@ namespace Vamsurlike.UI
 
         private void Awake()
         {
-            FilledImageUtility.ConfigureHorizontal(hpFill);
-            FilledImageUtility.ConfigureHorizontal(xpFill);
             viewModel = new HUDViewModel();
         }
 
@@ -65,6 +63,8 @@ namespace Vamsurlike.UI
             viewModel.OnSharedLevel       -= RenderSharedLevel;
             viewModel.Unbind();
         }
+
+        private void OnDestroy() => viewModel?.Dispose();
 
         private void RenderPlayerStatus(PlayerStatusPayload p)
         {
@@ -97,47 +97,4 @@ namespace Vamsurlike.UI
         }
     }
 
-    internal static class FilledImageUtility
-    {
-        private static Sprite fallbackSprite;
-
-        public static void ConfigureHorizontal(Image image)
-        {
-            if (image == null) return;
-
-            if (image.sprite == null)
-                image.sprite = GetFallbackSprite();
-
-            image.type = Image.Type.Filled;
-            image.fillMethod = Image.FillMethod.Horizontal;
-            image.fillOrigin = 0;
-            image.fillClockwise = true;
-        }
-
-        public static void SetAmount(Image image, float amount)
-        {
-            if (image == null) return;
-
-            ConfigureHorizontal(image);
-            image.fillAmount = Mathf.Clamp01(amount);
-        }
-
-        public static Sprite GetOrCreateFallbackSprite() => GetFallbackSprite();
-
-        private static Sprite GetFallbackSprite()
-        {
-            if (fallbackSprite != null) return fallbackSprite;
-
-            Texture2D texture = Texture2D.whiteTexture;
-            fallbackSprite = Sprite.Create(
-                texture,
-                new Rect(0f, 0f, texture.width, texture.height),
-                new Vector2(0.5f, 0.5f),
-                100f);
-            fallbackSprite.name = "Runtime UI Fill Sprite";
-            fallbackSprite.hideFlags = HideFlags.HideAndDontSave;
-
-            return fallbackSprite;
-        }
-    }
 }

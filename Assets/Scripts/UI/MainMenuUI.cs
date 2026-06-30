@@ -90,7 +90,12 @@ namespace Vamsurlike.UI
             if (viewModel == null) return;
             viewModel.OnLobbyChanged -= RefreshLobbyControls;
             viewModel.OnStatus       -= SetStatus;
-            viewModel.Dispose();
+            viewModel.Unbind();
+        }
+
+        private void OnDestroy()
+        {
+            viewModel?.Dispose();
         }
 
         private void RefreshLobbyControls(bool isConnected, bool isHost, int _)

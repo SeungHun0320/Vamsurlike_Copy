@@ -47,9 +47,6 @@ namespace Vamsurlike.UI
             if (panelCanvasGroup == null)
                 panelCanvasGroup = panel.AddComponent<CanvasGroup>();
 
-            if (hpFill != null)
-                FilledImageUtility.ConfigureHorizontal(hpFill);
-
             viewModel = new BossHPBarViewModel();
             SetVisible(false);
         }
@@ -67,6 +64,8 @@ namespace Vamsurlike.UI
             viewModel.OnBossHidden  -= Hide;
             viewModel.Unbind();
         }
+
+        private void OnDestroy() => viewModel?.Dispose();
 
         // ── Show / Hide ───────────────────────────────────────
 

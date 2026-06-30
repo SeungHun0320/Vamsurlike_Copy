@@ -1,7 +1,6 @@
 using System.Collections;
 using UnityEngine;
 using Vamsurlike.Data;
-using Vamsurlike.Enemy;
 
 namespace Vamsurlike.Skills
 {
@@ -28,6 +27,8 @@ namespace Vamsurlike.Skills
                 context.CasterTransform.position,
                 context.LevelData,
                 context.FinalDamage,
+                context.OwnerClientId,
+                context.Skill.name,
                 context.CoroutineRunner,
                 context.VFX));
             return true;
@@ -37,6 +38,8 @@ namespace Vamsurlike.Skills
             Vector3 origin,
             SkillLevelData levelData,
             float finalDamage,
+            ulong ownerClientId,
+            string skillTag,
             ISkillCoroutineRunner coroutineRunner,
             ISkillVFXBroadcaster vfx)
         {
@@ -55,7 +58,7 @@ namespace Vamsurlike.Skills
 
             // 중심 스플래시 (메인 데미지의 절반)
             float mainDamage = finalDamage * (1f - levelData.clusterDamageRatio);
-            ApplySplash(target, levelData.splashRadius, mainDamage);
+            SkillAreaDamage.ApplySplash(target, levelData.splashRadius, mainDamage, ownerClientId, skillTag);
 
             // 서브 그레네이드 분열
             float subDamage = finalDamage * levelData.clusterDamageRatio;
@@ -69,11 +72,11 @@ namespace Vamsurlike.Skills
                     levelData.grenadeArcHeight * 0.4f,
                     SubFlightTime);
                 coroutineRunner.StartSkillCoroutine(
-                    SubGrenadeCoroutine(subTarget, levelData.clusterSplashRadius, subDamage));
+                    SubGrenadeCoroutine(subTarget, levelData.clusterSplashRadius, subDamage, ownerClientId, skillTag));
             }
         }
 
-        private IEnumerator SubGrenadeCoroutine(Vector3 target, float splashRadius, float damage)
+        private IEnumerator SubGrenadeCoroutine(Vector3 target, float splashRadius, float damage, ulong ownerClientId, string skillTag)
         {
             float elapsed = 0f;
             while (elapsed < SubFlightTime)
@@ -81,7 +84,7 @@ namespace Vamsurlike.Skills
                 elapsed += Time.deltaTime;
                 yield return null;
             }
-            ApplySplash(target, splashRadius, damage);
+            SkillAreaDamage.ApplySplash(target, splashRadius, damage, ownerClientId, skillTag);
         }
 
         private Vector3 PickRandomTarget(Vector3 origin, float maxRange)
@@ -94,14 +97,5 @@ namespace Vamsurlike.Skills
             return origin + new Vector3((float)rx * range, 0f, (float)rz * range);
         }
 
-        private static void ApplySplash(Vector3 center, float radius, float damage)
-        {
-            var cols = Physics.OverlapSphere(center, radius);
-            foreach (var col in cols)
-            {
-                if (col.TryGetComponent<EnemyNetworkBase>(out var enemy))
-                    enemy.TakeDamage(damage);
-            }
-        }
     }
 }

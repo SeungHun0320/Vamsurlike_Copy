@@ -1,8 +1,6 @@
 using System.Collections;
-using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Data;
-using Vamsurlike.Network;
 
 namespace Vamsurlike.Skills
 {
@@ -62,7 +60,7 @@ namespace Vamsurlike.Skills
                     Vector3 origin = casterTransform.position + Vector3.up * DefaultSpawnHeight;
                     float angle = angleStep * i + waveAngle;
                     Vector3 dir = Quaternion.AngleAxis(angle, Vector3.up) * Vector3.forward;
-                    SpawnBullet(prefab, levelData, finalDamage, ownerClientId, origin, dir);
+                    SpawnBullet(prefab, levelData, finalDamage, ownerClientId, origin, dir, skillTag: skillName);
 
                     bool isLast = (wave == waveCount - 1) && (i == bulletsPerWave - 1);
                     if (!isLast && waveDelay > 0f)
@@ -77,26 +75,11 @@ namespace Vamsurlike.Skills
         }
 
         private static void SpawnBullet(GameObject prefab, SkillLevelData levelData, float finalDamage,
-            ulong ownerClientId, Vector3 position, Vector3 direction)
+            ulong ownerClientId, Vector3 position, Vector3 direction, string skillTag = null)
         {
-            Quaternion rot = Quaternion.LookRotation(direction, Vector3.up);
-            if (prefab.TryGetComponent<NetworkProjectile>(out var template))
-                rot = template.GetProjectileRotation(direction);
-
-            NetworkObject obj = PoolManager.GetOrInstantiateNetworkObject(
-                prefab,
-                position,
-                rot,
-                nameof(UltimateSkill));
-
-            if (obj == null) return;
-
-            if (obj.TryGetComponent<NetworkProjectile>(out var projectile))
-                projectile.Initialize(prefab, ownerClientId, position, direction, levelData, finalDamage);
-            else
-                Debug.LogWarning($"[{nameof(UltimateSkill)}] NetworkProjectile 없음. prefab={prefab.name}");
-
-            obj.Spawn(true);
+            ProjectileSpawnHelper.Spawn(
+                prefab, ownerClientId, position, direction, levelData,
+                finalDamage, skillTag: skillTag, callerTag: nameof(UltimateSkill));
         }
     }
 }

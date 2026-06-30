@@ -23,15 +23,6 @@ namespace Vamsurlike.UI
         private void Awake()
         {
             viewModel = new UltimateCooldownViewModel();
-            if (cooldownFill != null)
-            {
-                cooldownFill.type        = Image.Type.Filled;
-                cooldownFill.fillMethod  = Image.FillMethod.Radial360;
-                cooldownFill.fillOrigin  = (int)Image.Origin360.Top;
-                cooldownFill.fillClockwise = true;
-                if (cooldownFill.sprite == null)
-                    cooldownFill.sprite = FilledImageUtility.GetOrCreateFallbackSprite();
-            }
         }
 
         private void OnEnable()
@@ -47,6 +38,8 @@ namespace Vamsurlike.UI
             viewModel.Unbind();
         }
 
+        private void OnDestroy() => viewModel?.Dispose();
+
         private void Render(UltimateCooldownPayload p)
         {
             if (cooldownFill != null)
@@ -56,7 +49,9 @@ namespace Vamsurlike.UI
 
             if (timerText != null)
             {
-                string next = p.IsReady ? keyHint : p.Remaining.ToString("0.0");
+                string next = p.IsReady
+                    ? keyHint
+                    : Mathf.FloorToInt(p.Duration - p.Remaining).ToString();
                 if (next != lastText)
                 {
                     lastText = next;

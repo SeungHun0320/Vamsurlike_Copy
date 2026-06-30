@@ -32,6 +32,8 @@ namespace Vamsurlike.UI
             viewModel.Unbind();
         }
 
+        private void OnDestroy() => viewModel?.Dispose();
+
         private void Show(LevelUpCardViewData[] cardData)
         {
             if (panel != null) panel.SetActive(true);

@@ -33,6 +33,8 @@ namespace Vamsurlike.UI
             viewModel.Unbind();
         }
 
+        private void OnDestroy() => viewModel?.Dispose();
+
         private void Render(IReadOnlyList<SkillHUDSlotViewData> slots)
         {
             if (container == null) container = transform;

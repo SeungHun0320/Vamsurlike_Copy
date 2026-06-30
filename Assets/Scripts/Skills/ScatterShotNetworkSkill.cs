@@ -1,9 +1,7 @@
 using System.Collections;
-using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Data;
 using Vamsurlike.Enemy;
-using Vamsurlike.Network;
 
 namespace Vamsurlike.Skills
 {
@@ -67,7 +65,7 @@ namespace Vamsurlike.Skills
 
                 Vector3 origin = casterTransform.position + Vector3.up * DefaultSpawnHeight;
                 Vector3 dir = Quaternion.AngleAxis(recoilAngle, Vector3.up) * baseForward;
-                SpawnBullet(prefab, levelData, finalDamage, ownerClientId, origin, dir, speedMultiplier);
+                SpawnBullet(prefab, levelData, finalDamage, ownerClientId, origin, dir, speedMultiplier, skillName);
 
                 if (i < count - 1 && interval > 0f)
                     yield return new WaitForSeconds(interval);
@@ -77,26 +75,11 @@ namespace Vamsurlike.Skills
         }
 
         private static void SpawnBullet(GameObject prefab, SkillLevelData levelData, float finalDamage,
-            ulong ownerClientId, Vector3 position, Vector3 direction, float speedMultiplier = 1f)
+            ulong ownerClientId, Vector3 position, Vector3 direction, float speedMultiplier = 1f, string skillTag = null)
         {
-            Quaternion rot = Quaternion.LookRotation(direction, Vector3.up);
-            if (prefab.TryGetComponent<NetworkProjectile>(out var template))
-                rot = template.GetProjectileRotation(direction);
-
-            NetworkObject obj = PoolManager.GetOrInstantiateNetworkObject(
-                prefab,
-                position,
-                rot,
-                nameof(ScatterShotSkill));
-
-            if (obj == null) return;
-
-            if (obj.TryGetComponent<NetworkProjectile>(out var projectile))
-                projectile.Initialize(prefab, ownerClientId, position, direction, levelData, finalDamage, speedMultiplier);
-            else
-                Debug.LogWarning($"[{nameof(ScatterShotSkill)}] NetworkProjectile 없음. prefab={prefab.name}");
-
-            obj.Spawn(true);
+            ProjectileSpawnHelper.Spawn(
+                prefab, ownerClientId, position, direction, levelData,
+                finalDamage, speedMultiplier, skillTag, nameof(ScatterShotSkill));
         }
     }
 }

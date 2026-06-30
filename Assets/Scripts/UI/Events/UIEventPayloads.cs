@@ -154,6 +154,12 @@ namespace Vamsurlike.UI.Events
         }
     }
 
+    public readonly struct MatchResultPayload
+    {
+        public readonly MatchResultEntry[] Entries;
+        public MatchResultPayload(MatchResultEntry[] entries) => Entries = entries;
+    }
+
     public readonly struct AcquisitionLogPayload
     {
         public readonly string Message;

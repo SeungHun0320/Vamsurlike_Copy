@@ -119,6 +119,10 @@ namespace Vamsurlike.Player
             if (!IsServer || stats == null) return;
             if (stats.IsDowned.Value || stats.IsDeadWaiting.Value) return;
 
+            // 다운 직전까지의 생존 시간 기록 (부활 후 재다운 시 덮어씌움 → 최종값)
+            if (TryGetComponent<PlayerMatchStats>(out var matchStats) && StageRuntime.Instance != null)
+                matchStats.SetSurvivalTime(StageRuntime.Instance.ElapsedTime.Value);
+
             stats.IsDowned.Value      = true;
             DownedTimeRemaining.Value = downedDuration;
             reviverClientId           = NoReviver;
@@ -236,6 +240,10 @@ namespace Vamsurlike.Player
             if (NetworkManager.Singleton == null) return false;
             if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(rescuerClientId, out var client)) return false;
             if (client.PlayerObject == null) return false;
+
+            var rescuerStats = client.PlayerObject.GetComponent<PlayerNetworkStats>();
+            if (rescuerStats == null || !rescuerStats.CanAct) return false;
+
             return Vector3.Distance(transform.position, client.PlayerObject.transform.position) <= reviveRadius;
         }
 

@@ -34,6 +34,8 @@ namespace Vamsurlike.UI
             viewModel.Unbind();
         }
 
+        private void OnDestroy() => viewModel?.Dispose();
+
         private void Render(StageTimerPayload p)
         {
             if (timerText == null) return;

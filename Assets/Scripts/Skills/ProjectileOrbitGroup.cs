@@ -56,7 +56,8 @@ namespace Vamsurlike.Skills
                     initialDirection,
                     center.CurrentLevelData,
                     damage,
-                    center.SpeedMultiplier);
+                    center.SpeedMultiplier,
+                    center.SkillTag);
 
                 projectile.ConfigureAsOrbiting(center, angle, radius, rotSpeed, hitRadius, damage);
 

@@ -1,7 +1,6 @@
 using System.Collections;
 using UnityEngine;
 using Vamsurlike.Data;
-using Vamsurlike.Enemy;
 
 namespace Vamsurlike.Skills
 {
@@ -31,6 +30,8 @@ namespace Vamsurlike.Skills
                 context.CasterTransform.position,
                 levelData,
                 context.FinalDamage,
+                context.OwnerClientId,
+                context.Skill.name,
                 context.VFX));
             return true;
         }
@@ -39,6 +40,8 @@ namespace Vamsurlike.Skills
             Vector3 origin,
             SkillLevelData levelData,
             float finalDamage,
+            ulong ownerClientId,
+            string skillTag,
             ISkillVFXBroadcaster vfx)
         {
             double rx = rng.NextDouble() * 2.0 - 1.0;
@@ -60,17 +63,7 @@ namespace Vamsurlike.Skills
                 yield return null;
             }
 
-            ApplySplash(target, levelData.splashRadius, finalDamage);
-        }
-
-        private static void ApplySplash(Vector3 center, float radius, float damage)
-        {
-            var cols = Physics.OverlapSphere(center, radius);
-            foreach (var col in cols)
-            {
-                if (col.TryGetComponent<EnemyNetworkBase>(out var enemy))
-                    enemy.TakeDamage(damage);
-            }
+            SkillAreaDamage.ApplySplash(target, levelData.splashRadius, finalDamage, ownerClientId, skillTag);
         }
     }
 }

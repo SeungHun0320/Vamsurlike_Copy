@@ -131,7 +131,7 @@ namespace Vamsurlike.Items
             foreach (var col in cols)
             {
                 if (col.TryGetComponent<EnemyNetworkBase>(out var enemy))
-                    enemy.TakeDamage(itemData.value);
+                    enemy.TakeDamage(itemData.value); // 아이템 효과 — 플레이어 통계 비귀속
             }
         }
 

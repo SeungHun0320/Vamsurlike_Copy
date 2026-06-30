@@ -12,6 +12,8 @@ namespace Vamsurlike.UI.Adapters
     {
         private bool ready;
         private int  lastPublishedSecond = -1;
+        private bool lastPublishedBossPhase;
+        private bool hasPublished;
 
         private void Update()
         {
@@ -25,19 +27,27 @@ namespace Vamsurlike.UI.Adapters
             // 표시 단위(초)가 바뀔 때만 Publish — 매 프레임 string alloc 방지
             int currentSecond = Mathf.FloorToInt(
                 StageRuntime.Instance != null ? StageRuntime.Instance.ElapsedTime.Value : 0f);
-            if (currentSecond == lastPublishedSecond) return;
-            lastPublishedSecond = currentSecond;
+            bool isBossPhase = GameFlowCoordinator.Instance != null && GameFlowCoordinator.Instance.IsBossPhase;
+            if (hasPublished &&
+                currentSecond == lastPublishedSecond &&
+                isBossPhase == lastPublishedBossPhase)
+            {
+                return;
+            }
 
-            Publish();
+            lastPublishedSecond    = currentSecond;
+            lastPublishedBossPhase = isBossPhase;
+            hasPublished           = true;
+
+            Publish(isBossPhase);
         }
 
-        private void Publish()
+        private void Publish(bool isBossPhase)
         {
             if (UIEventHub.Instance == null) return;
 
             float elapsed     = StageRuntime.Instance != null ? StageRuntime.Instance.ElapsedTime.Value : 0f;
             float bossTime    = StageRuntime.Instance != null ? StageRuntime.Instance.StageDuration     : 0f;
-            bool  isBossPhase = GameFlowCoordinator.Instance != null && GameFlowCoordinator.Instance.IsBossPhase;
 
             UIEventHub.Instance.Stage.PublishStageTimer(
                 new StageTimerPayload(elapsed, bossTime, isBossPhase));

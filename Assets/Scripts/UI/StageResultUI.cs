@@ -5,19 +5,30 @@ using Vamsurlike.UI.ViewModels;
 
 namespace Vamsurlike.UI
 {
-    // Stage 씬에 배치. Inspector에서 resultPanel, resultText를 연결.
-    // Phase 8에서 애니메이션·버튼·귀환 로직을 추가한다.
+    // Result UI: 결과 제목과 플레이어 통계만 렌더링한다.
+    // Clear 배너와 계속 버튼은 StageClearBannerUI가 담당한다.
     public class StageResultUI : MonoBehaviour
     {
+        [Header("Shared")]
+        [SerializeField] private GameObject backdrop;
+
+        [Header("Title")]
         [SerializeField] private GameObject resultPanel;
         [SerializeField] private TMP_Text   resultText;
-        [SerializeField] private string     clearMessage    = "STAGE CLEAR";
-        [SerializeField] private string     gameOverMessage = "GAME OVER";
-        [SerializeField] private float      gameOverDelay   = 3f;
-        [SerializeField] private float      clearDelay      = 1f;
 
-        private Coroutine          showCoroutine;
+        [Header("Stats")]
+        [SerializeField] private GameObject        statsPanel;
+        [SerializeField] private Transform         rowContainer;
+        [SerializeField] private PlayerResultRowUI rowPrefab;
+
+        [Header("Messages")]
+        [SerializeField] private string resultMessage   = "RESULT";
+        [SerializeField] private string gameOverMessage = "GAME OVER";
+        [SerializeField] private float  gameOverDelay   = 3f;
+
+        private Coroutine            showCoroutine;
         private StageResultViewModel viewModel;
+        private PlayerResultViewModel[] pendingVMs;
 
         private void Awake()
         {
@@ -26,49 +37,83 @@ namespace Vamsurlike.UI
 
         private void Start()
         {
-            if (resultPanel != null) resultPanel.SetActive(false);
+            ApplyStateImmediate(new StageResultViewState(StageResultDisplayMode.Hidden));
         }
 
         private void OnEnable()
         {
-            viewModel.OnShowClear    += ShowClear;
-            viewModel.OnShowGameOver += ShowGameOver;
-            viewModel.OnHide         += HideResult;
+            viewModel.StateChanged    += ApplyState;
+            viewModel.OnPlayerResults += OnPlayerResults;
             viewModel.Bind();
         }
 
         private void OnDisable()
         {
-            viewModel.OnShowClear    -= ShowClear;
-            viewModel.OnShowGameOver -= ShowGameOver;
-            viewModel.OnHide         -= HideResult;
+            viewModel.StateChanged    -= ApplyState;
+            viewModel.OnPlayerResults -= OnPlayerResults;
             viewModel.Unbind();
 
             if (showCoroutine != null) StopCoroutine(showCoroutine);
         }
 
-        private void ShowClear()    => ScheduleShow(clearMessage,    clearDelay);
-        private void ShowGameOver() => ScheduleShow(gameOverMessage, gameOverDelay);
+        private void OnDestroy() => viewModel?.Dispose();
 
-        private void HideResult()
-        {
-            if (showCoroutine != null) { StopCoroutine(showCoroutine); showCoroutine = null; }
-            if (resultPanel != null) resultPanel.SetActive(false);
-        }
-
-        private void ScheduleShow(string message, float delay)
+        private void ApplyState(StageResultViewState state)
         {
             if (showCoroutine != null) StopCoroutine(showCoroutine);
-            showCoroutine = StartCoroutine(ShowDelayed(message, delay));
+
+            if (state.Mode == StageResultDisplayMode.GameOver)
+            {
+                showCoroutine = StartCoroutine(ApplyStateAfterDelay(state, gameOverDelay));
+                return;
+            }
+
+            ApplyStateImmediate(state);
         }
 
-        // WaitForSecondsRealtime: Clear(timeScale=0)과 GameOver(timeScale=1) 모두 대응
-        private IEnumerator ShowDelayed(string message, float delay)
+        private void OnPlayerResults(PlayerResultViewModel[] vms)
+        {
+            pendingVMs = vms;
+            if (statsPanel != null && statsPanel.activeSelf)
+                PopulateRows(vms);
+        }
+
+        private IEnumerator ApplyStateAfterDelay(StageResultViewState state, float delay)
         {
             yield return new WaitForSecondsRealtime(delay);
             showCoroutine = null;
-            if (resultText  != null) resultText.text = message;
-            if (resultPanel != null) resultPanel.SetActive(true);
+            ApplyStateImmediate(state);
+        }
+
+        private void ApplyStateImmediate(StageResultViewState state)
+        {
+            if (backdrop    != null) backdrop.SetActive(state.BackdropVisible);
+            if (resultPanel != null) resultPanel.SetActive(state.IsVisible);
+            if (statsPanel  != null) statsPanel.SetActive(state.StatsVisible);
+
+            if (resultText != null)
+            {
+                resultText.text = state.Mode == StageResultDisplayMode.GameOver
+                    ? gameOverMessage
+                    : resultMessage;
+            }
+
+            if (state.StatsVisible && pendingVMs != null)
+                PopulateRows(pendingVMs);
+        }
+
+        private void PopulateRows(PlayerResultViewModel[] vms)
+        {
+            if (rowContainer == null || rowPrefab == null) return;
+
+            foreach (Transform child in rowContainer)
+                Destroy(child.gameObject);
+
+            foreach (var vm in vms)
+            {
+                var row = Instantiate(rowPrefab, rowContainer);
+                row.Bind(vm);
+            }
         }
     }
 }

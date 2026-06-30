@@ -50,7 +50,7 @@ namespace Vamsurlike.Skills
             float orbitalDamage = context.FinalDamage * Mathf.Max(0f, data.orbitalDamageMultiplier);
 
             if (obj.TryGetComponent(out proj))
-                proj.Initialize(skill.projectilePrefab, context.OwnerClientId, spawnPos, direction, data, context.FinalDamage, context.SpeedMultiplier);
+                proj.Initialize(skill.projectilePrefab, context.OwnerClientId, spawnPos, direction, data, context.FinalDamage, context.SpeedMultiplier, skill.name);
             else
                 Debug.LogWarning($"[{nameof(OrbitalGrenadeSkill)}] NetworkProjectile 없음. prefab={skill.projectilePrefab.name}");
 

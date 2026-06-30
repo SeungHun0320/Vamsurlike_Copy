@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 using UnityEngine;
 using Vamsurlike.Data;
 
@@ -136,20 +135,19 @@ namespace Vamsurlike.Skills
             return false;
         }
 
-        public void BuildSnapshot(out string joinedNames, out int[] levels)
+        public SkillSlotSyncData[] BuildSnapshot()
         {
-            var names = new StringBuilder();
-            levels = new int[skills.Count];
+            var slots = new SkillSlotSyncData[skills.Count];
 
             for (int i = 0; i < skills.Count; i++)
             {
-                if (i > 0) names.Append('|');
                 SkillDataSO skill = skills[i].Skill;
-                names.Append(skill != null ? skill.skillName : "?");
-                levels[i] = skills[i].Level;
+                slots[i] = new SkillSlotSyncData(
+                    skill != null ? skill.skillName : "?",
+                    skills[i].Level);
             }
 
-            joinedNames = names.ToString();
+            return slots;
         }
 
         private static bool UpgradeOwned(SkillRuntimeState owned, float retryDelay)

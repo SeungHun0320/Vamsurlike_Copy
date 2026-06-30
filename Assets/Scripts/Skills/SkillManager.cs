@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Data;
@@ -11,6 +12,25 @@ using Vamsurlike.Upgrades;
 
 namespace Vamsurlike.Skills
 {
+    public struct SkillSlotSyncData : INetworkSerializable
+    {
+        public FixedString64Bytes skillName;
+        public int                level;
+
+        public SkillSlotSyncData(string skillName, int level)
+        {
+            this.skillName = default;
+            this.skillName.CopyFromTruncated(string.IsNullOrWhiteSpace(skillName) ? "?" : skillName);
+            this.level = level;
+        }
+
+        public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+        {
+            serializer.SerializeValue(ref skillName);
+            serializer.SerializeValue(ref level);
+        }
+    }
+
     [RequireComponent(typeof(NetworkObject), typeof(SkillVFXController), typeof(PlayerNetworkController))]
     public class SkillManager : NetworkBehaviour, ISkillCoroutineRunner
     {
@@ -21,6 +41,11 @@ namespace Vamsurlike.Skills
         [SerializeField] private Transform projectileSpawnPoint;
         [SerializeField] private float spawnForwardOffset = 0.8f;
         [SerializeField] private float failedCastRetryDelay = 0.1f;
+
+        [Header("Ultimate Gauge")]
+        [SerializeField] private float gaugeRequired  = 100f;
+        [SerializeField] private float gaugePerDamage = 1f;
+        [SerializeField] private float gaugePerKill   = 25f;
 
         private PassiveStatHandler      passiveStatHandler;
         private PlayerNetworkStats      playerStats;
@@ -34,11 +59,15 @@ namespace Vamsurlike.Skills
 
         private float nextMissingExecutorLogTime;
 
-        // Owner 전용 — 수동 스킬 쿨다운 동기화 (UI 표시용)
+        // Owner 전용 — 궁극기 게이지 동기화 (UI 표시용, ManualSkillAdapter가 읽음)
         public readonly NetworkVariable<float> ManualCooldownRemaining = new(
             0f, NetworkVariableReadPermission.Owner, NetworkVariableWritePermission.Server);
         public readonly NetworkVariable<float> ManualCooldownDuration = new(
             DefaultManualCooldown, NetworkVariableReadPermission.Owner, NetworkVariableWritePermission.Server);
+
+        // 서버 → Owner: 현재 게이지 (0 ~ gaugeRequired)
+        public readonly NetworkVariable<float> UltimateGaugeAmount = new(
+            0f, NetworkVariableReadPermission.Owner, NetworkVariableWritePermission.Server);
 
         public static event Action<string[], int[]> OnSkillsSynced;
 
@@ -105,13 +134,41 @@ namespace Vamsurlike.Skills
             for (int i = 0; i < skills.Count; i++)
             {
                 if (skills[i].Skill == null || !skills[i].Skill.isManual) continue;
-                ManualCooldownRemaining.Value = Mathf.Max(0f, skills[i].CooldownTimer);
-                float levelCooldown = skills[i].Skill.GetLevelData(skills[i].Level)?.cooldown
-                                      ?? DefaultManualCooldown;
-                ManualCooldownDuration.Value = levelCooldown;
+                ManualCooldownRemaining.Value = Mathf.Max(0f, gaugeRequired - UltimateGaugeAmount.Value);
+                ManualCooldownDuration.Value  = gaugeRequired;
                 return;
             }
             ManualCooldownRemaining.Value = 0f;
+        }
+
+        // EnemyNetworkBase에서 데미지 발생 시 호출 (서버 전용)
+        public void AddUltimateGaugeForDamage(float rawDamage)
+        {
+            if (!IsServer) return;
+            AddGaugeInternal(rawDamage * gaugePerDamage);
+        }
+
+        // EnemyNetworkBase에서 킬 발생 시 호출 (서버 전용)
+        public void AddUltimateGaugeForKill()
+        {
+            if (!IsServer) return;
+            AddGaugeInternal(gaugePerKill);
+        }
+
+        private void AddGaugeInternal(float amount)
+        {
+            if (!HasManualSkill()) return;
+            float next = Mathf.Clamp(UltimateGaugeAmount.Value + amount, 0f, gaugeRequired);
+            if (Mathf.Approximately(UltimateGaugeAmount.Value, next)) return;
+            UltimateGaugeAmount.Value = next;
+        }
+
+        private bool HasManualSkill()
+        {
+            IReadOnlyList<SkillRuntimeState> skills = skillInventory.Skills;
+            for (int i = 0; i < skills.Count; i++)
+                if (skills[i].Skill != null && skills[i].Skill.isManual) return true;
+            return false;
         }
 
         public bool LearnSkill(SkillDataSO skill)
@@ -182,17 +239,19 @@ namespace Vamsurlike.Skills
                 return;
             }
 
+            if (UltimateGaugeAmount.Value < gaugeRequired) return;
+
             IReadOnlyList<SkillRuntimeState> skills = skillInventory.Skills;
             for (int i = 0; i < skills.Count; i++)
             {
                 SkillRuntimeState owned = skills[i];
                 if (owned.Skill == null || !owned.Skill.isManual) continue;
-                if (owned.CooldownTimer > 0f) return;
 
                 SkillLevelData levelData = owned.Skill.GetLevelData(owned.Level);
-                owned.CooldownTimer = TryCast(owned, levelData)
-                    ? levelData != null ? levelData.cooldown : DefaultManualCooldown
-                    : failedCastRetryDelay;
+                if (TryCast(owned, levelData))
+                    UltimateGaugeAmount.Value = 0f;
+                else
+                    owned.CooldownTimer = failedCastRetryDelay;
                 return;
             }
         }
@@ -282,8 +341,8 @@ namespace Vamsurlike.Skills
 
         private void BroadcastSkillsToOwner()
         {
-            skillInventory.BuildSnapshot(out string joinedNames, out int[] levels);
-            SyncSkillsToOwnerClientRpc(joinedNames, levels, new ClientRpcParams
+            SkillSlotSyncData[] slots = skillInventory.BuildSnapshot();
+            SyncSkillsToOwnerClientRpc(slots, new ClientRpcParams
             {
                 Send = new ClientRpcSendParams
                 {
@@ -301,13 +360,19 @@ namespace Vamsurlike.Skills
 
         [ClientRpc]
         private void SyncSkillsToOwnerClientRpc(
-            string joinedNames,
-            int[] levels,
+            SkillSlotSyncData[] slots,
             ClientRpcParams rpcParams = default)
         {
-            string[] names = joinedNames.Length > 0
-                ? joinedNames.Split('|')
-                : Array.Empty<string>();
+            int count = slots != null ? slots.Length : 0;
+            string[] names  = count > 0 ? new string[count] : Array.Empty<string>();
+            int[]    levels = count > 0 ? new int[count]    : Array.Empty<int>();
+
+            for (int i = 0; i < count; i++)
+            {
+                names[i]  = slots[i].skillName.ToString();
+                levels[i] = slots[i].level;
+            }
+
             OnSkillsSynced?.Invoke(names, levels); // 임시 경유지 (Phase 8 마이그레이션 완료 후 제거)
             UIEventHub.Instance?.Skill.PublishSkillSlotsChanged(new SkillSlotsPayload(names, levels));
         }

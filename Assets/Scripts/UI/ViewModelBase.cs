@@ -4,7 +4,7 @@ namespace Vamsurlike.UI
 {
     // ViewModel 공통 베이스 — UIEventHub 구독 수명주기 관리.
     // 상속 클래스는 Subscribe()/Unsubscribe()에서 이벤트를 등록/해제한다.
-    // Bind()는 View의 OnEnable에서, Dispose()는 OnDisable에서 호출한다.
+    // Bind()는 View의 OnEnable에서, Unbind()는 OnDisable에서, Dispose()는 OnDestroy에서 호출한다.
     public abstract class ViewModelBase : IDisposable
     {
         private bool disposed;

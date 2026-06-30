@@ -68,7 +68,7 @@ namespace Vamsurlike.Skills
                 {
                     EnemyNetworkBase target = targets[j];
                     if (target == null || !hitEnemyIds.Add(target.NetworkObjectId)) continue;
-                    target.TakeDamage(damage);
+                    target.TakeDamage(damage, context.OwnerClientId, context.Skill.name);
                     damagedCount++;
                 }
             }

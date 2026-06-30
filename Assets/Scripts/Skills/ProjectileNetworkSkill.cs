@@ -1,8 +1,6 @@
-using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Data;
 using Vamsurlike.Enemy;
-using Vamsurlike.Network;
 
 namespace Vamsurlike.Skills
 {
@@ -49,25 +47,9 @@ namespace Vamsurlike.Skills
         private static bool SpawnProjectile(SkillDataSO skill, SkillLevelData levelData, float finalDamage,
             ulong ownerClientId, Vector3 pos, Vector3 dir, float speedMultiplier = 1f)
         {
-            Quaternion rot = Quaternion.LookRotation(dir, Vector3.up);
-            if (skill.projectilePrefab.TryGetComponent<NetworkProjectile>(out var template))
-                rot = template.GetProjectileRotation(dir);
-
-            NetworkObject obj = PoolManager.GetOrInstantiateNetworkObject(
-                skill.projectilePrefab,
-                pos,
-                rot,
-                nameof(ProjectileSkill));
-
-            if (obj == null) return false;
-
-            if (obj.TryGetComponent<NetworkProjectile>(out var projectile))
-                projectile.Initialize(skill.projectilePrefab, ownerClientId, pos, dir, levelData, finalDamage, speedMultiplier);
-            else
-                Debug.LogWarning($"[{nameof(ProjectileSkill)}] NetworkProjectile 없음. prefab={skill.projectilePrefab.name}");
-
-            obj.Spawn(true);
-            return true;
+            return ProjectileSpawnHelper.Spawn(
+                skill.projectilePrefab, ownerClientId, pos, dir, levelData,
+                finalDamage, speedMultiplier, skill.name, nameof(ProjectileSkill)) != null;
         }
 
         private static Vector3 GetSpreadDirection(Vector3 baseDir, int index, int count, float spreadAngle)
