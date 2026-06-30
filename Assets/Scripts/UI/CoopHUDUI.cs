@@ -25,8 +25,9 @@ namespace Vamsurlike.UI
             public Image           hpFill;
             public TextMeshProUGUI nameText;
             public GameObject      downedIcon;
+            public TextMeshProUGUI downedTimerText; // "다운됨 Xs"
             public GameObject      deadIcon;
-            public TextMeshProUGUI deadTimerText;
+            public TextMeshProUGUI deadTimerText;   // "Xs"
         }
 
         private void OnEnable()
@@ -65,6 +66,9 @@ namespace Vamsurlike.UI
 
             if (slot.downedIcon != null)
                 slot.downedIcon.SetActive(p.IsDowned);
+
+            if (slot.downedTimerText != null && p.IsDowned)
+                slot.downedTimerText.text = $"다운됨 {p.DownedTimeRemaining:0}s";
 
             if (slot.deadIcon != null)
                 slot.deadIcon.SetActive(p.IsDeadWaiting);
@@ -135,6 +139,7 @@ namespace Vamsurlike.UI
             downTxtRt.sizeDelta = Vector2.zero;
 
             downGO.SetActive(false);
+            // downTxt를 downedTimerText로 재사용 — "다운됨 Xs" 포맷으로 갱신
 
             // 사망 대기 오버레이 (2단계: 자동 부활 카운트다운)
             var deadGO = new GameObject("DeadOverlay");
@@ -162,12 +167,13 @@ namespace Vamsurlike.UI
 
             return new SlotRefs
             {
-                root          = root,
-                hpFill        = fill,
-                nameText      = nameText,
-                downedIcon    = downGO,
-                deadIcon      = deadGO,
-                deadTimerText = deadTxt,
+                root            = root,
+                hpFill          = fill,
+                nameText        = nameText,
+                downedIcon      = downGO,
+                downedTimerText = downTxt,
+                deadIcon        = deadGO,
+                deadTimerText   = deadTxt,
             };
         }
 
