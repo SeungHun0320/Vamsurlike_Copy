@@ -1239,6 +1239,12 @@ Done when: HUD/다운·부활/결과/메인 메뉴 UI가 이벤트 기반으로 
 
 ---
 
+##### Phase 8.4a 결과 통계 / Result UI
+
+`Clear` / `GameOver` 진입 시 플레이어별 전투 결과를 서버 권한으로 확정하고, 모든 클라이언트에 같은 결과 화면을 표시한다.
+
+결과 통계는 네트워크 실시간 상태인 `PlayerNetworkStats`와 분리한다. `PlayerNetworkStats`는 HP, 다운, 행동 가능 여부처럼 전투 중 계속 변하는 값만 맡고, `PlayerMatchStats`는 한 판이 끝났을 때 보여줄 누적 통계만 맡는다.
+
 ##### PlayerMatchStats — 처치수 / 데미지 / 생존 시간
 
 개인 전투 통계를 서버 권한으로 누적하는 전담 컴포넌트. `PlayerNetworkStats`(실시간 HP·상태)와 역할 분리.
@@ -1252,11 +1258,13 @@ public class PlayerMatchStats : NetworkBehaviour
     public NetworkVariable<int>   KillCount     = new(0, NetworkVariableReadPermission.Owner, NetworkVariableWritePermission.Server);
     public NetworkVariable<float> TotalDamage   = new(0f, NetworkVariableReadPermission.Owner, NetworkVariableWritePermission.Server);
     public NetworkVariable<float> SurvivalTime  = new(0f, NetworkVariableReadPermission.Owner, NetworkVariableWritePermission.Server);
+    public NetworkVariable<int>   Level         = new(1, NetworkVariableReadPermission.Owner, NetworkVariableWritePermission.Server);
 
     // 서버에서 외부 호출
     public void AddKill()                     { if (IsServer) KillCount.Value++; }
     public void AddDamage(float amount)       { if (IsServer) TotalDamage.Value += amount; }
     public void SetSurvivalTime(float time)   { if (IsServer) SurvivalTime.Value = time; }
+    public void SetLevel(int level)           { if (IsServer) Level.Value = level; }
 }
 ```
 
@@ -1267,12 +1275,13 @@ public class PlayerMatchStats : NetworkBehaviour
 public void TakeDamage(float amount)
 
 // After
-public void TakeDamage(float amount, ulong attackerClientId = ulong.MaxValue, string skillTag = null)
+public void TakeDamage(float amount, ulong attackerClientId = ulong.MaxValue, int sourceSkillId = -1)
 ```
 
 귀속 규칙:
 - **플레이어 귀속**: `attackerClientId = OwnerClientId` 전달 → `AddDamage` / kill 시 `AddKill` 호출
 - **비귀속**: `attackerClientId = ulong.MaxValue` (환경 데미지, 자폭, 디버그 커맨드) → 통계 누적 없음
+- **스킬별 귀속**: `sourceSkillId`는 가능하면 카탈로그 인덱스/고정 ID를 사용한다. 문자열 이름은 UI 표시용으로만 로컬 카탈로그에서 조회한다.
 
 `attackerClientId` 전달이 필요한 전체 호출처:
 
@@ -1291,16 +1300,17 @@ public void TakeDamage(float amount, ulong attackerClientId = ulong.MaxValue, st
 
 **처치 판정 — `lastAttackerClientId` 방식**
 
-- `EnemyNetworkBase`에 `lastAttackerClientId` 필드 유지 (데미지 입을 때마다 갱신)
+- `EnemyNetworkBase`에 `lastAttackerClientId`, `lastSourceSkillId` 필드 유지 (플레이어 귀속 데미지 입을 때마다 갱신)
 - HP=0 시 `lastAttackerClientId`로 kill 귀속
 - 도트/오라/블랙홀처럼 지속 피해도 소유자 유지되므로 자연스럽게 처리
 - 자폭·환경 데미지(`ulong.MaxValue`)는 kill 미귀속
 
-**아이템별 데미지 — `skillTag` 방식**
+**스킬별 데미지 — ID 기반**
 
-- `TakeDamage(amount, attackerId, skillTag)` 서명으로 스킬 식별자 전달
-- `PlayerMatchStats`에 `Dictionary<string, float> DamagePerSkill` 누적
-- 결과 전송 시 `ItemResultEntry[]`로 직렬화
+- `TakeDamage(amount, attackerId, sourceSkillId)` 서명으로 스킬/아이템 식별자 전달
+- `PlayerMatchStats`에 `Dictionary<int, float> DamagePerSource` 누적
+- 결과 UI는 `sourceSkillId`를 로컬 `SkillDataSO`/카탈로그에서 이름으로 변환
+- MVP에서는 플레이어별 총 데미지만 먼저 표시하고, 스킬별 데미지 표는 2차 작업으로 미뤄도 된다.
 
 **생존 시간 기준**
 
@@ -1319,18 +1329,51 @@ GameFlowCoordinator.ForceTransition(Clear/GameOver)
        └─ SendMatchResultClientRpc(entries)
 ```
 
+**결과 payload 직렬화 규칙**
+
+기본 타입 RPC는 NGO 자동 직렬화를 그대로 사용한다. 단, `MatchResultEntry[]`처럼 커스텀 struct 배열을 RPC로 보낼 때는 `ChestChoiceData`와 같은 방식으로 `INetworkSerializable`을 명시한다.
+
+결과 entry 안에 일반 `string`이나 가변 길이 배열을 직접 넣지 않는다. 표시 이름은 `FixedString32Bytes` 같은 고정 길이 문자열로 제한하고, 스킬별 상세 데미지는 별도 payload 또는 후속 RPC로 평탄화해서 보낸다.
+
 ```csharp
-struct MatchResultEntry
+using Unity.Collections;
+using Unity.Netcode;
+
+public struct MatchResultEntry : INetworkSerializable
 {
-    ulong            clientId;
-    string           displayName;
-    int              level;          // 종료 시점 플레이어 레벨
-    int              kills;
-    float            totalDamage;
-    float            survivalTime;
-    ItemResultEntry[] items;         // 스킬별 데미지 기여
+    public ulong              clientId;
+    public FixedString32Bytes displayName;
+    public int                level;
+    public int                kills;
+    public float              totalDamage;
+    public float              survivalTime;
+
+    public void NetworkSerialize<T>(BufferSerializer<T> serializer)
+        where T : IReaderWriter
+    {
+        serializer.SerializeValue(ref clientId);
+        serializer.SerializeValue(ref displayName);
+        serializer.SerializeValue(ref level);
+        serializer.SerializeValue(ref kills);
+        serializer.SerializeValue(ref totalDamage);
+        serializer.SerializeValue(ref survivalTime);
+    }
 }
-struct ItemResultEntry { string skillTag; float damage; }
+
+public struct SourceDamageEntry : INetworkSerializable
+{
+    public ulong clientId;
+    public int   sourceSkillId;
+    public float damage;
+
+    public void NetworkSerialize<T>(BufferSerializer<T> serializer)
+        where T : IReaderWriter
+    {
+        serializer.SerializeValue(ref clientId);
+        serializer.SerializeValue(ref sourceSkillId);
+        serializer.SerializeValue(ref damage);
+    }
+}
 ```
 
 **Result UI — 기존 `StageResultUI` 확장**
@@ -1342,30 +1385,96 @@ StageResultViewModel.OnResultReceived(MatchResultEntry[])
 StageResultUI
   ├─ Clear / GameOver 헤더
   └─ 플레이어별 행 (row prefab): 이름 / 레벨 / 처치수 / 총 데미지 / 생존 시간
-       └─ 펼치면: 스킬별 데미지 기여 목록 (ItemResultEntry[])
+       └─ 펼치면: 스킬별 데미지 기여 목록 (SourceDamageEntry[] 기반)
 ```
 
 ---
 
-##### 구현 항목
+##### Phase 8.4a 구현 항목
 
 - [ ] `PlayerMatchStats` NetworkBehaviour 구현 및 `NetworkedPlayer` 프리팹에 추가
-  - `KillCount`, `TotalDamage`, `SurvivalTime`, `Level`, `DamagePerSkill` 필드
-  - `lastAttackerClientId` 필드 포함
-- [ ] `EnemyNetworkBase.TakeDamage(float amount, ulong attackerClientId, string skillTag)` 서명 변경
-  - `lastAttackerClientId` 갱신 (비귀속 `ulong.MaxValue` 제외)
-  - 데미지 적용 후 공격자 `PlayerMatchStats.AddDamage(actual, skillTag)` 호출
+  - `KillCount`, `TotalDamage`, `SurvivalTime`, `Level`, `DamagePerSource` 필드
+- [ ] `EnemyNetworkBase.TakeDamage(float amount, ulong attackerClientId, int sourceSkillId)` 서명 변경
+  - `lastAttackerClientId`, `lastSourceSkillId` 갱신 (비귀속 `ulong.MaxValue` 제외)
+  - 데미지 적용 후 공격자 `PlayerMatchStats.AddDamage(actual, sourceSkillId)` 호출
   - HP=0 시 `lastAttackerClientId`로 `AddKill()` 호출
-- [ ] 전체 호출처에 `attackerClientId` + `skillTag` 전달 (표 참조: NetworkProjectile / OrbitingProjectileMode / AuraNetworkSkill / BlackHoleNetworkSkill / ClusterGrenadeNetworkSkill / GrenadeNetworkSkill / MeleeNetworkSkill / OrbitalNetworkSkill / ChestRewardApplier / DebugEnemyCommands)
+- [ ] 전체 호출처에 `attackerClientId` + `sourceSkillId` 전달 (표 참조: NetworkProjectile / OrbitingProjectileMode / AuraNetworkSkill / BlackHoleNetworkSkill / ClusterGrenadeNetworkSkill / GrenadeNetworkSkill / MeleeNetworkSkill / OrbitalNetworkSkill / ChestRewardApplier / DebugEnemyCommands)
 - [ ] `PlayerMatchStats`에 레벨 필드 추가 — `SharedLevelSystem`에서 종료 시 `SetLevel(int)` 호출
 - [ ] `StageRuntime`에 "최종 CanAct=false 전환 시각" 기록 로직 추가 (`SetSurvivalTime` 판단 기준)
+- [ ] `MatchResultEntry : INetworkSerializable` 구현 (`FixedString32Bytes displayName`)
+- [ ] `SourceDamageEntry : INetworkSerializable` 구현 (스킬별 데미지 상세가 필요할 때 사용)
 - [ ] `StageResultBroadcaster` 구현 — `GameFlowCoordinator.ForceTransition` 호출 시 `BuildEntries()` + `SendMatchResultClientRpc(entries)` 일원화
 - [ ] `StageResultViewModel`에 `OnResultReceived(MatchResultEntry[])` 추가
 - [ ] `StageResultUI` 확장 — row prefab 연결, 스킬별 데미지 기여 펼침 표시
-- [ ] LoadingScreen 구현 (NetworkManager.SceneManager 로딩 이벤트 연동)
-- [ ] MainMenu 구현 (방 만들기/참여 UI 완성)
-- [ ] 설정 UI 구현 (음량, 해상도)
-- [ ] 개발용 네트워크 상태 UI 구현 (Host/Client/Server 모드, 연결 상태, ping/relay 상태 표시)
+
+##### Phase 8.4b 메뉴 / 로딩 / 설정
+
+결과 통계와 별도 작업 단위로 진행한다. 8.4a 완료 후 독립적으로 다듬는다.
+
+**씬 전환 흐름**
+
+```
+Bootstrap → MainMenu → Lobby(대기실) → Stage_01(로딩 화면) → 게임 → 결과 화면 → MainMenu
+```
+
+---
+
+**① MainMenu**
+
+- 방 만들기 버튼 → Relay 세션 생성 → Lobby 씬 이동
+- 코드 입력 참여 → Relay 코드 검증 → Lobby 씬 이동
+- 연결 상태 표시 (Relay 연결 중 / 실패 / 재시도)
+
+**② LobbyUI (대기실)**
+
+- 참여 플레이어 슬롯 4개 (이름 + 준비 상태)
+- 방 코드 표시 + 복사 버튼
+- 호스트만 "게임 시작" 버튼 활성화; 최소 인원 미달 시 비활성
+- 비호스트: "대기 중…" 표시
+
+**③ LoadingScreen**
+
+- `NetworkManager.SceneManager.OnSceneEvent` 구독
+- 씬 로드 완료 후 NGO 스폰 대기 구간도 커버 (로딩 바 or 스피너)
+- 클라이언트 측: 씬 전환 승인 후 자동 표시 → 스폰 완료 시 자동 숨김
+
+**④ 결과 화면 버튼**
+
+- 호스트: "재시작" (동일 씬 재로드) / "메인 메뉴" (Bootstrap 복귀)
+- 클라이언트: "메인 메뉴"
+- 버튼 클릭 → `GameFlowCoordinator`를 통해 씬 전환 요청
+
+**⑤ 네트워크 에러 다이얼로그**
+
+- 호스트 접속 끊김 / Relay 타임아웃 → 오버레이 다이얼로그 표시
+- "확인" 클릭 시 MainMenu로 강제 복귀 (씬 상태 초기화)
+- `GameNetworkManager.OnClientDisconnected` / `OnTransportFailure` 이벤트 수신
+
+**⑥ 설정 UI**
+
+- 음량 슬라이더 (Master / SFX / BGM)
+- 해상도 드롭다운 + 전체화면 토글
+- 프레임 캡 (60 / 120 / 무제한)
+- 설정값은 `PlayerPrefs`로 로컬 저장
+
+**⑦ 개발용 네트워크 오버레이**
+
+- Host / Client / Server 모드 표시
+- Ping (RTT ms), Relay 연결 상태
+- 씬 이름, 접속 인원수
+- `#if DEVELOPMENT_BUILD || UNITY_EDITOR` 조건부 표시
+
+---
+
+##### Phase 8.4b 구현 항목
+
+- [ ] MainMenu 구현 (방 만들기 / 코드 참여 / 연결 상태 표시)
+- [ ] LobbyUI 구현 (플레이어 슬롯 4개, 방 코드 공유, 호스트 시작 버튼)
+- [ ] LoadingScreen 구현 (`SceneManager.OnSceneEvent` 구독, 스폰 대기 커버)
+- [ ] 결과 화면 재시작 / 메인 메뉴 복귀 버튼 (`StageResultUI` 확장)
+- [ ] 네트워크 에러 다이얼로그 (호스트 끊김 / 타임아웃 → MainMenu 강제 복귀)
+- [ ] 설정 UI (음량 3채널, 해상도, 프레임 캡, PlayerPrefs 저장)
+- [ ] 개발용 네트워크 오버레이 (`DEVELOPMENT_BUILD` 조건부)
 
 #### Phase 8.5 이펙트
 
