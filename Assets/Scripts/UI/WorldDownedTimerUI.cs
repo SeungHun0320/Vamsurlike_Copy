@@ -15,6 +15,7 @@ namespace Vamsurlike.UI
         [SerializeField] private float   canvasRadius = 80f;   // 원 지름 (pixels)
         [SerializeField] private float   worldScale   = 0.012f;
         [SerializeField] private float   downedDuration = 15f; // PlayerReviveHandler.downedDuration 과 맞춤
+        [SerializeField] private Sprite  circleSprite;
         [SerializeField] private Color   bgColor      = new Color(0.12f, 0.12f, 0.12f, 0.85f);
         [SerializeField] private Color   fillColor    = new Color(0.9f,  0.25f, 0.1f,  1f);
         [SerializeField] private Color   textColor    = Color.white;
@@ -111,30 +112,28 @@ namespace Vamsurlike.UI
             cg.alpha = 0f;
             root     = go.transform;
 
+            var circle = circleSprite;
+
             // 배경 원
             var bgGO = new GameObject("BG");
             bgGO.transform.SetParent(go.transform, false);
-            var bgImg = bgGO.AddComponent<Image>();
-            bgImg.color      = bgColor;
-            bgImg.type       = Image.Type.Filled;
-            bgImg.fillMethod = Image.FillMethod.Radial360;
-            bgImg.fillAmount = 1f;
-            if (bgImg.sprite == null)
-                bgImg.sprite = FilledImageUtility.GetOrCreateFallbackSprite();
+            var bgImg    = bgGO.AddComponent<Image>();
+            bgImg.sprite = circle;
+            bgImg.color  = bgColor;
+            bgImg.type   = Image.Type.Simple;
             Stretch(bgGO);
 
-            // Radial fill (남은 시간 비율)
+            // Radial fill (남은 시간 비율) — 원형 스프라이트로 실제 원 모양
             var fillGO = new GameObject("Fill");
             fillGO.transform.SetParent(go.transform, false);
-            radialFill              = fillGO.AddComponent<Image>();
-            radialFill.color        = fillColor;
-            radialFill.type         = Image.Type.Filled;
-            radialFill.fillMethod   = Image.FillMethod.Radial360;
-            radialFill.fillOrigin   = (int)Image.Origin360.Top;
+            radialFill               = fillGO.AddComponent<Image>();
+            radialFill.sprite        = circle;
+            radialFill.color         = fillColor;
+            radialFill.type          = Image.Type.Filled;
+            radialFill.fillMethod    = Image.FillMethod.Radial360;
+            radialFill.fillOrigin    = (int)Image.Origin360.Top;
             radialFill.fillClockwise = true;
-            radialFill.fillAmount   = 1f;
-            if (radialFill.sprite == null)
-                radialFill.sprite = FilledImageUtility.GetOrCreateFallbackSprite();
+            radialFill.fillAmount    = 1f;
             Stretch(fillGO);
 
             // 중앙 텍스트 "Ns"
@@ -157,5 +156,6 @@ namespace Vamsurlike.UI
             r.offsetMin  = Vector2.zero;
             r.offsetMax  = Vector2.zero;
         }
+
     }
 }
