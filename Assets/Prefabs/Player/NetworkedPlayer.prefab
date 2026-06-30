@@ -692,7 +692,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Player.PlayerReviveHandler
   ShowTopMostFoldoutHeaderGroup: 1
-  downedDuration: 30
+  downedDuration: 15
   baseDeadWaitDuration: 10
   deathPenaltyRatio: 0.5
   reviveDuration: 2
