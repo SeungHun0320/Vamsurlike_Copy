@@ -136,6 +136,7 @@ namespace Vamsurlike.Player
             while (DownedTimeRemaining.Value > 0f)
             {
                 yield return new WaitForSeconds(1f);
+                if (reviveCoroutine != null) continue; // 구조 중 타이머 일시정지
                 DownedTimeRemaining.Value = Mathf.Max(0f, DownedTimeRemaining.Value - 1f);
             }
 
