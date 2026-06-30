@@ -6,7 +6,7 @@ namespace Vamsurlike.Items
     [CreateAssetMenu(fileName = "ChestFallbackRewardCatalog", menuName = "Vamsurlike/Chest Fallback Reward Catalog")]
     public class ChestFallbackRewardCatalog : ScriptableObject
     {
-        private const string ResourcesPath = "ChestFallbackRewardCatalog";
+        private const string ResourcesPath = "Catalogs/ChestFallbackRewardCatalog";
 
         private static ChestFallbackRewardCatalog cachedInstance;
         public static ChestFallbackRewardCatalog Instance

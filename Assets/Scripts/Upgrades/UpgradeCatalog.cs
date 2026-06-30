@@ -2,12 +2,12 @@ using UnityEngine;
 
 namespace Vamsurlike.Upgrades
 {
-    // Resources/UpgradeCatalog.asset 으로 배치.
+    // Resources/Catalogs/UpgradeCatalog.asset 으로 배치.
     // 서버·클라이언트 모두 동일 순서로 로드 — 인덱스가 옵션 ID 역할을 한다.
     [CreateAssetMenu(fileName = "UpgradeCatalog", menuName = "Vamsurlike/Upgrade Catalog")]
     public class UpgradeCatalog : ScriptableObject
     {
-        private const string ResourcesPath = "UpgradeCatalog";
+        private const string ResourcesPath = "Catalogs/UpgradeCatalog";
 
         private static UpgradeCatalog cachedInstance;
         public static UpgradeCatalog Instance
