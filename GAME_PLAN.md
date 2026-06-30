@@ -1286,10 +1286,24 @@ public void TakeDamage(float amount, ulong attackerClientId = ulong.MaxValue)
 
 - 서버가 `GameState.Clear/GameOver` 진입 시 `[ClientRpc]`로 전원에게 결과 payload 전송
   ```csharp
-  struct MatchResultEntry { ulong clientId; string displayName; int kills; float damage; float survivalTime; }
+  struct MatchResultEntry
+  {
+      ulong  clientId;
+      string displayName;
+      int    kills;
+      float  damage;
+      float  survivalTime;
+      int    level;                   // 스테이지 종료 시점 플레이어 레벨
+      // 획득 아이템 목록: 아이템 이름 + 해당 아이템으로 기여한 데미지
+      ItemResultEntry[] items;
+  }
+  struct ItemResultEntry { string itemName; float damageContribution; }
   [ClientRpc] void SendMatchResultClientRpc(MatchResultEntry[] entries) { ... }
   ```
 - `NetworkVariable`은 Owner만 읽을 수 있으므로 결과 화면에서 타인 통계를 보려면 위 RPC 방식으로 수집
+- **아이템별 데미지 귀속**: `TakeDamage`에 `skillId` 또는 `itemTag`를 추가로 전달하거나, 스킬별 누적 딕셔너리를 `PlayerMatchStats`에 유지하는 방식 중 선택
+  - 단순안: 스킬 종류별로 `Dictionary<string, float> DamagePerSkill` 누적 후 결과 전송 시 직렬화
+  - 정밀안: 각 발사체·틱에 `skillTag` 부착 → `TakeDamage(amount, attackerId, skillTag)` 서명 확장
 
 ---
 
@@ -1301,8 +1315,12 @@ public void TakeDamage(float amount, ulong attackerClientId = ulong.MaxValue)
   - 처치 시 공격자 `PlayerMatchStats.AddKill()` 호출
 - [ ] 스킬·발사체에 `attackerClientId` 전달 (`NetworkProjectile`, `AuraNetworkSkill`, `OrbitalNetworkSkill`, `MeleeNetworkSkill`, `GrenadeNetworkSkill` 등)
 - [ ] `StageRuntime`에 생존 시간 기록 로직 추가 (스테이지 종료 시 각 플레이어 `SetSurvivalTime()`)
+- [ ] `PlayerMatchStats`에 레벨 필드 추가 — `SharedLevelSystem`에서 스테이지 종료 시 `SetLevel(int)` 호출
+- [ ] `PlayerMatchStats`에 아이템별 데미지 누적 구조 추가 (`Dictionary<string, float> DamagePerSkill` 또는 `skillTag` 서명 확장 방식 결정 필요)
 - [ ] `SendMatchResultClientRpc` 구현 (GameState.Clear/GameOver 진입 시 서버가 전원에게 브로드캐스트)
-- [ ] ResultUI 구현 (처치수, 데미지, 생존 시간 테이블)
+- [ ] ResultUI 구현
+  - 플레이어별 행: 이름 / 레벨 / 처치수 / 총 데미지 / 생존 시간
+  - 플레이어 행 펼치면: 스킬(아이템)별 데미지 기여 목록
 - [ ] LoadingScreen 구현 (NetworkManager.SceneManager 로딩 이벤트 연동)
 - [ ] MainMenu 구현 (방 만들기/참여 UI 완성)
 - [ ] 설정 UI 구현 (음량, 해상도)
