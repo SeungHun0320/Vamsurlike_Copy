@@ -25,6 +25,8 @@ namespace Vamsurlike.UI
             public Image           hpFill;
             public TextMeshProUGUI nameText;
             public GameObject      downedIcon;
+            public GameObject      deadIcon;
+            public TextMeshProUGUI deadTimerText;
         }
 
         private void OnEnable()
@@ -63,6 +65,12 @@ namespace Vamsurlike.UI
 
             if (slot.downedIcon != null)
                 slot.downedIcon.SetActive(p.IsDowned);
+
+            if (slot.deadIcon != null)
+                slot.deadIcon.SetActive(p.IsDeadWaiting);
+
+            if (slot.deadTimerText != null && p.IsDeadWaiting)
+                slot.deadTimerText.text = $"{p.DeadWaitRemaining:0}s";
         }
 
         private SlotRefs BuildSlot(ulong clientId, string displayName)
@@ -128,7 +136,39 @@ namespace Vamsurlike.UI
 
             downGO.SetActive(false);
 
-            return new SlotRefs { root = root, hpFill = fill, nameText = nameText, downedIcon = downGO };
+            // 사망 대기 오버레이 (2단계: 자동 부활 카운트다운)
+            var deadGO = new GameObject("DeadOverlay");
+            deadGO.transform.SetParent(root.transform, false);
+            deadGO.AddComponent<Image>().color = new Color(0.1f, 0.1f, 0.1f, 0.75f);
+            var deadRt = deadGO.GetComponent<RectTransform>();
+            deadRt.anchorMin = Vector2.zero;
+            deadRt.anchorMax = Vector2.one;
+            deadRt.sizeDelta = Vector2.zero;
+
+            var deadTxtGO = new GameObject("Timer");
+            deadTxtGO.transform.SetParent(deadGO.transform, false);
+            var deadTxt = deadTxtGO.AddComponent<TextMeshProUGUI>();
+            deadTxt.text      = "0s";
+            deadTxt.fontSize  = 20f;
+            deadTxt.color     = new Color(0.8f, 0.8f, 0.8f, 1f);
+            deadTxt.fontStyle = FontStyles.Bold;
+            deadTxt.alignment = TextAlignmentOptions.Center;
+            var deadTxtRt = deadTxtGO.GetComponent<RectTransform>();
+            deadTxtRt.anchorMin = Vector2.zero;
+            deadTxtRt.anchorMax = Vector2.one;
+            deadTxtRt.sizeDelta = Vector2.zero;
+
+            deadGO.SetActive(false);
+
+            return new SlotRefs
+            {
+                root          = root,
+                hpFill        = fill,
+                nameText      = nameText,
+                downedIcon    = downGO,
+                deadIcon      = deadGO,
+                deadTimerText = deadTxt,
+            };
         }
 
         private void RebuildLayout()
