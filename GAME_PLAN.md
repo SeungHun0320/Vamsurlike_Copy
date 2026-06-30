@@ -1411,26 +1411,35 @@ StageResultUI
 
 결과 통계와 별도 작업 단위로 진행한다. 8.4a 완료 후 독립적으로 다듬는다.
 
+**아키텍처: 전용 서버 (Dedicated Server)**
+
+- 서버는 별도 헤드리스 빌드로 실행 (`-server` 플래그 또는 `UNITY_SERVER`)
+- 클라이언트는 서버 IP:PORT를 직접 입력해 접속 (`StartAsClient`)
+- Host-Client / Relay 세션 방식 미사용 (`StartAsHost`, `StartAsRelayHost` Obsolete 처리됨)
+- "방장"은 먼저 접속한 클라이언트가 담당 (`LobbyHostService`)
+
 **씬 전환 흐름**
 
 ```
-Bootstrap → MainMenu → Lobby(대기실) → Stage_01(로딩 화면) → 게임 → 결과 화면 → MainMenu
+Bootstrap → MainMenu(접속) → Stage_01(로딩 화면) → 게임 → 결과 화면 → MainMenu
 ```
 
 ---
 
 **① MainMenu**
 
-- 방 만들기 버튼 → Relay 세션 생성 → Lobby 씬 이동
-- 코드 입력 참여 → Relay 코드 검증 → Lobby 씬 이동
-- 연결 상태 표시 (Relay 연결 중 / 실패 / 재시도)
+- 플레이어 이름 입력 (`PlayerPrefs`로 저장/복원)
+- 서버 IP:PORT 입력 + 접속 버튼
+- 연결 상태 표시 (접속 중 / 실패 / 재시도)
+- 서버 모드(`IsServerBuild`)일 때 UI 전체 비활성
 
-**② LobbyUI (대기실)**
+**② LobbyUI (접속 후 대기실 — MainMenu 씬 내 패널 전환)**
 
 - 참여 플레이어 슬롯 4개 (이름 + 준비 상태)
-- 방 코드 표시 + 복사 버튼
-- 호스트만 "게임 시작" 버튼 활성화; 최소 인원 미달 시 비활성
-- 비호스트: "대기 중…" 표시
+- 서버 IP 표시 + 복사 버튼
+- 방장(첫 접속 클라이언트)만 "게임 시작" 버튼 활성화; 최소 인원 미달 시 비활성
+- 비방장: "대기 중…" 표시
+- 접속 해제 버튼
 
 **③ LoadingScreen**
 
@@ -1440,15 +1449,15 @@ Bootstrap → MainMenu → Lobby(대기실) → Stage_01(로딩 화면) → 게�
 
 **④ 결과 화면 버튼**
 
-- 호스트: "재시작" (동일 씬 재로드) / "메인 메뉴" (Bootstrap 복귀)
-- 클라이언트: "메인 메뉴"
+- 방장: "재시작" (동일 씬 재로드) / "메인 메뉴" (접속 해제 후 MainMenu 복귀)
+- 비방장: "메인 메뉴"
 - 버튼 클릭 → `GameFlowCoordinator`를 통해 씬 전환 요청
 
 **⑤ 네트워크 에러 다이얼로그**
 
-- 호스트 접속 끊김 / Relay 타임아웃 → 오버레이 다이얼로그 표시
-- "확인" 클릭 시 MainMenu로 강제 복귀 (씬 상태 초기화)
-- `GameNetworkManager.OnClientDisconnected` / `OnTransportFailure` 이벤트 수신
+- 서버 접속 끊김 / 타임아웃 → 오버레이 다이얼로그 표시
+- "확인" 클릭 시 MainMenu로 강제 복귀 (접속 상태 초기화)
+- `GameNetworkManager.OnClientDisconnected` 이벤트 수신
 
 **⑥ 설정 UI**
 
@@ -1459,8 +1468,8 @@ Bootstrap → MainMenu → Lobby(대기실) → Stage_01(로딩 화면) → 게�
 
 **⑦ 개발용 네트워크 오버레이**
 
-- Host / Client / Server 모드 표시
-- Ping (RTT ms), Relay 연결 상태
+- Server / Client 모드 표시
+- Ping (RTT ms), 서버 연결 상태
 - 씬 이름, 접속 인원수
 - `#if DEVELOPMENT_BUILD || UNITY_EDITOR` 조건부 표시
 
@@ -1468,11 +1477,11 @@ Bootstrap → MainMenu → Lobby(대기실) → Stage_01(로딩 화면) → 게�
 
 ##### Phase 8.4b 구현 항목
 
-- [ ] MainMenu 구현 (방 만들기 / 코드 참여 / 연결 상태 표시)
-- [ ] LobbyUI 구현 (플레이어 슬롯 4개, 방 코드 공유, 호스트 시작 버튼)
+- [x] MainMenu 구현 (이름 입력 / 서버 IP 접속 / 연결 상태 표시)
+- [ ] LobbyUI 구현 (플레이어 슬롯 4개, 서버 IP 표시, 방장 시작 버튼)
 - [ ] LoadingScreen 구현 (`SceneManager.OnSceneEvent` 구독, 스폰 대기 커버)
 - [ ] 결과 화면 재시작 / 메인 메뉴 복귀 버튼 (`StageResultUI` 확장)
-- [ ] 네트워크 에러 다이얼로그 (호스트 끊김 / 타임아웃 → MainMenu 강제 복귀)
+- [ ] 네트워크 에러 다이얼로그 (서버 끊김 / 타임아웃 → MainMenu 강제 복귀)
 - [ ] 설정 UI (음량 3채널, 해상도, 프레임 캡, PlayerPrefs 저장)
 - [ ] 개발용 네트워크 오버레이 (`DEVELOPMENT_BUILD` 조건부)
 

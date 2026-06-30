@@ -40,7 +40,7 @@ namespace Vamsurlike.Skills
                 count++;
             }
 
-            context.VFX?.ShowMelee(origin, forward);
+            context.VFX?.ShowMelee(origin, forward, levelData.meleeRange, levelData.meleeArcAngle);
             return true;
         }
     }

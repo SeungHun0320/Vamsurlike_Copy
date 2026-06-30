@@ -8,7 +8,7 @@ namespace Vamsurlike.Network
         ushort CurrentPort { get; }
 
         void ConfigureConnectionApproval();
-        bool StartClient(string ip, ushort port);
+        bool StartClient(string ip, ushort port, string nickname = "");
         bool StartRelayClient();
         bool StartServer(string ip, ushort port);
         void Disconnect();

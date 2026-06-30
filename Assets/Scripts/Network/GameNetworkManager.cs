@@ -123,9 +123,9 @@ namespace Vamsurlike.Network
             return false;
         }
 
-        public bool StartAsClient(string ip = DefaultClientIp, ushort port = DefaultPort)
+        public bool StartAsClient(string ip = DefaultClientIp, ushort port = DefaultPort, string nickname = "")
         {
-            bool started = sessionService?.StartClient(ip, port) ?? false;
+            bool started = sessionService?.StartClient(ip, port, nickname) ?? false;
             if (started) RegisterMessagingHandlers();
             return started;
         }

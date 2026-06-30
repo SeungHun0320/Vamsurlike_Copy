@@ -10,15 +10,18 @@ namespace Vamsurlike.Player
     // OwnerClientId로 어느 플레이어 상태인지 구분한다.
     [RequireComponent(typeof(PlayerNetworkStats))]
     [RequireComponent(typeof(PlayerReviveHandler))]
+    [RequireComponent(typeof(PlayerMatchStats))]
     public class PlayerStatusAdapter : NetworkBehaviour
     {
         private PlayerNetworkStats  stats;
         private PlayerReviveHandler reviveHandler;
+        private PlayerMatchStats    matchStats;
 
         private void Awake()
         {
             stats         = GetComponent<PlayerNetworkStats>();
             reviveHandler = GetComponent<PlayerReviveHandler>();
+            matchStats    = GetComponent<PlayerMatchStats>();
         }
 
         public override void OnNetworkSpawn()
@@ -31,6 +34,7 @@ namespace Vamsurlike.Player
             stats.IsDeadWaiting.OnValueChanged               += OnStatB;
             reviveHandler.DownedTimeRemaining.OnValueChanged += OnStatF;
             reviveHandler.DeadWaitRemaining.OnValueChanged   += OnStatF;
+            matchStats.PlayerName.OnValueChanged             += OnNameChanged;
 
             Publish();
         }
@@ -45,18 +49,24 @@ namespace Vamsurlike.Player
             stats.IsDeadWaiting.OnValueChanged               -= OnStatB;
             reviveHandler.DownedTimeRemaining.OnValueChanged -= OnStatF;
             reviveHandler.DeadWaitRemaining.OnValueChanged   -= OnStatF;
+            matchStats.PlayerName.OnValueChanged             -= OnNameChanged;
         }
 
         private void OnStatF(float _, float __) => Publish();
         private void OnStatB(bool  _, bool  __) => Publish();
+        private void OnNameChanged(Unity.Collections.FixedString64Bytes _, Unity.Collections.FixedString64Bytes __) => Publish();
 
         private void Publish()
         {
             if (UIEventHub.Instance == null) return;
 
+            string name = matchStats.PlayerName.Value.ToString();
+            if (string.IsNullOrWhiteSpace(name))
+                name = $"Player {OwnerClientId + 1}";
+
             UIEventHub.Instance.Player.PublishPlayerStatus(new PlayerStatusPayload(
                 clientId:            OwnerClientId,
-                displayName:         $"Player {OwnerClientId + 1}",
+                displayName:         name,
                 hp:                  stats.HP.Value,
                 maxHp:               stats.MaxHP.Value,
                 isDowned:            stats.IsDowned.Value,

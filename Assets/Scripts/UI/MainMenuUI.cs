@@ -8,29 +8,31 @@ namespace Vamsurlike.UI
 {
     public class MainMenuUI : MonoBehaviour
     {
+        private const string PrefKeyName   = "PlayerName";
+        private const string PrefKeyLastIp = "LastServerIp";
+
         [SerializeField] private GameObject      clientPanel;
+        [SerializeField] private TMP_InputField  nameInput;
+        [SerializeField] private TMP_InputField  serverIpInput;
         [SerializeField] private Button          joinButton;
         [SerializeField] private Button          startGameButton;
-        [SerializeField] private TMP_InputField  ipOrCodeInput;
         [SerializeField] private TextMeshProUGUI statusText;
-        [SerializeField] private TextMeshProUGUI localIPText;
         [Header("Connection")]
-        [SerializeField] private ushort defaultServerPort        = 7777;
+        [SerializeField] private ushort defaultServerPort         = 7777;
         [SerializeField, Min(0.5f)] private float connectionTimeoutSeconds = 5f;
         [SerializeField, Min(50)]   private int   connectionPollIntervalMs = 200;
         [SerializeField] private string routeProbeHost  = "8.8.8.8";
         [SerializeField] private int    routeProbePort  = 65530;
         [SerializeField] private string fallbackLocalIp = "127.0.0.1";
         [Header("Labels")]
-        [SerializeField] private string localIpFormat           = "내 IP: {0}";
-        [SerializeField] private string emptyAddressMessage     = "서버 IP 또는 호스트명을 입력하세요.";
-        [SerializeField] private string invalidAddressMessage   = "주소 형식이 올바르지 않습니다. 예: 192.168.0.10:7777";
-        [SerializeField] private string connectingFormat        = "접속 중: {0}:{1}";
+        [SerializeField] private string emptyAddressMessage      = "서버 IP를 입력하세요. 예: 192.168.0.10:7777";
+        [SerializeField] private string invalidAddressMessage    = "주소 형식이 올바르지 않습니다. 예: 192.168.0.10:7777";
+        [SerializeField] private string connectingFormat         = "접속 중: {0}:{1}";
         [SerializeField] private string clientStartFailedMessage = "클라이언트 시작 실패.";
-        [SerializeField] private string connectionFailedMessage = "접속 실패: 서버를 찾을 수 없습니다.";
-        [SerializeField] private string lobbyHostStatusFormat   = "방장입니다 - 플레이어 {0}명, 게임 시작 가능";
-        [SerializeField] private string lobbyClientStatusFormat = "플레이어 {0}명 접속 중 - 방장 시작 대기";
-        [SerializeField] private string startRequestMessage     = "게임 시작 요청 중...";
+        [SerializeField] private string connectionFailedMessage  = "접속 실패: 서버를 찾을 수 없습니다.";
+        [SerializeField] private string lobbyHostStatusFormat    = "방장입니다 — 플레이어 {0}명";
+        [SerializeField] private string lobbyClientStatusFormat  = "플레이어 {0}명 접속 중 — 방장 시작 대기";
+        [SerializeField] private string startRequestMessage      = "게임 시작 요청 중...";
 
         private LobbyViewModel viewModel;
 
@@ -40,7 +42,6 @@ namespace Vamsurlike.UI
             {
                 if (clientPanel != null) clientPanel.SetActive(false);
                 if (statusText  != null) statusText.gameObject.SetActive(false);
-                if (localIPText != null) localIPText.gameObject.SetActive(false);
                 enabled = false;
                 return;
             }
@@ -63,18 +64,19 @@ namespace Vamsurlike.UI
                 StartRequestMessage      = startRequestMessage,
             });
 
-            if (joinButton      != null) joinButton.onClick.AddListener(() => _ = viewModel.ConnectAsync(ipOrCodeInput != null ? ipOrCodeInput.text.Trim() : ""));
+            RestorePrefs();
+
+            if (nameInput != null)
+                nameInput.onEndEdit.AddListener(SaveName);
+
+            if (joinButton != null)
+                joinButton.onClick.AddListener(OnJoinClicked);
+
             if (startGameButton != null)
             {
                 startGameButton.onClick.AddListener(viewModel.StartGame);
                 startGameButton.gameObject.SetActive(false);
             }
-        }
-
-        private void Start()
-        {
-            if (localIPText != null && viewModel != null)
-                localIPText.text = string.Format(localIpFormat, viewModel.GetLocalIp());
         }
 
         private void OnEnable()
@@ -98,21 +100,43 @@ namespace Vamsurlike.UI
             viewModel?.Dispose();
         }
 
+        private void OnJoinClicked()
+        {
+            string name = nameInput != null ? nameInput.text.Trim() : "";
+            SaveName(name);
+            string ip = serverIpInput != null ? serverIpInput.text.Trim() : "";
+            if (!string.IsNullOrEmpty(ip))
+                PlayerPrefs.SetString(PrefKeyLastIp, ip);
+            _ = viewModel.ConnectAsync(ip, name);
+        }
+
         private void RefreshLobbyControls(bool isConnected, bool isHost, int _)
         {
             if (startGameButton != null)
             {
-                startGameButton.gameObject.SetActive(isConnected);
+                startGameButton.gameObject.SetActive(isConnected && isHost);
                 startGameButton.interactable = isHost;
             }
-            if (joinButton     != null) joinButton.gameObject.SetActive(!isConnected);
-            if (ipOrCodeInput  != null) ipOrCodeInput.gameObject.SetActive(!isConnected);
+            if (joinButton    != null) joinButton.gameObject.SetActive(!isConnected);
+            if (nameInput     != null) nameInput.interactable = !isConnected;
+            if (serverIpInput != null) serverIpInput.interactable = !isConnected;
         }
 
         private void SetStatus(string message)
         {
             if (statusText != null) statusText.text = message;
             Debug.Log($"[{nameof(MainMenuUI)}] {message}");
+        }
+
+        private void RestorePrefs()
+        {
+            if (nameInput     != null) nameInput.text     = PlayerPrefs.GetString(PrefKeyName, "");
+            if (serverIpInput != null) serverIpInput.text = PlayerPrefs.GetString(PrefKeyLastIp, "");
+        }
+
+        private void SaveName(string value)
+        {
+            PlayerPrefs.SetString(PrefKeyName, value.Trim());
         }
 
         private static bool IsServerMode()

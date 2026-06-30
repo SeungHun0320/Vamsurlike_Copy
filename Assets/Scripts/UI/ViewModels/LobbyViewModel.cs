@@ -70,7 +70,7 @@ namespace Vamsurlike.UI.ViewModels
         }
 
         // 커맨드: IP 또는 호스트명으로 전용 서버에 참여
-        public async Task ConnectAsync(string input)
+        public async Task ConnectAsync(string input, string nickname = "")
         {
             if (isBusy) return;
 
@@ -91,7 +91,7 @@ namespace Vamsurlike.UI.ViewModels
             {
                 OnStatus?.Invoke(string.Format(cfg.ConnectingFormat, ip, port));
                 var gnm = GameNetworkManager.Instance;
-                if (gnm == null || !gnm.StartAsClient(ip, port))
+                if (gnm == null || !gnm.StartAsClient(ip, port, nickname))
                 {
                     OnStatus?.Invoke(cfg.ClientStartFailed);
                     return;

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Vamsurlike.Player;
 
 namespace Vamsurlike.Network
 {
@@ -113,6 +114,13 @@ namespace Vamsurlike.Network
             }
 
             networkObject.SpawnAsPlayerObject(clientId, destroyWithScene: true);
+
+            if (NetworkSessionService.PendingPlayerNames.TryGetValue(clientId, out string playerName))
+            {
+                if (player.TryGetComponent(out PlayerMatchStats matchStats))
+                    matchStats.SetPlayerName(playerName);
+                NetworkSessionService.PendingPlayerNames.Remove(clientId);
+            }
         }
 
         private bool CanServerSpawnInScene(string sceneName)

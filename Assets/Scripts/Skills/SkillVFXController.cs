@@ -22,6 +22,8 @@ namespace Vamsurlike.Skills
         [SerializeField] private CharacterDataSO characterData;
         [SerializeField] private GameObject orbitalVisualPrefab;
         [SerializeField] private float orbitalHeightOffset = 0.9f;
+        [SerializeField] private float meleeVisualForwardOffsetRatio = 0.5f;
+        [SerializeField] private float meleeVisualHeightOffset = 2.2f;
 
         private readonly Dictionary<SkillCastType, GameObject> vfxPrefabsByType = new();
         private readonly Dictionary<SkillCastType, AreaCircleVFX> areaCircleVfxByType = new();
@@ -84,10 +86,10 @@ namespace Vamsurlike.Skills
             ShowUltimateClientRpc(position);
         }
 
-        public void ShowMelee(Vector3 position, Vector3 forward)
+        public void ShowMelee(Vector3 position, Vector3 forward, float range, float arcAngle)
         {
             if (!IsServer) return;
-            ShowMeleeClientRpc(position, forward);
+            ShowMeleeClientRpc(position, forward, range, arcAngle);
         }
 
         public void ShowGrenade(Vector3 from, Vector3 to, float arcHeight, float flightTime)
@@ -170,16 +172,26 @@ namespace Vamsurlike.Skills
         }
 
         [ClientRpc]
-        private void ShowMeleeClientRpc(Vector3 position, Vector3 forward)
+        private void ShowMeleeClientRpc(Vector3 position, Vector3 forward, float range, float arcAngle)
         {
-            if (!vfxPrefabsByType.TryGetValue(SkillCastType.Melee, out GameObject prefab)
-                || prefab == null)
-                return;
+            Vector3 flatForward = forward;
+            flatForward.y = 0f;
+            if (flatForward.sqrMagnitude < 0.0001f)
+                flatForward = transform.forward;
+            flatForward.Normalize();
+
+            // 부채꼴 범위 표시
+            MeleeArcVFX.Spawn(position, flatForward, range, arcAngle * 0.5f, MeleeVisualDuration);
+
+            // 망치 VFX
+            if (!TryGetVFXPrefab(SkillCastType.Melee, out GameObject prefab)) return;
 
             GameObject visual = Instantiate(
                 prefab,
-                position,
-                Quaternion.LookRotation(forward, Vector3.up));
+                position
+                + flatForward * range * meleeVisualForwardOffsetRatio
+                + Vector3.up * meleeVisualHeightOffset,
+                Quaternion.LookRotation(flatForward, Vector3.up));
             Destroy(visual, MeleeVisualDuration);
         }
 
@@ -248,6 +260,15 @@ namespace Vamsurlike.Skills
         {
             if (skill == null || skill.vfxPrefab == null) return;
             vfxPrefabsByType[skill.castType] = skill.vfxPrefab;
+        }
+
+        private bool TryGetVFXPrefab(SkillCastType castType, out GameObject prefab)
+        {
+            if (vfxPrefabsByType.TryGetValue(castType, out prefab) && prefab != null)
+                return true;
+
+            BuildVFXPrefabMap();
+            return vfxPrefabsByType.TryGetValue(castType, out prefab) && prefab != null;
         }
 
         private IEnumerator GrenadeVisualCoroutine(

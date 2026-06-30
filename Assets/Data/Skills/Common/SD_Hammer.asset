@@ -36,6 +36,13 @@ MonoBehaviour:
     orbitalRadius: 2
     orbitalRotationSpeed: 180
     orbitalHitRadius: 0.65
+    orbitalDamageMultiplier: 1
+    orbitalHitCooldown: 0.2
+    orbitalProjectileScale: 0.75
+    detachedOrbitalLifetimeMultiplier: 0.8
+    detachedOrbitalHomingDelay: 0.2
+    detachedOrbitalHomingRange: 18
+    detachedOrbitalHomingTurnSpeed: 540
     waveCount: 1
     waveDelay: 0.15
     rotationPerWave: 30
@@ -45,8 +52,13 @@ MonoBehaviour:
     scatterBulletCount: 8
     scatterAngle: 60
     burstDuration: 2
-    meleeArcAngle: 120
-    meleeRange: 5
+    meleeArcAngle: 60
+    meleeRange: 10
+    clusterCount: 4
+    clusterSpread: 3
+    clusterSplashRadius: 1.5
+    clusterDamageRatio: 0.5
+    pullSpeed: 3
   - cooldown: 1.8
     damage: 90
     range: 10
@@ -63,6 +75,13 @@ MonoBehaviour:
     orbitalRadius: 2
     orbitalRotationSpeed: 180
     orbitalHitRadius: 0.65
+    orbitalDamageMultiplier: 1
+    orbitalHitCooldown: 0.2
+    orbitalProjectileScale: 0.75
+    detachedOrbitalLifetimeMultiplier: 0.8
+    detachedOrbitalHomingDelay: 0.2
+    detachedOrbitalHomingRange: 18
+    detachedOrbitalHomingTurnSpeed: 540
     waveCount: 1
     waveDelay: 0.15
     rotationPerWave: 30
@@ -72,8 +91,13 @@ MonoBehaviour:
     scatterBulletCount: 8
     scatterAngle: 60
     burstDuration: 2
-    meleeArcAngle: 130
-    meleeRange: 5
+    meleeArcAngle: 90
+    meleeRange: 15
+    clusterCount: 4
+    clusterSpread: 3
+    clusterSplashRadius: 1.5
+    clusterDamageRatio: 0.5
+    pullSpeed: 3
   - cooldown: 1.5
     damage: 120
     range: 10
@@ -90,6 +114,13 @@ MonoBehaviour:
     orbitalRadius: 2
     orbitalRotationSpeed: 180
     orbitalHitRadius: 0.65
+    orbitalDamageMultiplier: 1
+    orbitalHitCooldown: 0.2
+    orbitalProjectileScale: 0.75
+    detachedOrbitalLifetimeMultiplier: 0.8
+    detachedOrbitalHomingDelay: 0.2
+    detachedOrbitalHomingRange: 18
+    detachedOrbitalHomingTurnSpeed: 540
     waveCount: 1
     waveDelay: 0.15
     rotationPerWave: 30
@@ -99,5 +130,10 @@ MonoBehaviour:
     scatterBulletCount: 8
     scatterAngle: 60
     burstDuration: 2
-    meleeArcAngle: 140
-    meleeRange: 5
+    meleeArcAngle: 120
+    meleeRange: 20
+    clusterCount: 4
+    clusterSpread: 3
+    clusterSplashRadius: 1.5
+    clusterDamageRatio: 0.5
+    pullSpeed: 3

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine;
@@ -6,6 +7,9 @@ namespace Vamsurlike.Network
 {
     internal sealed class NetworkSessionService : INetworkSessionService
     {
+        // 서버에서 clientId → 닉네임 임시 저장 (스폰 시 PlayerMatchStats에 주입)
+        internal static readonly Dictionary<ulong, string> PendingPlayerNames = new();
+
         private readonly NetworkManager networkManager;
         private readonly UnityTransport transport;
 
@@ -39,12 +43,12 @@ namespace Vamsurlike.Network
                 Debug.LogWarning($"[{nameof(NetworkSessionService)}] 다른 ConnectionApprovalCallback이 이미 등록되어 있습니다.");
         }
 
-        public bool StartClient(string ip, ushort port)
+        public bool StartClient(string ip, ushort port, string nickname = "")
         {
             if (!CanStart(nameof(StartClient)) || !TrySetTransport(ip, port)) return false;
 
             ConfigureConnectionApproval();
-            SetVersionPayload();
+            SetVersionPayload(nickname);
             bool started = networkManager.StartClient();
             Debug.Log($"[{nameof(NetworkSessionService)}] Client 시작 - {ip}:{port} (ok={started})");
             return started;
@@ -122,17 +126,22 @@ namespace Vamsurlike.Network
             return true;
         }
 
-        private void SetVersionPayload()
+        private void SetVersionPayload(string nickname = "")
         {
-            networkManager.NetworkConfig.ConnectionData =
-                System.BitConverter.GetBytes(CatalogVersionUtility.GetHash());
+            byte[] hashBytes = System.BitConverter.GetBytes(CatalogVersionUtility.GetHash());
+            byte[] nameBytes = System.Text.Encoding.UTF8.GetBytes(
+                string.IsNullOrWhiteSpace(nickname) ? "" : nickname.Trim());
+            var payload = new byte[hashBytes.Length + nameBytes.Length];
+            hashBytes.CopyTo(payload, 0);
+            nameBytes.CopyTo(payload, hashBytes.Length);
+            networkManager.NetworkConfig.ConnectionData = payload;
         }
 
         private static void HandleConnectionApproval(
             NetworkManager.ConnectionApprovalRequest request,
             NetworkManager.ConnectionApprovalResponse response)
         {
-            if (!ValidatePayload(request.Payload, out string reason))
+            if (!ValidatePayload(request.Payload, out string reason, out string nickname))
             {
                 response.Approved = false;
                 response.Reason   = reason;
@@ -141,13 +150,15 @@ namespace Vamsurlike.Network
                 return;
             }
 
-            response.Approved          = true;
+            PendingPlayerNames[request.ClientNetworkId] = nickname;
+            response.Approved           = true;
             response.CreatePlayerObject = false;
-            response.Pending           = false;
+            response.Pending            = false;
         }
 
-        private static bool ValidatePayload(byte[] payload, out string reason)
+        private static bool ValidatePayload(byte[] payload, out string reason, out string nickname)
         {
+            nickname = "Player";
             if (payload == null || payload.Length < sizeof(int))
             {
                 reason = "연결 데이터가 없습니다.";
@@ -161,6 +172,14 @@ namespace Vamsurlike.Network
             {
                 reason = "데이터 버전이 서버와 다릅니다. 클라이언트를 업데이트하세요.";
                 return false;
+            }
+
+            int nameStart = sizeof(int);
+            if (payload.Length > nameStart)
+            {
+                string name = System.Text.Encoding.UTF8.GetString(payload, nameStart, payload.Length - nameStart).Trim();
+                if (!string.IsNullOrEmpty(name))
+                    nickname = name;
             }
 
             reason = null;
