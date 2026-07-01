@@ -87,6 +87,19 @@ namespace Vamsurlike.Network
             Publish(entry);
         }
 
+        // 같은 key 로그를 intervalSeconds 이내에 중복 출력하지 않는다.
+        // 매 프레임 수십 번 호출될 수 있는 게임플레이 검증 로그에 사용.
+        private static readonly Dictionary<string, float> throttleTable = new();
+
+        public static void LogThrottled(string key, string message, float intervalSeconds = 5f)
+        {
+            float now = UnityEngine.Time.realtimeSinceStartup;
+            if (throttleTable.TryGetValue(key, out float last) && now - last < intervalSeconds)
+                return;
+            throttleTable[key] = now;
+            Log(message);
+        }
+
         private static void Publish(string entry)
         {
             BufferedEntries.Add(entry);

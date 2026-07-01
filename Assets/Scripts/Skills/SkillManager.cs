@@ -239,7 +239,11 @@ namespace Vamsurlike.Skills
                 return;
             }
 
-            if (UltimateGaugeAmount.Value < gaugeRequired) return;
+            if (UltimateGaugeAmount.Value < gaugeRequired)
+            {
+                Debug.LogWarning($"[ActivateFirstManualSkillServerRpc] FAIL — 게이지 부족 (current={UltimateGaugeAmount.Value:F1}, required={gaugeRequired:F1}, owner={OwnerClientId})");
+                return;
+            }
 
             IReadOnlyList<SkillRuntimeState> skills = skillInventory.Skills;
             for (int i = 0; i < skills.Count; i++)

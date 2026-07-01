@@ -83,6 +83,8 @@ namespace Vamsurlike.UI
             viewModel.OnLobbyChanged += RefreshLobbyControls;
             viewModel.OnStatus       += SetStatus;
             viewModel.Bind();
+            // 이미 연결된 채로 씬이 로드된 경우(로비 복귀) 현재 상태 즉시 반영
+            viewModel.Refresh();
         }
 
         private void OnDisable()
@@ -134,14 +136,6 @@ namespace Vamsurlike.UI
             PlayerPrefs.SetString(PrefKeyName, value.Trim());
         }
 
-        private static bool IsServerMode()
-        {
-            if (NetworkBootstrapper.IsServerBuild) return true;
-#if UNITY_EDITOR
-            foreach (string tag in Unity.Multiplayer.PlayMode.CurrentPlayer.Tags)
-                if (string.Equals(tag, "Server", System.StringComparison.OrdinalIgnoreCase)) return true;
-#endif
-            return false;
-        }
+        private static bool IsServerMode() => NetworkBootstrapper.IsServerMode();
     }
 }

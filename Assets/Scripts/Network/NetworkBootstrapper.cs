@@ -60,6 +60,17 @@ namespace Vamsurlike.Network
             ServerConsoleLogger.Log($"서버 시작 — {ip}:{port} (ok={ok})");
         }
 
+        // 서버 빌드 또는 에디터 MPM "Server" 태그 여부 — 스크립트 초기화 단계에서도 사용 가능
+        public static bool IsServerMode()
+        {
+            if (IsServerBuild) return true;
+#if UNITY_EDITOR
+            foreach (string tag in Unity.Multiplayer.PlayMode.CurrentPlayer.Tags)
+                if (string.Equals(tag, "Server", StringComparison.OrdinalIgnoreCase)) return true;
+#endif
+            return false;
+        }
+
         private static bool DetectServerBuild()
         {
 #if UNITY_SERVER

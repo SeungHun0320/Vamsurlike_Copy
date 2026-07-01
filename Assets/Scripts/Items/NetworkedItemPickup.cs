@@ -68,19 +68,36 @@ namespace Vamsurlike.Items
                 (GameFlowCoordinator.Instance == null ||
                  !GameFlowCoordinator.Instance.IsGameplayActive))
             {
+                ServerConsoleLogger.LogThrottled(
+                    $"item-flow-{NetworkObjectId}-{clientId}",
+                    $"[검증] 아이템 픽업 거부 — 게임플레이 상태 아님 (client={clientId}, item={itemData.name})",
+                    3f);
                 SendPickupRejected(clientId);
                 return;
             }
 
             // 거리 검증
             const float MaxPickupDist = 4f;
-            if (Vector3.SqrMagnitude(client.PlayerObject.transform.position - transform.position)
-                > MaxPickupDist * MaxPickupDist) return;
+            float sqrDist = Vector3.SqrMagnitude(client.PlayerObject.transform.position - transform.position);
+            if (sqrDist > MaxPickupDist * MaxPickupDist)
+            {
+                ServerConsoleLogger.LogThrottled(
+                    $"item-dist-{NetworkObjectId}-{clientId}",
+                    $"[검증] 아이템 픽업 거부 — 거리 초과 (client={clientId}, item={itemData.name}, sqrDist={sqrDist:F1})",
+                    3f);
+                return;
+            }
 
             if (ApplyEffect(client.PlayerObject.gameObject))
+            {
+                ServerConsoleLogger.Log($"[검증] 아이템 픽업 승인 (client={clientId}, item={itemData.name})");
                 DespawnToPool();
+            }
             else
+            {
+                ServerConsoleLogger.Log($"[검증] 아이템 픽업 거부 — 효과 적용 실패 (client={clientId}, item={itemData.name})");
                 SendPickupRejected(clientId);
+            }
         }
 
         // 서버 → 요청 클라이언트: 픽업 거절 통보 (pendingPickupRequests 정리 용도)

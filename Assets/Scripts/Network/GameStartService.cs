@@ -8,8 +8,10 @@ namespace Vamsurlike.Network
 {
     internal sealed class GameStartService : IGameStartService
     {
-        private const string StartGameRequestMessage = "Vamsurlike.StartGameRequest";
-        private const byte StartGameRequestCode = 1;
+        private const string StartGameRequestMessage    = "Vamsurlike.StartGameRequest";
+        private const string ReturnToLobbyRequestMessage = "Vamsurlike.ReturnToLobbyRequest";
+        private const byte StartGameRequestCode    = 1;
+        private const byte ReturnToLobbyRequestCode = 2;
 
         private readonly NetworkManager networkManager;
         private readonly ILobbyHostService lobbyHostService;
@@ -36,8 +38,9 @@ namespace Vamsurlike.Network
             if (isMessageHandlerRegistered || networkManager?.CustomMessagingManager == null) return;
 
             networkManager.CustomMessagingManager.RegisterNamedMessageHandler(
-                StartGameRequestMessage,
-                HandleStartGameRequestMessage);
+                StartGameRequestMessage, HandleStartGameRequestMessage);
+            networkManager.CustomMessagingManager.RegisterNamedMessageHandler(
+                ReturnToLobbyRequestMessage, HandleReturnToLobbyRequestMessage);
             isMessageHandlerRegistered = true;
         }
 
@@ -46,6 +49,7 @@ namespace Vamsurlike.Network
             if (!isMessageHandlerRegistered || networkManager?.CustomMessagingManager == null) return;
 
             networkManager.CustomMessagingManager.UnregisterNamedMessageHandler(StartGameRequestMessage);
+            networkManager.CustomMessagingManager.UnregisterNamedMessageHandler(ReturnToLobbyRequestMessage);
             isMessageHandlerRegistered = false;
         }
 
@@ -73,53 +77,134 @@ namespace Vamsurlike.Network
             return true;
         }
 
+        public bool RequestReturnToLobby()
+        {
+            if (networkManager == null) return false;
+
+            // 서버면 직접 처리
+            if (networkManager.IsServer)
+            {
+                ExecuteReturnToLobby();
+                return true;
+            }
+
+            // 클라이언트면 서버에 요청
+            if (!networkManager.IsConnectedClient || networkManager.CustomMessagingManager == null)
+            {
+                Debug.LogWarning($"[{nameof(GameStartService)}] 서버에 연결되지 않아 로비 복귀를 요청할 수 없습니다.");
+                return false;
+            }
+
+            using FastBufferWriter writer = new(sizeof(byte), Allocator.Temp);
+            writer.WriteValueSafe(ReturnToLobbyRequestCode);
+            networkManager.CustomMessagingManager.SendNamedMessage(
+                ReturnToLobbyRequestMessage,
+                NetworkManager.ServerClientId,
+                writer);
+            Debug.Log($"[{nameof(GameStartService)}] 로비 복귀 요청 전송. clientId={networkManager.LocalClientId}");
+            return true;
+        }
+
         public void Dispose()
         {
             UnregisterMessageHandler();
+        }
+
+        private void HandleReturnToLobbyRequestMessage(ulong senderClientId, FastBufferReader reader)
+        {
+            if (networkManager == null || !networkManager.IsServer) return;
+
+            ServerConsoleLogger.Log($"[검증] 로비 복귀 요청 수신 — sender={senderClientId}");
+
+            byte requestCode;
+            try
+            {
+                reader.ReadValueSafe(out requestCode);
+            }
+            catch (Exception exception)
+            {
+                ServerConsoleLogger.Log($"[검증] 로비 복귀 요청 파싱 실패: {exception.Message}");
+                return;
+            }
+
+            if (requestCode != ReturnToLobbyRequestCode)
+            {
+                ServerConsoleLogger.Log($"[검증] 로비 복귀 요청 코드 불일치 — expected={ReturnToLobbyRequestCode}, got={requestCode} → 거부");
+                return;
+            }
+
+            string currentScene = SceneManager.GetActiveScene().name;
+            if (currentScene == lobbySceneName)
+            {
+                ServerConsoleLogger.Log($"[검증] 이미 로비 씬({lobbySceneName})입니다 — 무시");
+                return;
+            }
+
+            ServerConsoleLogger.Log($"[검증] 로비 복귀 승인 — sender={senderClientId}, currentScene={currentScene}");
+            ExecuteReturnToLobby();
+        }
+
+        private void ExecuteReturnToLobby()
+        {
+            ServerConsoleLogger.Log($"로비 복귀 실행 → '{lobbySceneName}' 로드");
+            isGameStartRequested = false;
+            networkManager.SceneManager.LoadScene(lobbySceneName, LoadSceneMode.Single);
         }
 
         private void HandleStartGameRequestMessage(ulong senderClientId, FastBufferReader reader)
         {
             if (networkManager == null || !networkManager.IsServer) return;
 
+            ServerConsoleLogger.Log($"[검증] 게임 시작 요청 수신 — sender={senderClientId}");
+
+            byte requestCode;
             try
             {
-                reader.ReadValueSafe(out byte requestCode);
-                if (requestCode != StartGameRequestCode)
-                {
-                    Debug.LogWarning($"[{nameof(GameStartService)}] 유효하지 않은 게임 시작 요청입니다.");
-                    return;
-                }
+                reader.ReadValueSafe(out requestCode);
             }
             catch (Exception exception)
             {
-                Debug.LogWarning($"[{nameof(GameStartService)}] 게임 시작 요청을 읽지 못했습니다: {exception.Message}");
+                ServerConsoleLogger.Log($"[검증] 게임 시작 요청 파싱 실패: {exception.Message}");
                 return;
             }
 
-            if (lobbyHostService == null || senderClientId != lobbyHostService.LobbyHostClientId)
+            if (requestCode != StartGameRequestCode)
             {
-                Debug.LogWarning(
-                    $"[{nameof(GameStartService)}] 비방장 게임 시작 요청 거부. " +
-                    $"sender={senderClientId}, host={lobbyHostService?.LobbyHostClientId}");
+                ServerConsoleLogger.Log($"[검증] 요청 코드 불일치 — expected={StartGameRequestCode}, got={requestCode} → 거부");
                 return;
             }
 
-            if (networkManager.ConnectedClientsIds.Count <= 0)
+            ulong expectedHost = lobbyHostService?.LobbyHostClientId ?? NoHost;
+            if (lobbyHostService == null || senderClientId != expectedHost)
             {
-                Debug.LogWarning($"[{nameof(GameStartService)}] 접속 플레이어가 없어 게임 시작 요청을 거부했습니다.");
+                ServerConsoleLogger.Log($"[검증] 방장 아님 → 거부 (sender={senderClientId}, host={expectedHost})");
                 return;
             }
 
-            if (isGameStartRequested || SceneManager.GetActiveScene().name != lobbySceneName)
+            int playerCount = networkManager.ConnectedClientsIds.Count;
+            if (playerCount <= 0)
             {
-                Debug.LogWarning($"[{nameof(GameStartService)}] 게임 시작이 이미 진행 중이거나 로비 상태가 아닙니다.");
+                ServerConsoleLogger.Log($"[검증] 접속 플레이어 없음(count={playerCount}) → 거부");
+                return;
+            }
+
+            string currentScene = SceneManager.GetActiveScene().name;
+            if (isGameStartRequested)
+            {
+                ServerConsoleLogger.Log($"[검증] 이미 시작 진행 중(isGameStartRequested=true) → 거부");
+                return;
+            }
+            if (currentScene != lobbySceneName)
+            {
+                ServerConsoleLogger.Log($"[검증] 현재 씬이 로비가 아님(currentScene={currentScene}) → 거부");
                 return;
             }
 
             isGameStartRequested = true;
-            ServerConsoleLogger.Log($"방장 Client {senderClientId}의 게임 시작 요청 승인");
+            ServerConsoleLogger.Log($"[검증] 게임 시작 승인 — host={senderClientId}, players={playerCount} → '{stageSceneName}' 로드");
             networkManager.SceneManager.LoadScene(stageSceneName, LoadSceneMode.Single);
         }
+
+        private const ulong NoHost = ulong.MaxValue;
     }
 }

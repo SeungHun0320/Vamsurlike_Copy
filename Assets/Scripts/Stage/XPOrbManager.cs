@@ -28,6 +28,23 @@ namespace Vamsurlike.Stage
             Instance = this;
         }
 
+        public override void OnNetworkDespawn()
+        {
+            base.OnNetworkDespawn();
+            // 씬 언로드 시 수거되지 않은 XP 오브 비주얼 전부 정리
+            foreach (var (_, go) in orbVisuals)
+            {
+                if (go == null) continue;
+                if (go.TryGetComponent<XPOrbVisualProxy>(out var proxy))
+                    proxy.Clear();
+                if (PoolManager.Instance != null)
+                    PoolManager.Instance.ReturnGO(orbVisualPrefab, go);
+                else
+                    Destroy(go);
+            }
+            orbVisuals.Clear();
+        }
+
         public override void OnDestroy()
         {
             base.OnDestroy();
@@ -55,7 +72,14 @@ namespace Vamsurlike.Stage
                 var stats = client.PlayerObject.GetComponent<PlayerNetworkStats>();
 
                 // 사망/다운 상태 플레이어는 XP 획득 불가
-                if (stats != null && !stats.CanAct) return false;
+                if (stats != null && !stats.CanAct)
+                {
+                    ServerConsoleLogger.LogThrottled(
+                        $"xp-dead-{clientId}",
+                        $"[검증] XP 픽업 거부 — 사망/다운 상태 (client={clientId})",
+                        5f);
+                    return false;
+                }
 
                 // 서버 권한 거리 검증: 플레이어 스탯의 픽업 반경 기준 + 네트워크 지연 보상(×2)
                 float pickupRadius = stats != null && stats.PickupRadius.Value > 0f
