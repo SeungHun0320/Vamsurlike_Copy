@@ -121,6 +121,12 @@ namespace Vamsurlike.Network
                     matchStats.SetPlayerName(playerName);
                 NetworkSessionService.PendingPlayerNames.Remove(clientId);
             }
+
+            if (LobbyPlayerState.All.TryGetValue(clientId, out var lobbyState))
+            {
+                if (player.TryGetComponent(out PlayerColorSync colorSync))
+                    colorSync.SetColorIndex(lobbyState.ColorIndex.Value);
+            }
         }
 
         private bool CanServerSpawnInScene(string sceneName)
