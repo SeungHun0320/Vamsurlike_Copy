@@ -11,11 +11,11 @@ namespace Vamsurlike.UI
         private const string PrefKeyName   = "PlayerName";
         private const string PrefKeyLastIp = "LastServerIp";
 
-        [SerializeField] private GameObject      clientPanel;
+        [SerializeField] private GameObject      connectPanel;
+        [SerializeField] private LobbyUI         lobbyUI;
         [SerializeField] private TMP_InputField  nameInput;
         [SerializeField] private TMP_InputField  serverIpInput;
         [SerializeField] private Button          joinButton;
-        [SerializeField] private Button          startGameButton;
         [SerializeField] private TextMeshProUGUI statusText;
         [Header("Connection")]
         [SerializeField] private ushort defaultServerPort         = 7777;
@@ -40,8 +40,9 @@ namespace Vamsurlike.UI
         {
             if (IsServerMode())
             {
-                if (clientPanel != null) clientPanel.SetActive(false);
-                if (statusText  != null) statusText.gameObject.SetActive(false);
+                if (connectPanel != null) connectPanel.SetActive(false);
+                if (lobbyUI      != null) lobbyUI.gameObject.SetActive(false);
+                if (statusText   != null) statusText.gameObject.SetActive(false);
                 enabled = false;
                 return;
             }
@@ -72,11 +73,8 @@ namespace Vamsurlike.UI
             if (joinButton != null)
                 joinButton.onClick.AddListener(OnJoinClicked);
 
-            if (startGameButton != null)
-            {
-                startGameButton.onClick.AddListener(viewModel.StartGame);
-                startGameButton.gameObject.SetActive(false);
-            }
+            if (lobbyUI != null)
+                lobbyUI.gameObject.SetActive(false);
         }
 
         private void OnEnable()
@@ -112,11 +110,8 @@ namespace Vamsurlike.UI
 
         private void RefreshLobbyControls(bool isConnected, bool isHost, int _)
         {
-            if (startGameButton != null)
-            {
-                startGameButton.gameObject.SetActive(isConnected && isHost);
-                startGameButton.interactable = isHost;
-            }
+            if (connectPanel != null) connectPanel.SetActive(!isConnected);
+            if (lobbyUI      != null) lobbyUI.gameObject.SetActive(isConnected);
             if (joinButton    != null) joinButton.gameObject.SetActive(!isConnected);
             if (nameInput     != null) nameInput.interactable = !isConnected;
             if (serverIpInput != null) serverIpInput.interactable = !isConnected;
