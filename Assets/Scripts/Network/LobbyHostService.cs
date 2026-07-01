@@ -10,6 +10,7 @@ namespace Vamsurlike.Network
         public const ulong NoLobbyHost = ulong.MaxValue;
 
         private const string LobbyHostChangedMessage = "Vamsurlike.LobbyHostChanged";
+        private const string LobbyHostRequestMessage = "Vamsurlike.LobbyHostRequest";
 
         private readonly NetworkManager networkManager;
         private bool isMessageHandlerRegistered;
@@ -34,7 +35,13 @@ namespace Vamsurlike.Network
             networkManager.CustomMessagingManager.RegisterNamedMessageHandler(
                 LobbyHostChangedMessage,
                 HandleLobbyHostChangedMessage);
+            networkManager.CustomMessagingManager.RegisterNamedMessageHandler(
+                LobbyHostRequestMessage,
+                HandleLobbyHostRequestMessage);
             isMessageHandlerRegistered = true;
+
+            if (networkManager.IsClient && !networkManager.IsServer)
+                RequestLobbyHostFromServer();
         }
 
         public void UnregisterMessageHandler()
@@ -42,16 +49,27 @@ namespace Vamsurlike.Network
             if (!isMessageHandlerRegistered || networkManager?.CustomMessagingManager == null) return;
 
             networkManager.CustomMessagingManager.UnregisterNamedMessageHandler(LobbyHostChangedMessage);
+            networkManager.CustomMessagingManager.UnregisterNamedMessageHandler(LobbyHostRequestMessage);
             isMessageHandlerRegistered = false;
         }
 
         public void HandleClientConnected(ulong clientId)
         {
-            if (networkManager == null || !networkManager.IsServer || LobbyHostClientId != NoLobbyHost) return;
+            if (networkManager == null) return;
+            if (!networkManager.IsServer)
+            {
+                if (networkManager.IsClient && clientId == networkManager.LocalClientId)
+                    RequestLobbyHostFromServer();
+                return;
+            }
 
-            SetLobbyHost(clientId);
+            if (LobbyHostClientId == NoLobbyHost)
+            {
+                SetLobbyHost(clientId);
+                ServerConsoleLogger.Log($"Client {clientId} 방장 지정");
+            }
+
             BroadcastLobbyHost();
-            ServerConsoleLogger.Log($"Client {clientId} 방장 지정");
         }
 
         public void HandleClientDisconnected(ulong clientId)
@@ -101,6 +119,38 @@ namespace Vamsurlike.Network
             networkManager.CustomMessagingManager.SendNamedMessageToAll(
                 LobbyHostChangedMessage,
                 writer);
+        }
+
+        private void SendLobbyHostToClient(ulong clientId)
+        {
+            if (networkManager == null || !networkManager.IsServer || networkManager.CustomMessagingManager == null)
+                return;
+
+            using FastBufferWriter writer = new(sizeof(ulong), Allocator.Temp);
+            writer.WriteValueSafe(LobbyHostClientId);
+            networkManager.CustomMessagingManager.SendNamedMessage(
+                LobbyHostChangedMessage,
+                clientId,
+                writer);
+        }
+
+        private void RequestLobbyHostFromServer()
+        {
+            if (networkManager?.CustomMessagingManager == null || !networkManager.IsConnectedClient)
+                return;
+
+            using FastBufferWriter writer = new(1, Allocator.Temp);
+            writer.WriteValueSafe((byte)0);
+            networkManager.CustomMessagingManager.SendNamedMessage(
+                LobbyHostRequestMessage,
+                NetworkManager.ServerClientId,
+                writer);
+        }
+
+        private void HandleLobbyHostRequestMessage(ulong senderClientId, FastBufferReader reader)
+        {
+            if (networkManager == null || !networkManager.IsServer) return;
+            SendLobbyHostToClient(senderClientId);
         }
 
         private void HandleLobbyHostChangedMessage(ulong senderClientId, FastBufferReader reader)

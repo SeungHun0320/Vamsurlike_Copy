@@ -19,6 +19,10 @@ namespace Vamsurlike.Upgrades
         private readonly Dictionary<ulong, int[]> playerOptions  = new();
         // 서버: 아직 선택하지 않은 플레이어 집합
         private readonly HashSet<ulong>           pendingChoices = new();
+        private readonly Dictionary<ulong, double> playerOptionDeadlines = new();
+        private readonly Dictionary<ulong, Queue<QueuedLevelUpOptions>> deferredPlayerOptions = new();
+        private bool isResolvingDeferredOptions;
+        [SerializeField, Min(0f)] private float selectionTimeoutSeconds = 20f;
 
         // 클라이언트 이벤트: 이 클라이언트에 옵션이 도착했을 때 (optionIndices, currentLevels)
         public static event Action<int[], int[]> OnOptionsReceived;
@@ -28,6 +32,18 @@ namespace Vamsurlike.Upgrades
         // RULES.md: 시드 기반 System.Random 사용
         private readonly System.Random rng = new();
         private LevelUpOptionPicker optionPicker;
+
+        private readonly struct QueuedLevelUpOptions
+        {
+            public readonly int[] OptionIndices;
+            public readonly int[] CurrentLevels;
+
+            public QueuedLevelUpOptions(int[] optionIndices, int[] currentLevels)
+            {
+                OptionIndices = optionIndices;
+                CurrentLevels = currentLevels;
+            }
+        }
 
         private void Awake()
         {
@@ -52,6 +68,12 @@ namespace Vamsurlike.Upgrades
         {
             base.OnDestroy();
             if (Instance == this) Instance = null;
+        }
+
+        private void Update()
+        {
+            ProcessTimedOutChoices();
+            ProcessDeferredOptions();
         }
 
         // SharedLevelSystem이 XP 차감 전에 호출해 사전 검증 — null 엔트리도 걸러냄
@@ -82,12 +104,11 @@ namespace Vamsurlike.Upgrades
 
             playerOptions.Clear();
             pendingChoices.Clear();
+            playerOptionDeadlines.Clear();
+            isResolvingDeferredOptions = false;
 
             foreach (ulong clientId in NetworkManager.ConnectedClientsIds)
             {
-                if (!CanClientChooseUpgrade(clientId))
-                    continue;
-
                 SkillManager skillManager = GetPlayerSkillManager(clientId);
                 int[] indices = optionPicker.GenerateOptions(
                     catalog,
@@ -96,8 +117,16 @@ namespace Vamsurlike.Upgrades
                     clientId,
                     message => Debug.LogWarning($"[{nameof(LevelUpManager)}] {message}"));
                 int[] levels = optionPicker.BuildCurrentLevels(indices, catalog, skillManager);
+
+                if (!CanClientChooseUpgrade(clientId))
+                {
+                    EnqueueDeferredOptions(clientId, indices, levels);
+                    continue;
+                }
+
                 playerOptions[clientId] = indices;
                 pendingChoices.Add(clientId);
+                MarkChoiceDeadline(clientId);
 
                 ShowLevelUpOptionsClientRpc(indices, levels, new ClientRpcParams
                 {
@@ -124,17 +153,25 @@ namespace Vamsurlike.Upgrades
                 return;
             }
 
+            if (!playerOptions.TryGetValue(clientId, out int[] options))
+            {
+                Debug.LogWarning($"[{nameof(LevelUpManager)}] clientId {clientId}: 옵션 데이터 없음");
+                return;
+            }
+
             if (!CanClientChooseUpgrade(clientId))
             {
                 Debug.LogWarning($"[{nameof(LevelUpManager)}] clientId {clientId}: dead/downed player cannot choose upgrade.");
+                if (isResolvingDeferredOptions)
+                    RequeueDeferredOptionsFront(clientId, options);
                 pendingChoices.Remove(clientId);
                 playerOptions.Remove(clientId);
+                playerOptionDeadlines.Remove(clientId);
                 CheckAllDone();
                 return;
             }
 
-            if (!playerOptions.TryGetValue(clientId, out int[] options) ||
-                choiceIndex < 0 || choiceIndex >= options.Length)
+            if (choiceIndex < 0 || choiceIndex >= options.Length)
             {
                 Debug.LogWarning($"[{nameof(LevelUpManager)}] clientId {clientId}: 유효하지 않은 선택 인덱스 {choiceIndex}");
                 return;
@@ -142,7 +179,12 @@ namespace Vamsurlike.Upgrades
 
             Debug.Log($"[SubmitChoiceServerRpc] OK — clientId={clientId}, choice={choiceIndex}");
             pendingChoices.Remove(clientId);
+            playerOptionDeadlines.Remove(clientId);
             ApplyUpgrade(clientId, options[choiceIndex]);
+
+            if (isResolvingDeferredOptions && TrySendNextDeferredOptions(clientId))
+                return;
+
             CheckAllDone();
         }
 
@@ -169,6 +211,8 @@ namespace Vamsurlike.Upgrades
         private void FinalizeLevelUp()
         {
             playerOptions.Clear();
+            playerOptionDeadlines.Clear();
+            isResolvingDeferredOptions = false;
             NotifyLevelUpCompletedClientRpc();
             GameFlowCoordinator.Instance?.ReturnToGameplay();
 
@@ -179,6 +223,8 @@ namespace Vamsurlike.Upgrades
 
         private void HandleClientDisconnect(ulong clientId)
         {
+            deferredPlayerOptions.Remove(clientId);
+            playerOptionDeadlines.Remove(clientId);
             if (!pendingChoices.Contains(clientId)) return;
             pendingChoices.Remove(clientId);
             CheckAllDone();
@@ -204,6 +250,188 @@ namespace Vamsurlike.Upgrades
             }
 
             return stats.CanAct;
+        }
+
+        private void EnqueueDeferredOptions(ulong clientId, int[] optionIndices, int[] currentLevels)
+        {
+            if (optionIndices == null || optionIndices.Length == 0) return;
+
+            if (!deferredPlayerOptions.TryGetValue(clientId, out var queue))
+            {
+                queue = new Queue<QueuedLevelUpOptions>();
+                deferredPlayerOptions[clientId] = queue;
+            }
+
+            queue.Enqueue(new QueuedLevelUpOptions(optionIndices, currentLevels));
+            Debug.Log($"[{nameof(LevelUpManager)}] clientId {clientId}: level-up options deferred. count={queue.Count}");
+        }
+
+        private void RequeueDeferredOptionsFront(ulong clientId, int[] optionIndices)
+        {
+            if (optionIndices == null || optionIndices.Length == 0) return;
+
+            SkillManager skillManager = GetPlayerSkillManager(clientId);
+            var catalog = UpgradeCatalog.Instance;
+            int[] currentLevels = catalog != null
+                ? optionPicker.BuildCurrentLevels(optionIndices, catalog, skillManager)
+                : Array.Empty<int>();
+
+            var nextQueue = new Queue<QueuedLevelUpOptions>();
+            nextQueue.Enqueue(new QueuedLevelUpOptions(optionIndices, currentLevels));
+
+            if (deferredPlayerOptions.TryGetValue(clientId, out var existing))
+            {
+                while (existing.Count > 0)
+                    nextQueue.Enqueue(existing.Dequeue());
+            }
+
+            deferredPlayerOptions[clientId] = nextQueue;
+        }
+
+        private void ProcessDeferredOptions()
+        {
+            if (!IsServer) return;
+            if (isResolvingDeferredOptions || pendingChoices.Count > 0) return;
+            if (GameFlowCoordinator.Instance == null || !GameFlowCoordinator.Instance.IsGameplayActive) return;
+            if (deferredPlayerOptions.Count == 0) return;
+
+            var readyClients = new List<ulong>();
+            foreach (var kv in deferredPlayerOptions)
+            {
+                if (kv.Value.Count <= 0) continue;
+                if (CanClientChooseUpgrade(kv.Key))
+                    readyClients.Add(kv.Key);
+            }
+
+            if (readyClients.Count == 0) return;
+
+            GameFlowCoordinator.Instance.RequestTransition(
+                GameFlowState.LevelingUp,
+                () => StartDeferredLevelUpFlow(readyClients));
+        }
+
+        private void ProcessTimedOutChoices()
+        {
+            if (!IsServer || pendingChoices.Count == 0) return;
+
+            ulong timedOutClientId = 0;
+            bool hasTimedOutClient = false;
+            foreach (ulong clientId in pendingChoices)
+            {
+                if (!IsChoiceTimedOut(clientId)) continue;
+                timedOutClientId = clientId;
+                hasTimedOutClient = true;
+                break;
+            }
+
+            if (!hasTimedOutClient) return;
+
+            if (!playerOptions.TryGetValue(timedOutClientId, out int[] options) || options.Length == 0)
+            {
+                pendingChoices.Remove(timedOutClientId);
+                playerOptions.Remove(timedOutClientId);
+                playerOptionDeadlines.Remove(timedOutClientId);
+                CheckAllDone();
+                return;
+            }
+
+            if (!CanClientChooseUpgrade(timedOutClientId))
+            {
+                if (isResolvingDeferredOptions)
+                    RequeueDeferredOptionsFront(timedOutClientId, options);
+                pendingChoices.Remove(timedOutClientId);
+                playerOptions.Remove(timedOutClientId);
+                playerOptionDeadlines.Remove(timedOutClientId);
+                CheckAllDone();
+                return;
+            }
+
+            int choiceIndex = rng.Next(options.Length);
+            Debug.Log($"[{nameof(LevelUpManager)}] clientId {timedOutClientId}: timeout random upgrade choice={choiceIndex}");
+
+            pendingChoices.Remove(timedOutClientId);
+            playerOptionDeadlines.Remove(timedOutClientId);
+            ApplyUpgrade(timedOutClientId, options[choiceIndex]);
+
+            if (isResolvingDeferredOptions && TrySendNextDeferredOptions(timedOutClientId))
+                return;
+
+            CheckAllDone();
+        }
+
+        private void StartDeferredLevelUpFlow(List<ulong> readyClients)
+        {
+            playerOptions.Clear();
+            pendingChoices.Clear();
+            playerOptionDeadlines.Clear();
+            isResolvingDeferredOptions = true;
+
+            foreach (ulong clientId in readyClients)
+            {
+                if (!CanClientChooseUpgrade(clientId)) continue;
+                TrySendNextDeferredOptions(clientId);
+            }
+
+            if (pendingChoices.Count == 0)
+                FinalizeLevelUp();
+        }
+
+        private bool TrySendNextDeferredOptions(ulong clientId)
+        {
+            if (!deferredPlayerOptions.TryGetValue(clientId, out var queue) || queue.Count == 0)
+            {
+                pendingChoices.Remove(clientId);
+                deferredPlayerOptions.Remove(clientId);
+                playerOptions.Remove(clientId);
+                playerOptionDeadlines.Remove(clientId);
+                return false;
+            }
+
+            if (!CanClientChooseUpgrade(clientId))
+            {
+                pendingChoices.Remove(clientId);
+                playerOptions.Remove(clientId);
+                playerOptionDeadlines.Remove(clientId);
+                return false;
+            }
+
+            QueuedLevelUpOptions next = queue.Dequeue();
+            if (queue.Count == 0)
+                deferredPlayerOptions.Remove(clientId);
+
+            SkillManager skillManager = GetPlayerSkillManager(clientId);
+            var catalog = UpgradeCatalog.Instance;
+            int[] currentLevels = catalog != null
+                ? optionPicker.BuildCurrentLevels(next.OptionIndices, catalog, skillManager)
+                : next.CurrentLevels;
+
+            playerOptions[clientId] = next.OptionIndices;
+            pendingChoices.Add(clientId);
+            MarkChoiceDeadline(clientId);
+
+            ShowLevelUpOptionsClientRpc(next.OptionIndices, currentLevels, new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
+            });
+
+            return true;
+        }
+
+        private void MarkChoiceDeadline(ulong clientId)
+        {
+            if (selectionTimeoutSeconds <= 0f)
+            {
+                playerOptionDeadlines.Remove(clientId);
+                return;
+            }
+
+            playerOptionDeadlines[clientId] = Time.unscaledTimeAsDouble + selectionTimeoutSeconds;
+        }
+
+        private bool IsChoiceTimedOut(ulong clientId)
+        {
+            return playerOptionDeadlines.TryGetValue(clientId, out double deadline)
+                   && Time.unscaledTimeAsDouble >= deadline;
         }
 
         // 서버 → 특정 클라이언트: 해당 플레이어의 업그레이드 옵션 인덱스 + 현재 스킬 레벨 전달

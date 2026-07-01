@@ -18,11 +18,13 @@ namespace Vamsurlike.Items
 
         private readonly Dictionary<ulong, ChestChoiceData[]> playerOptions = new();
         private readonly HashSet<ulong>                      pendingChoices = new();
+        private readonly Dictionary<ulong, double> playerOptionDeadlines = new();
 
         public static event Action<ChestChoiceData[]> OnOptionsReceived;
         public static event Action        OnChestRewardCompleted;
 
         [SerializeField] private int fallbackXP = 30;
+        [SerializeField, Min(0f)] private float selectionTimeoutSeconds = 20f;
 
         private readonly System.Random rng = new();
         private ChestChoiceBuilder choiceBuilder;
@@ -54,6 +56,11 @@ namespace Vamsurlike.Items
             if (Instance == this) Instance = null;
         }
 
+        private void Update()
+        {
+            ProcessTimedOutChoices();
+        }
+
         // 서버 전용: NetworkedItemPickup(Chest)에서 호출.
         // 큐에 적재하고 항상 true 반환 — 상자는 현재 Flow와 무관하게 즉시 소멸.
         public bool BeginChestReward()
@@ -75,6 +82,7 @@ namespace Vamsurlike.Items
 
             playerOptions.Clear();
             pendingChoices.Clear();
+            playerOptionDeadlines.Clear();
 
             bool anyHasCards = false;
 
@@ -94,6 +102,7 @@ namespace Vamsurlike.Items
 
                 playerOptions[clientId] = choices;
                 pendingChoices.Add(clientId);
+                MarkChoiceDeadline(clientId);
                 anyHasCards = true;
 
                 ShowOptionsClientRpc(choices, new ClientRpcParams
@@ -122,6 +131,7 @@ namespace Vamsurlike.Items
                 Debug.LogWarning($"[{nameof(ChestRewardManager)}] clientId {clientId}: dead/downed player cannot choose reward.");
                 pendingChoices.Remove(clientId);
                 playerOptions.Remove(clientId);
+                playerOptionDeadlines.Remove(clientId);
                 CheckAllDone();
                 return;
             }
@@ -135,6 +145,7 @@ namespace Vamsurlike.Items
 
             Debug.Log($"[SubmitChoiceServerRpc] OK — clientId={clientId}, choice={choiceIndex}");
             pendingChoices.Remove(clientId);
+            playerOptionDeadlines.Remove(clientId);
             ApplyChoice(clientId, options[choiceIndex]);
             CheckAllDone();
         }
@@ -152,6 +163,7 @@ namespace Vamsurlike.Items
             if (pendingChoices.Count > 0) return;
 
             playerOptions.Clear();
+            playerOptionDeadlines.Clear();
             // NotifyCompleted를 ReturnToGameplay보다 먼저 전송해야 한다.
             // ReturnToGameplay가 큐를 즉시 소비하면 StartChestFlow → ShowOptionsClientRpc가
             // 같은 프레임에 전송되어, 클라이언트가 수신 시 ShowOptions → NotifyCompleted 순서로
@@ -164,9 +176,70 @@ namespace Vamsurlike.Items
 
         private void HandleClientDisconnect(ulong clientId)
         {
+            playerOptionDeadlines.Remove(clientId);
             if (!pendingChoices.Contains(clientId)) return;
             pendingChoices.Remove(clientId);
             CheckAllDone();
+        }
+
+        private void ProcessTimedOutChoices()
+        {
+            if (!IsServer || pendingChoices.Count == 0) return;
+
+            ulong timedOutClientId = 0;
+            bool hasTimedOutClient = false;
+            foreach (ulong clientId in pendingChoices)
+            {
+                if (!IsChoiceTimedOut(clientId)) continue;
+                timedOutClientId = clientId;
+                hasTimedOutClient = true;
+                break;
+            }
+
+            if (!hasTimedOutClient) return;
+
+            if (!CanClientChooseReward(timedOutClientId))
+            {
+                pendingChoices.Remove(timedOutClientId);
+                playerOptions.Remove(timedOutClientId);
+                playerOptionDeadlines.Remove(timedOutClientId);
+                CheckAllDone();
+                return;
+            }
+
+            if (!playerOptions.TryGetValue(timedOutClientId, out ChestChoiceData[] options) || options.Length == 0)
+            {
+                pendingChoices.Remove(timedOutClientId);
+                playerOptions.Remove(timedOutClientId);
+                playerOptionDeadlines.Remove(timedOutClientId);
+                CheckAllDone();
+                return;
+            }
+
+            int choiceIndex = rng.Next(options.Length);
+            Debug.Log($"[{nameof(ChestRewardManager)}] clientId {timedOutClientId}: timeout random chest choice={choiceIndex}");
+
+            pendingChoices.Remove(timedOutClientId);
+            playerOptionDeadlines.Remove(timedOutClientId);
+            ApplyChoice(timedOutClientId, options[choiceIndex]);
+            CheckAllDone();
+        }
+
+        private void MarkChoiceDeadline(ulong clientId)
+        {
+            if (selectionTimeoutSeconds <= 0f)
+            {
+                playerOptionDeadlines.Remove(clientId);
+                return;
+            }
+
+            playerOptionDeadlines[clientId] = Time.unscaledTimeAsDouble + selectionTimeoutSeconds;
+        }
+
+        private bool IsChoiceTimedOut(ulong clientId)
+        {
+            return playerOptionDeadlines.TryGetValue(clientId, out double deadline)
+                   && Time.unscaledTimeAsDouble >= deadline;
         }
 
         private Skills.SkillManager GetSkillManager(ulong clientId)

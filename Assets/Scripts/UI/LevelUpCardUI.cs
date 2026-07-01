@@ -54,6 +54,12 @@ namespace Vamsurlike.UI
             }
         }
 
+        public void SetInteractable(bool interactable)
+        {
+            if (selectButton != null)
+                selectButton.interactable = interactable;
+        }
+
         private string BuildLevelLabel(UpgradeOptionSO option, float currentValue)
         {
             if (currentValue < 0f) return string.Empty;

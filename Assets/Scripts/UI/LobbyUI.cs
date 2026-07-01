@@ -57,26 +57,31 @@ namespace Vamsurlike.UI
 
         private void OnEnable()
         {
+            LobbyPlayerState.Changed += Refresh;
             if (GameNetworkManager.Instance != null)
             {
                 GameNetworkManager.Instance.OnClientConnected    += OnClientChanged;
                 GameNetworkManager.Instance.OnClientDisconnected += OnClientChanged;
+                GameNetworkManager.Instance.OnLobbyHostChanged   += OnHostChanged;
             }
             Refresh();
         }
 
         private void OnDisable()
         {
+            LobbyPlayerState.Changed -= Refresh;
             if (GameNetworkManager.Instance != null)
             {
                 GameNetworkManager.Instance.OnClientConnected    -= OnClientChanged;
                 GameNetworkManager.Instance.OnClientDisconnected -= OnClientChanged;
+                GameNetworkManager.Instance.OnLobbyHostChanged   -= OnHostChanged;
             }
             if (playerSlots != null)
                 foreach (var slot in playerSlots) slot?.Unbind();
         }
 
         private void OnClientChanged(ulong _) => Refresh();
+        private void OnHostChanged(ulong _)   => Refresh();
 
         private void Refresh()
         {
@@ -123,7 +128,7 @@ namespace Vamsurlike.UI
             if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsConnectedClient) return;
             ulong local = NetworkManager.Singleton.LocalClientId;
             if (LobbyPlayerState.All.TryGetValue(local, out var state) && state.IsOwner)
-                state.ColorIndex.Value = index;
+                state.RequestColorIndex(index);
         }
 
         private void OnStartGame() => GameNetworkManager.Instance?.RequestStartGame();

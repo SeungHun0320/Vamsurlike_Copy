@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 using Vamsurlike.Items;
 using Vamsurlike.UI.ViewModels;
 
@@ -10,12 +11,27 @@ namespace Vamsurlike.UI
     {
         [SerializeField] private GameObject    panel;
         [SerializeField] private ChestCardUI[] cards;
+        [SerializeField] private Image         timerFill;
+        [SerializeField, Min(0f)] private float selectionTimeoutSeconds = 20f;
 
         private ChestRewardViewModel viewModel;
+        private bool selectionTimerRunning;
+        private float selectionTimerRemaining;
 
         private void Awake()
         {
             viewModel = new ChestRewardViewModel();
+        }
+
+        private void Update()
+        {
+            if (!selectionTimerRunning) return;
+
+            selectionTimerRemaining = Mathf.Max(0f, selectionTimerRemaining - Time.unscaledDeltaTime);
+            RefreshTimerFill();
+
+            if (selectionTimerRemaining <= 0f)
+                selectionTimerRunning = false;
         }
 
         private void OnEnable()
@@ -56,11 +72,49 @@ namespace Vamsurlike.UI
                 else
                     cards[i].SetupUpgrade(d.Option, () => viewModel.SubmitChoice(captured));
             }
+
+            BeginSelectionCooldown();
         }
 
         private void Hide()
         {
+            selectionTimerRunning = false;
+            if (timerFill != null) timerFill.transform.parent.gameObject.SetActive(false);
             if (panel != null) panel.SetActive(false);
+        }
+
+        private void BeginSelectionCooldown()
+        {
+            selectionTimerRunning = selectionTimeoutSeconds > 0f;
+            selectionTimerRemaining = selectionTimeoutSeconds;
+            SetCardsInteractable(true);
+
+            if (selectionTimerRunning)
+            {
+                if (timerFill != null) timerFill.transform.parent.gameObject.SetActive(true);
+                RefreshTimerFill();
+            }
+            else if (timerFill != null)
+            {
+                timerFill.transform.parent.gameObject.SetActive(false);
+            }
+        }
+
+        private void SetCardsInteractable(bool interactable)
+        {
+            foreach (var card in cards)
+            {
+                if (card != null && card.gameObject.activeSelf)
+                    card.SetInteractable(interactable);
+            }
+        }
+
+        private void RefreshTimerFill()
+        {
+            if (timerFill != null)
+                timerFill.fillAmount = selectionTimeoutSeconds > 0f
+                    ? Mathf.Clamp01(selectionTimerRemaining / selectionTimeoutSeconds)
+                    : 0f;
         }
     }
 }

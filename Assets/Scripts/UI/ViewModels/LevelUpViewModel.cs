@@ -37,8 +37,6 @@ namespace Vamsurlike.UI.ViewModels
 
         private void HandleShow(LevelUpOptionsPayload payload)
         {
-            if (!CanLocalPlayerChoose()) { OnHide?.Invoke(); return; }
-
             var catalog = UpgradeCatalog.Instance;
             if (catalog == null) { OnHide?.Invoke(); return; }
 
@@ -84,16 +82,9 @@ namespace Vamsurlike.UI.ViewModels
 
         public void SubmitChoice(int cardIndex)
         {
-            if (!CanLocalPlayerChoose()) return;
             LevelUpManager.Instance?.SubmitChoiceServerRpc(cardIndex);
             OnHide?.Invoke();
         }
 
-        private static bool CanLocalPlayerChoose()
-        {
-            var localPlayer = NetworkManager.Singleton?.LocalClient?.PlayerObject;
-            var stats = localPlayer?.GetComponent<PlayerNetworkStats>();
-            return stats != null && stats.CanAct;
-        }
     }
 }

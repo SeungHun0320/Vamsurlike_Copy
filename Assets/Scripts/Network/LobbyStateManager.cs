@@ -22,6 +22,7 @@ namespace Vamsurlike.Network
 
             gnm.OnClientConnected    += HandleClientConnected;
             gnm.OnClientDisconnected += HandleClientDisconnected;
+            SpawnStatesForConnectedClients();
         }
 
         private void OnDestroy()
@@ -45,6 +46,13 @@ namespace Vamsurlike.Network
             // destroyWithScene: false — 씬 전환 후에도 유지되어 플레이어 스폰 시 색상 읽기 가능
             obj.SpawnWithOwnership(clientId, destroyWithScene: false);
             Debug.Log($"[{nameof(LobbyStateManager)}] LobbyPlayerState 스폰 (clientId={clientId})");
+        }
+
+        private void SpawnStatesForConnectedClients()
+        {
+            if (!IsServerRunning()) return;
+            foreach (ulong clientId in NetworkManager.Singleton.ConnectedClientsIds)
+                HandleClientConnected(clientId);
         }
 
         private void HandleClientDisconnected(ulong clientId)

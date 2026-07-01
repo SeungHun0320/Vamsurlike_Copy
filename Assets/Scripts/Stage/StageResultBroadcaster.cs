@@ -62,7 +62,7 @@ namespace Vamsurlike.Stage
                 results.Add(new MatchResultEntry
                 {
                     ClientId        = client.ClientId,
-                    DisplayName     = new FixedString64Bytes($"Player {++playerIndex}"),
+                    DisplayName     = ResolveDisplayName(statsComp, ++playerIndex),
                     Level           = statsComp.Level,
                     KillCount       = statsComp.KillCount,
                     TotalDamage     = statsComp.TotalDamage,
@@ -76,6 +76,14 @@ namespace Vamsurlike.Stage
             }
 
             return results.ToArray();
+        }
+
+        private static FixedString64Bytes ResolveDisplayName(PlayerMatchStats statsComp, int fallbackIndex)
+        {
+            string playerName = statsComp.PlayerName.Value.ToString();
+            return new FixedString64Bytes(string.IsNullOrWhiteSpace(playerName)
+                ? $"Player {fallbackIndex}"
+                : playerName.Trim());
         }
 
         private static SkillDamageEntry MakeSkillEntry(KeyValuePair<string, float>[] sorted, int idx)

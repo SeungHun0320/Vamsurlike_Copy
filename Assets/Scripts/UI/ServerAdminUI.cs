@@ -12,20 +12,22 @@ namespace Vamsurlike.UI
     {
         [SerializeField] private GameObject panel;
         [SerializeField] private TextMeshProUGUI playerCountText;
-        [SerializeField, Min(10)] private int maxVisibleLogLines = 24;
+        [SerializeField, Min(10)] private int maxVisibleLogLines = 500;
         [Header("Layout")]
-        [SerializeField] private Vector2 panelSize = new(760f, 520f);
+        [SerializeField] private Vector2 panelSize = new(1520f, 1040f);
         [SerializeField] private Vector2 logViewAnchor = new(0.5f, 0.5f);
-        [SerializeField] private Vector2 logViewPosition = new(0f, -40f);
-        [SerializeField] private Vector2 logViewSize = new(700f, 340f);
-        [SerializeField] private Vector2 logTextPaddingMin = new(14f, 10f);
-        [SerializeField] private Vector2 logTextPaddingMax = new(-14f, -10f);
-        [SerializeField] private Vector2 playerCountPosition = new(0f, 210f);
+        [SerializeField] private Vector2 logViewPosition = new(0f, -80f);
+        [SerializeField] private Vector2 logViewSize = new(1400f, 680f);
+        [SerializeField] private Vector2 logTextPaddingMin = new(28f, 20f);
+        [SerializeField] private Vector2 logTextPaddingMax = new(-28f, -20f);
+        [SerializeField] private Vector2 playerCountPosition = new(0f, 420f);
         [SerializeField, Min(1)] private int disableCameraFramesOnSceneLoad = 5;
         [Header("Style")]
         [SerializeField] private Color logBackgroundColor = new(0.035f, 0.045f, 0.06f, 0.94f);
         [SerializeField] private Color logTextColor = new(0.82f, 0.9f, 1f);
-        [SerializeField, Min(1f)] private float logFontSize = 16f;
+        [SerializeField, Min(1f)] private float logFontSize = 32f;
+        [SerializeField, Min(0.1f)] private float existingTextScale = 2f;
+        [SerializeField, Min(1f)] private float logScrollSensitivity = 48f;
         [Header("Labels")]
         [SerializeField] private string playerCountFormat = "접속 중: {0}명";
         [SerializeField] private string sceneLoadedFormat = "{0:HH:mm:ss} [SERVER] 씬 '{1}' 로드";
@@ -35,6 +37,8 @@ namespace Vamsurlike.UI
 
         private readonly Queue<string> visibleLogs = new();
         private TextMeshProUGUI logText;
+        private RectTransform logContentRect;
+        private ScrollRect logScrollRect;
 
         private void Awake()
         {
@@ -62,6 +66,7 @@ namespace Vamsurlike.UI
 
             s_persistent = this;
             DontDestroyOnLoad(transform.root.gameObject);
+            ScaleExistingPanelText();
             CreateLogView();
         }
 
@@ -140,7 +145,7 @@ namespace Vamsurlike.UI
             if (panel.transform is RectTransform panelRect)
                 panelRect.sizeDelta = panelSize;
 
-            GameObject background = new("ServerLogView", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(RectMask2D));
+            GameObject background = new("ServerLogView", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(ScrollRect));
             background.transform.SetParent(panel.transform, false);
 
             RectTransform backgroundRect = (RectTransform)background.transform;
@@ -151,14 +156,38 @@ namespace Vamsurlike.UI
 
             Image backgroundImage = background.GetComponent<Image>();
             backgroundImage.color = logBackgroundColor;
-            backgroundImage.raycastTarget = false;
+            backgroundImage.raycastTarget = true;
+
+            GameObject viewport = new("Viewport", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(RectMask2D));
+            viewport.transform.SetParent(background.transform, false);
+
+            RectTransform viewportRect = (RectTransform)viewport.transform;
+            viewportRect.anchorMin = Vector2.zero;
+            viewportRect.anchorMax = Vector2.one;
+            viewportRect.offsetMin = Vector2.zero;
+            viewportRect.offsetMax = Vector2.zero;
+
+            Image viewportImage = viewport.GetComponent<Image>();
+            viewportImage.color = Color.clear;
+            viewportImage.raycastTarget = true;
+
+            GameObject content = new("Content", typeof(RectTransform));
+            content.transform.SetParent(viewport.transform, false);
+
+            logContentRect = (RectTransform)content.transform;
+            logContentRect.anchorMin = new Vector2(0f, 1f);
+            logContentRect.anchorMax = new Vector2(1f, 1f);
+            logContentRect.pivot = new Vector2(0.5f, 1f);
+            logContentRect.anchoredPosition = Vector2.zero;
+            logContentRect.sizeDelta = Vector2.zero;
 
             GameObject textObject = new("LogText", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
-            textObject.transform.SetParent(background.transform, false);
+            textObject.transform.SetParent(content.transform, false);
 
             RectTransform textRect = (RectTransform)textObject.transform;
-            textRect.anchorMin = Vector2.zero;
-            textRect.anchorMax = Vector2.one;
+            textRect.anchorMin = new Vector2(0f, 1f);
+            textRect.anchorMax = new Vector2(1f, 1f);
+            textRect.pivot = new Vector2(0.5f, 1f);
             textRect.offsetMin = logTextPaddingMin;
             textRect.offsetMax = logTextPaddingMax;
 
@@ -170,6 +199,14 @@ namespace Vamsurlike.UI
             logText.textWrappingMode = TextWrappingModes.NoWrap;
             logText.overflowMode = TextOverflowModes.Overflow;
             logText.raycastTarget = false;
+
+            logScrollRect = background.GetComponent<ScrollRect>();
+            logScrollRect.viewport = viewportRect;
+            logScrollRect.content = logContentRect;
+            logScrollRect.horizontal = false;
+            logScrollRect.vertical = true;
+            logScrollRect.movementType = ScrollRect.MovementType.Clamped;
+            logScrollRect.scrollSensitivity = logScrollSensitivity;
 
             if (playerCountText != null)
                 playerCountText.rectTransform.anchoredPosition = playerCountPosition;
@@ -200,6 +237,27 @@ namespace Vamsurlike.UI
             foreach (string line in visibleLogs)
                 builder.AppendLine(line);
             logText.text = builder.ToString();
+            RefreshLogContentSize();
+            logScrollRect.verticalNormalizedPosition = 0f;
+        }
+
+        private void ScaleExistingPanelText()
+        {
+            if (panel == null || Mathf.Approximately(existingTextScale, 1f)) return;
+
+            foreach (var text in panel.GetComponentsInChildren<TextMeshProUGUI>(includeInactive: true))
+                text.fontSize *= existingTextScale;
+        }
+
+        private void RefreshLogContentSize()
+        {
+            if (logText == null || logContentRect == null) return;
+
+            float height = Mathf.Max(logViewSize.y, logText.preferredHeight + logTextPaddingMin.y - logTextPaddingMax.y);
+            logContentRect.sizeDelta = new Vector2(0f, height);
+
+            RectTransform textRect = logText.rectTransform;
+            textRect.sizeDelta = new Vector2(0f, height - logTextPaddingMin.y + logTextPaddingMax.y);
         }
 
         private static bool IsServerMode()

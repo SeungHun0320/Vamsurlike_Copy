@@ -115,18 +115,40 @@ namespace Vamsurlike.Network
 
             networkObject.SpawnAsPlayerObject(clientId, destroyWithScene: true);
 
-            if (NetworkSessionService.PendingPlayerNames.TryGetValue(clientId, out string playerName))
+            if (LobbyPlayerState.All.TryGetValue(clientId, out var lobbyState))
+            {
+                string playerName = ResolvePlayerName(clientId, lobbyState);
+                if (player.TryGetComponent(out PlayerMatchStats matchStats))
+                    matchStats.SetPlayerName(playerName);
+
+                if (player.TryGetComponent(out PlayerColorSync colorSync))
+                    colorSync.SetColorIndex(lobbyState.ColorIndex.Value);
+            }
+            else if (NetworkSessionService.PendingPlayerNames.TryGetValue(clientId, out string playerName))
             {
                 if (player.TryGetComponent(out PlayerMatchStats matchStats))
                     matchStats.SetPlayerName(playerName);
                 NetworkSessionService.PendingPlayerNames.Remove(clientId);
             }
+        }
 
-            if (LobbyPlayerState.All.TryGetValue(clientId, out var lobbyState))
+        private static string ResolvePlayerName(ulong clientId, LobbyPlayerState lobbyState)
+        {
+            string playerName = null;
+            if (NetworkSessionService.PendingPlayerNames.TryGetValue(clientId, out string pendingName))
             {
-                if (player.TryGetComponent(out PlayerColorSync colorSync))
-                    colorSync.SetColorIndex(lobbyState.ColorIndex.Value);
+                playerName = pendingName;
+                NetworkSessionService.PendingPlayerNames.Remove(clientId);
             }
+
+            string lobbyName = lobbyState.DisplayName.Value.ToString().Trim();
+            if (!string.IsNullOrWhiteSpace(lobbyName)
+                && (string.IsNullOrWhiteSpace(playerName) || string.Equals(playerName, "Player", System.StringComparison.Ordinal)))
+            {
+                playerName = lobbyName;
+            }
+
+            return string.IsNullOrWhiteSpace(playerName) ? $"Player {clientId}" : playerName.Trim();
         }
 
         private bool CanServerSpawnInScene(string sceneName)

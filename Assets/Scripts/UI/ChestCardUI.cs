@@ -87,5 +87,11 @@ namespace Vamsurlike.UI
             selectButton.onClick.RemoveAllListeners();
             selectButton.onClick.AddListener(() => onSelect?.Invoke());
         }
+
+        public void SetInteractable(bool interactable)
+        {
+            if (selectButton != null)
+                selectButton.interactable = interactable;
+        }
     }
 }
