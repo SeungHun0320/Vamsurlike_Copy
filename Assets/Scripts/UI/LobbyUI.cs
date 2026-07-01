@@ -14,8 +14,10 @@ namespace Vamsurlike.UI
     // 필수 자식 구조:
     //   ServerIPRow/ServerIPText   (TextMeshProUGUI)
     //   ServerIPRow/CopyButton     (Button)
-    //   ColorPaletteArea/          (Button × 8 — 버튼 Image 자체가 스와치)
-    //   StartGameButton            (Button)
+    //   ColorPaletteArea/          (Button × 9 — 버튼 Image 자체가 스와치)
+    //   StartGameButton            (Button)   — 방장에게만 표시
+    //   WaitingText                (TextMeshProUGUI) — 비방장에게만 표시
+    //   DisconnectButton           (Button)
     //   LobbySlotUI × 4            (GetComponentsInChildren 자동 탐색)
     public class LobbyUI : MonoBehaviour
     {
@@ -24,6 +26,8 @@ namespace Vamsurlike.UI
         private TextMeshProUGUI  serverIpText;
         private Button           copyIpButton;
         private Button           startGameButton;
+        private TextMeshProUGUI  waitingText;
+        private Button           disconnectButton;
 
         private void Awake()
         {
@@ -53,6 +57,11 @@ namespace Vamsurlike.UI
 
             startGameButton = transform.Find("StartGameButton")?.GetComponent<Button>();
             if (startGameButton != null) startGameButton.onClick.AddListener(OnStartGame);
+
+            waitingText = transform.Find("WaitingText")?.GetComponent<TextMeshProUGUI>();
+
+            disconnectButton = transform.Find("DisconnectButton")?.GetComponent<Button>();
+            if (disconnectButton != null) disconnectButton.onClick.AddListener(OnDisconnect);
         }
 
         private void OnEnable()
@@ -89,8 +98,8 @@ namespace Vamsurlike.UI
             RefreshServerIp();
 
             bool isHost = GameNetworkManager.Instance?.IsLocalLobbyHost ?? false;
-            if (startGameButton != null)
-                startGameButton.gameObject.SetActive(isHost);
+            if (startGameButton != null) startGameButton.gameObject.SetActive(isHost);
+            if (waitingText     != null) waitingText.gameObject.SetActive(!isHost);
 
             bool canPick = NetworkManager.Singleton != null
                 && NetworkManager.Singleton.IsConnectedClient
@@ -131,7 +140,8 @@ namespace Vamsurlike.UI
                 state.RequestColorIndex(index);
         }
 
-        private void OnStartGame() => GameNetworkManager.Instance?.RequestStartGame();
+        private void OnStartGame()  => GameNetworkManager.Instance?.RequestStartGame();
+        private void OnDisconnect() => GameNetworkManager.Instance?.Disconnect();
 
         private void CopyIp()
         {
