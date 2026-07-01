@@ -1449,9 +1449,8 @@ Bootstrap → MainMenu(접속) → Stage_01(로딩 화면) → 게임 → 결과
 
 **④ 결과 화면 버튼**
 
-- 방장: "재시작" (동일 씬 재로드) / "메인 메뉴" (접속 해제 후 MainMenu 복귀)
-- 비방장: "메인 메뉴"
-- 버튼 클릭 → `GameFlowCoordinator`를 통해 씬 전환 요청
+- 모든 플레이어: "메인 메뉴" — `GameNetworkManager.Disconnect()` 후 로컬 씬 전환
+- 재시작 없음 (로비에서 다시 시작하는 방식으로 통일)
 
 **⑤ 네트워크 에러 다이얼로그**
 
@@ -1478,10 +1477,10 @@ Bootstrap → MainMenu(접속) → Stage_01(로딩 화면) → 게임 → 결과
 ##### Phase 8.4b 구현 항목
 
 - [x] MainMenu 구현 (이름 입력 / 서버 IP 접속 / 연결 상태 표시)
-- [ ] LobbyUI 구현 (플레이어 슬롯 4개, 서버 IP 표시, 방장 시작 버튼)
-- [ ] LoadingScreen 구현 (`SceneManager.OnSceneEvent` 구독, 스폰 대기 커버)
-- [ ] 결과 화면 재시작 / 메인 메뉴 복귀 버튼 (`StageResultUI` 확장)
-- [ ] 네트워크 에러 다이얼로그 (서버 끊김 / 타임아웃 → MainMenu 강제 복귀)
+- [x] LobbyUI 구현 (슬롯 4개, IP 표시, 방장 시작 버튼, 나가기, 대기 텍스트, 색상 팔레트 9색, 자동 반응형)
+- [x] LoadingScreen 구현 (`SceneManager.OnSceneEvent` 구독, 스폰 대기 커버, Bootstrap DontDestroyOnLoad)
+- [x] 결과 화면 메인 메뉴 복귀 버튼 (`StageResultUI` 확장, 전원 동일)
+- [x] 네트워크 에러 다이얼로그 (서버 끊김 / 타임아웃 → MainMenu 강제 복귀)
 - [ ] 설정 UI (음량 3채널, 해상도, 프레임 캡, PlayerPrefs 저장)
 - [ ] 개발용 네트워크 오버레이 (`DEVELOPMENT_BUILD` 조건부)
 

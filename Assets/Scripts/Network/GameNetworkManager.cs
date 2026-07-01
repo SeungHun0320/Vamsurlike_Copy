@@ -26,9 +26,13 @@ namespace Vamsurlike.Network
 
         public static GameNetworkManager Instance { get; private set; }
 
-        public event Action<ulong> OnClientConnected;
-        public event Action<ulong> OnClientDisconnected;
-        public event Action<ulong> OnLobbyHostChanged;
+        public event Action<ulong>  OnClientConnected;
+        public event Action<ulong>  OnClientDisconnected;
+        public event Action<ulong>  OnLobbyHostChanged;
+        // 예기치 않은 연결 종료 시 발생. reason = 빈 문자열이면 서버가 이유를 제공하지 않음.
+        public event Action<string> OnUnexpectedDisconnect;
+
+        private bool isIntentionalDisconnect;
 
         public string CurrentIp => sessionService?.CurrentIp ?? DefaultClientIp;
         public ushort CurrentPort => sessionService?.CurrentPort ?? DefaultPort;
@@ -77,21 +81,23 @@ namespace Vamsurlike.Network
             if (networkManager == null || sessionService == null || lobbyHostService == null) return;
 
             sessionService.ConfigureConnectionApproval();
-            networkManager.OnClientConnectedCallback += HandleClientConnected;
+            networkManager.OnClientConnectedCallback  += HandleClientConnected;
             networkManager.OnClientDisconnectCallback += HandleClientDisconnected;
-            networkManager.OnServerStarted += RegisterMessagingHandlers;
-            networkManager.OnClientStarted += RegisterMessagingHandlers;
-            lobbyHostService.LobbyHostChanged += HandleLobbyHostChanged;
+            networkManager.OnClientStopped            += HandleClientStopped;
+            networkManager.OnServerStarted            += RegisterMessagingHandlers;
+            networkManager.OnClientStarted            += RegisterMessagingHandlers;
+            lobbyHostService.LobbyHostChanged         += HandleLobbyHostChanged;
         }
 
         private void OnDisable()
         {
             if (networkManager != null)
             {
-                networkManager.OnClientConnectedCallback -= HandleClientConnected;
+                networkManager.OnClientConnectedCallback  -= HandleClientConnected;
                 networkManager.OnClientDisconnectCallback -= HandleClientDisconnected;
-                networkManager.OnServerStarted -= RegisterMessagingHandlers;
-                networkManager.OnClientStarted -= RegisterMessagingHandlers;
+                networkManager.OnClientStopped            -= HandleClientStopped;
+                networkManager.OnServerStarted            -= RegisterMessagingHandlers;
+                networkManager.OnClientStarted            -= RegisterMessagingHandlers;
             }
 
             if (lobbyHostService != null)
@@ -149,6 +155,7 @@ namespace Vamsurlike.Network
             // Shutdown() 전에 호출해야 CustomMessagingManager가 유효한 상태에서 플래그 초기화됨.
             // Shutdown() 이후엔 CustomMessagingManager가 null이 되어 isMessageHandlerRegistered가
             // 리셋되지 않고, 다음 연결 시 RegisterMessageHandler()가 스킵되어 방장 정보를 못 받음.
+            isIntentionalDisconnect = true;
             UnregisterMessagingHandlers();
             sessionService?.Disconnect();
             lobbyHostService?.Clear();
@@ -183,6 +190,20 @@ namespace Vamsurlike.Network
             lobbyHostService?.HandleClientDisconnected(clientId);
             OnClientDisconnected?.Invoke(clientId);
             Debug.Log($"[{nameof(GameNetworkManager)}] clientId {clientId} 종료. 현재 {ConnectedPlayerCount}명");
+        }
+
+        private void HandleClientStopped(bool _)
+        {
+            if (isIntentionalDisconnect)
+            {
+                isIntentionalDisconnect = false;
+                return;
+            }
+
+            string reason = networkManager != null && !string.IsNullOrEmpty(networkManager.DisconnectReason)
+                ? networkManager.DisconnectReason
+                : string.Empty;
+            OnUnexpectedDisconnect?.Invoke(reason);
         }
 
         private void HandleLobbyHostChanged(ulong clientId)

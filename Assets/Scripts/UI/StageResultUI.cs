@@ -1,6 +1,9 @@
 using System.Collections;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
+using Vamsurlike.Core;
+using Vamsurlike.Network;
 using Vamsurlike.UI.ViewModels;
 
 namespace Vamsurlike.UI
@@ -21,10 +24,14 @@ namespace Vamsurlike.UI
         [SerializeField] private Transform         rowContainer;
         [SerializeField] private PlayerResultRowUI rowPrefab;
 
+        [Header("Buttons")]
+        [SerializeField] private Button mainMenuButton;
+
         [Header("Messages")]
-        [SerializeField] private string resultMessage   = "RESULT";
-        [SerializeField] private string gameOverMessage = "GAME OVER";
-        [SerializeField] private float  gameOverDelay   = 3f;
+        [SerializeField] private string resultMessage    = "RESULT";
+        [SerializeField] private string gameOverMessage  = "GAME OVER";
+        [SerializeField] private float  gameOverDelay    = 3f;
+        [SerializeField] private string mainMenuScene    = "MainMenu";
 
         private Coroutine            showCoroutine;
         private StageResultViewModel viewModel;
@@ -33,6 +40,8 @@ namespace Vamsurlike.UI
         private void Awake()
         {
             viewModel = new StageResultViewModel();
+            if (mainMenuButton != null)
+                mainMenuButton.onClick.AddListener(OnMainMenuClicked);
         }
 
         private void Start()
@@ -85,11 +94,18 @@ namespace Vamsurlike.UI
             ApplyStateImmediate(state);
         }
 
+        private void OnMainMenuClicked()
+        {
+            if (GameNetworkManager.Instance != null) GameNetworkManager.Instance.Disconnect();
+            if (SceneLoader.Instance != null)        SceneLoader.Instance.LoadSceneLocal(mainMenuScene);
+        }
+
         private void ApplyStateImmediate(StageResultViewState state)
         {
-            if (backdrop    != null) backdrop.SetActive(state.BackdropVisible);
-            if (resultPanel != null) resultPanel.SetActive(state.IsVisible);
-            if (statsPanel  != null) statsPanel.SetActive(state.StatsVisible);
+            if (backdrop      != null) backdrop.SetActive(state.BackdropVisible);
+            if (resultPanel   != null) resultPanel.SetActive(state.IsVisible);
+            if (statsPanel    != null) statsPanel.SetActive(state.StatsVisible);
+            if (mainMenuButton != null) mainMenuButton.gameObject.SetActive(state.IsVisible);
 
             if (resultText != null)
             {
