@@ -1482,7 +1482,7 @@ Bootstrap → MainMenu(접속) → Stage_01(로딩 화면) → 게임 → 결과
 - [x] 결과 화면 메인 메뉴 복귀 버튼 (`StageResultUI` 확장, 전원 동일)
 - [x] 네트워크 에러 다이얼로그 (서버 끊김 / 타임아웃 → MainMenu 강제 복귀)
 - [x] 설정 UI (음량 3채널, 해상도, 프레임 캡, PlayerPrefs 저장)
-- [ ] 개발용 네트워크 오버레이 (`DEVELOPMENT_BUILD` 조건부)
+- [x] 개발용 네트워크 오버레이 (`DEVELOPMENT_BUILD` 조건부) — FPS + Ping(ms)
 
 #### Phase 8.5 이펙트
 
