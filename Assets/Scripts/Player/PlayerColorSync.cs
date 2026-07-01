@@ -17,6 +17,7 @@ namespace Vamsurlike.Player
             new(220, 120,  40, 255), // 주황
             new( 40, 200, 200, 255), // 청록
             new(220,  80, 160, 255), // 분홍
+            new(255, 255, 255, 255), // 하양
         };
 
         public readonly NetworkVariable<int> ColorIndex = new(
