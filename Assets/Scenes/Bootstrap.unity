@@ -1043,6 +1043,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1102573905}
   - component: {fileID: 1102573906}
+  - component: {fileID: 1102573907}
   m_Layer: 0
   m_Name: GameInstance
   m_TagString: Untagged
@@ -1077,6 +1078,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 039e943a14d344647b5424a1c1d4fdfc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Core.GameInstance
+--- !u!114 &1102573907
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1102573903}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a8bdcb50863ac9e43bd23fd6eed850ab, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Core.SettingsManager
 --- !u!1 &1697414993
 GameObject:
   m_ObjectHideFlags: 0
