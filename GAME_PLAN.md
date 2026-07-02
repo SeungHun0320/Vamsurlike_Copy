@@ -1079,7 +1079,7 @@ Co-op 배율은 계획대로 테이블 분리 없이 `WaveController.DefaultSpaw
 
 ### Phase 7.5. 패시브 스킬 & 전투 밸런스 확장
 
-Done when: 패시브 스킬 12종이 레벨업/상자 카드로 등장해 정상 적용되고, 만렙 스킬의 진화(조합) 결과가 패시브 효과를 동반하며, 결과 화면에 다운/사망 횟수가 막대그래프로 표시되고, 오라 스킬이 지속시간 종료 후 정상적으로 쿨다운에 들어간다.
+Done when: 패시브 스킬 12종이 레벨업/상자 카드로 등장해 정상 적용되고, 조합 스킬 진화 카드가 "액티브 소스 스킬 만렙 + 지정된 패시브 1레벨 이상 보유" 조건을 만족할 때만 등장하며, 결과 화면에 다운/사망 횟수가 막대그래프로 표시되고, 오라 스킬이 지속시간 종료 후 정상적으로 쿨다운에 들어간다.
 
 > **왜 8.5(이펙트) 이전에 넣는가**: 이 Phase는 전투 수치 공식(크리티컬, 스킬가속, 투사체 개수)과 스킬 구조(조합 스킬 하이브리드)를 바꾼다. Phase 8.5는 스킬별로 식별 가능한 VFX를 붙이는 작업이라, 스킬 메커니즘을 먼저 확정해야 VFX를 다시 만드는 일이 없다. 반대로 §메타 프로그레션(Phase 8.8)은 VFX와 무관한 독립 시스템이라 뒤로 미뤄도 된다.
 
@@ -1140,19 +1140,30 @@ Done when: 패시브 스킬 12종이 레벨업/상자 카드로 등장해 정상
 
 ---
 
-#### 조합 스킬 → 패시브 + 액티브 하이브리드
+#### 조합 스킬 진화 조건 개편 — 액티브 만렙 + 패시브 보유
 
-현재 `CombineRecipeSO`는 sourceSkill(+sourceSkill2) → evolvedSkill 단순 치환이고, 진화 스킬도 결국 `SkillDataSO` + castType으로 동일하게 액티브 실행된다. 스킬 시스템과 패시브 시스템 사이에 연결점이 없는 현재 구조를 확장해야 패시브 효과를 동시에 줄 수 있다.
+> **정정**: 이전 초안은 "진화 결과(조합 스킬)가 패시브 효과를 동반한다"로 잘못 적었다. 실제 요구사항은 **진화 조건 자체에 패시브가 들어간다** — 바니서라이크류(예: Vampire Survivors)의 "무기 만렙 + 특정 패시브 아이템 보유 → 진화" 공식과 동일하다. 조합 스킬의 액티브 효과 자체를 세게 만드는 밸런싱은 그대로 유효하지만, 그건 수치 튜닝 문제이지 구조 변경이 아니다.
 
-**설계 방향 (구현 전 확정 필요 — RULES.md 패턴 제안 의무)**
-- `SkillDataSO`에 `PassiveBonusData[] passiveBonuses` 필드 추가 (StatType + value 페어)
-- 스킬 습득/진화 시점에 `PassiveStatHandler`가 해당 보너스를 적용/해제 — 스킬 인벤토리가 패시브 핸들러를 아는 최소 결합으로 연결
-- 진화(`EvolveSkill`) 시: 기존 sourceSkill이 부여했던 패시브 제거 → evolvedSkill의 패시브 재적용. "조합 스킬은 엄청 강하다" 요구사항에 맞춰 대폭 강화된 수치로 설계
+**확정된 조건 규칙**
+- 진화 카드 등장 조건 = **액티브 소스 스킬 만렙 (기존 그대로) AND 지정된 패시브를 1레벨 이상 보유** — 즉 패시브는 그냥 한 번이라도 선택했으면 충족되고, 패시브 자체를 만렙까지 찍을 필요는 없음
+- 현재 구현된 `CombineRecipeSO`(sourceSkill + **sourceSkill2**(액티브 2개 조합) → evolvedSkill)는 이 규칙과 맞지 않으므로 갈아엎는다 — `sourceSkill2`(액티브 스킬)를 **필요 패시브 종류**로 교체한다. 현재 등록된 레시피 4종(`Recipe_GrenadeEvolved`, `Recipe_OrbitalGrenade`, `Recipe_BlackHole`, `Recipe_PierceShotgun`)이 전부 `sourceSkill2`를 쓰고 있어 4종 다 재설계 대상
 
-- [ ] 패턴 제안 문서화 (예: Decorator vs 직접 호출 비교) 후 구현 착수
-- [ ] `SkillDataSO`에 `passiveBonuses` 필드 추가
-- [ ] `SkillManager.EvolveSkill()`에 패시브 적용/제거 연동
-- [ ] 조합 스킬 3~4종에 강화된 패시브 수치 부여 (밸런스 확정 필요)
+**구조 변경 필요 이유**: 현재 패시브는 `PassiveStatHandler.ApplyUpgrade()`가 스탯에 값만 더하고 끝나는 구조라 "이 플레이어가 어떤 패시브를 보유했는지" 조회할 방법이 없다 (액티브 스킬은 `SkillManager.GetSkillLevel()`로 조회 가능한 것과 대조적). 진화 조건에 쓰려면 패시브도 보유 여부를 조회 가능하게 만들어야 한다.
+
+**설계**
+- `PassiveStatHandler`에 `Dictionary<UpgradeEffectType, int> passiveLevels`(서버 전용, NetworkVariable 아님 — 진화 조건 판정은 서버에서만 하므로 동기화 불필요) 추가. `ApplyUpgrade()`가 Passive* 케이스를 처리할 때마다 해당 `UpgradeEffectType` 레벨을 1씩 증가
+- `PassiveStatHandler.HasPassive(UpgradeEffectType type) => passiveLevels.TryGetValue(type, out int lvl) && lvl > 0;` 조회 메서드 추가
+- `CombineRecipeSO`: `sourceSkill2` 필드 제거, `public UpgradeEffectType requiredPassiveType` 필드 추가 (항상 필수 입력 — "패시브 없이 액티브만으로 진화"하는 케이스는 이번 개편에서 만들지 않음). `IsCombine` bool도 의미가 없어지므로 제거
+- `CombineSystem.GetEvolutionCards(SkillManager, PassiveStatHandler)` — 파라미터에 `PassiveStatHandler` 추가, 조건을 `activeMaxed && passiveStatHandler.HasPassive(recipe.requiredPassiveType)`로 교체. 호출부(`ChestRewardManager`)도 같이 수정
+- `SkillManager.EvolveSkill(source, evolved, source2 = null)`의 `source2` 파라미터는 이제 항상 null로만 호출되므로 제거하고 `SkillInventory.Evolve()`의 `source2` 분기도 함께 정리 (죽은 코드 방지)
+- 패시브는 진화의 "재료"가 아니라 "자격 조건"이라 진화해도 소모/제거되지 않는다 (VS의 패시브 아이템처럼 계속 보유)
+
+- [ ] `PassiveStatHandler`에 `passiveLevels` 추적 + `HasPassive()` 추가
+- [ ] `CombineRecipeSO`에서 `sourceSkill2`/`IsCombine` 제거, `requiredPassiveType: UpgradeEffectType` 추가
+- [ ] `CombineSystem.GetEvolutionCards`/`ChestRewardManager` 호출부에 `PassiveStatHandler` 파라미터 반영
+- [ ] `SkillManager.EvolveSkill`/`SkillInventory.Evolve`에서 `source2` 관련 코드 제거
+- [ ] 기존 레시피 4종 재설계 — 각 레시피에 어떤 패시브를 요구할지 기획 확정 필요 (예: 관통 폭발탄 ← 기본 투사체 만렙 + 피해량 패시브 보유)
+- [ ] 조합 스킬 액티브 수치 자체도 강화 (밸런스 확정 필요 — "조합 스킬은 엄청 강하다" 요구사항은 여기서 반영)
 
 ---
 
