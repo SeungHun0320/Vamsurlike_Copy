@@ -29,7 +29,7 @@ MonoBehaviour:
     projectileCount: 1
     spreadAngle: 0
     pierceCount: 0
-    duration: 0
+    duration: 3
     tickInterval: 0.8
     areaRadius: 6
     orbitalCount: 1
@@ -48,7 +48,7 @@ MonoBehaviour:
     projectileCount: 1
     spreadAngle: 0
     pierceCount: 0
-    duration: 0
+    duration: 3.5
     tickInterval: 0.65
     areaRadius: 7
     orbitalCount: 1

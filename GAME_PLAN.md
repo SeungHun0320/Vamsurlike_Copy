@@ -1087,15 +1087,17 @@ Done when: 패시브 스킬 12종이 레벨업/상자 카드로 등장해 정상
 
 #### 버그 픽스 (선행)
 
-**오라 스킬 지속시간 후 쿨다운 미적용**
+**오라 스킬 지속시간 후 쿨다운 미적용 — 수정 완료**
 
 - 원인: `SkillExecutionScheduler.cs:57` `if (levelData.duration <= 0f) return;` — duration이 0이면 쿨다운 진입 로직(59~64줄)에 도달하지 못하고 `IsActive`가 영구 유지된다.
-- 현재 `SD_DamageAura.asset`은 `duration: 0`(상시 발동 설계)으로 되어 있어 지금은 의도적으로 쿨다운이 없는 상태.
-- 채택안: 오라를 "지속시간 있는 스킬"로 바꿔 `SD_DamageAura.asset`에 duration 값을 채운다. 다른 지속형 스킬(블랙홀 등)과 발동 패턴을 통일한다.
-- **VFX 연동 주의(Phase 8.5 연결점)**: 상시 오라 → duration 기반 오라로 바뀌면 연출도 "항상 loop 재생"에서 "켜짐(지속시간) → 꺼짐 → 쿨다운 → 재시작" 주기를 따라야 한다. Phase 8.5 `VFX_Loop_Aura.prefab`/`PooledVFX` 항목에 "오라 on/off 이벤트 연동" 체크리스트를 하나 추가해 둔다.
+- `SD_DamageAura.asset`이 `duration: 0`으로 되어 있었던 게 원인. duration을 Lv1 `3`, Lv2 `3.5`로 채워 "3초 발동 → 쿨다운(tickInterval과 동일한 0.8/0.65초) → 재발동" 주기로 바꿨다. 다른 지속형 스킬(블랙홀)과 발동 패턴이 통일됨.
+- **부수 발견**: `SD_Orbital.asset` Lv3만 `duration: 0.03`으로 되어 있어(Lv1/Lv2는 `0`) 같은 버그가 이미 발생 중이었다 — Lv3에서 궤도 블레이드가 사실상 즉시 5초 쿨다운에 들어가 데미지가 끊기는데 비주얼은 계속 돌아가고 있었다. Lv1/Lv2와 동일하게 `0`으로 정정.
+- **VFX 갱신 누락도 같이 수정**: `AuraSkill`/`OrbitalSkill`은 최초 활성화 시 한 번만 `ShowAreaCircle`/`ShowOrbital`을 브로드캐스트하고 비활성화 시 숨기는 로직이 아예 없었다 (`serverBroadcastSent` 플래그가 재설정되지 않음). `SkillExecutionScheduler.TickPersistent`가 `IsActive→false` 전환 시점에 `onPersistentDeactivated` 콜백을 호출하도록 추가하고, `SkillManager`에서 기존 `NotifySkillRemoved(castType)`(스킬 제거 시 쓰던 것과 동일한 `executor.OnSkillRemoved` + `skillVfxController.RemoveSkillVisual` 조합)를 재사용해 연결했다. 재활성화 시 `serverBroadcastSent`가 리셋돼 있어 자연스럽게 다시 표시된다.
 
-- [ ] `SD_DamageAura.asset` duration 값 설정 (기획 수치 확정 필요)
-- [ ] `SkillExecutionScheduler.TickPersistent()`가 duration>0인 지속 스킬에서 정상적으로 쿨다운 전환되는지 회귀 테스트
+- [x] `SD_DamageAura.asset` duration 값 설정 (Lv1 3 / Lv2 3.5)
+- [x] `SD_Orbital.asset` Lv3 `duration: 0.03` → `0` 정정 (동일 버그의 또 다른 사례)
+- [x] `SkillExecutionScheduler`에 `onPersistentDeactivated` 콜백 추가, `SkillManager`가 `NotifySkillRemoved` 재사용으로 연결 — 지속형 스킬 비활성화 시 VFX 숨김/재활성화 시 재표시
+- [ ] 에디터에서 회귀 테스트 (오라/궤도 Lv3가 duration 종료 후 실제로 비주얼이 꺼지고 쿨다운 뒤 재발동하는지 눈으로 확인 — 코드 리뷰만으론 런타임 타이밍 확인 불가)
 
 ---
 

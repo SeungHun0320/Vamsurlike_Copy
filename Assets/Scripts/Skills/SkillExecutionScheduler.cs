@@ -14,6 +14,7 @@ namespace Vamsurlike.Skills
             float failedCastRetryDelay,
             Func<SkillDataSO, bool> isPersistent,
             Func<SkillRuntimeState, SkillLevelData, bool> tryCast,
+            Action<SkillRuntimeState> onPersistentDeactivated,
             Action<string> logWarning)
         {
             if (skills == null) return;
@@ -29,7 +30,7 @@ namespace Vamsurlike.Skills
 
                 SkillLevelData levelData = owned.Skill.GetLevelData(owned.Level);
                 if (isPersistent != null && isPersistent(owned.Skill))
-                    TickPersistent(owned, levelData, tryCast);
+                    TickPersistent(owned, levelData, tryCast, onPersistentDeactivated);
                 else
                     TickCooldown(owned, levelData, failedCastRetryDelay, tryCast);
             }
@@ -38,7 +39,8 @@ namespace Vamsurlike.Skills
         private static void TickPersistent(
             SkillRuntimeState owned,
             SkillLevelData levelData,
-            Func<SkillRuntimeState, SkillLevelData, bool> tryCast)
+            Func<SkillRuntimeState, SkillLevelData, bool> tryCast,
+            Action<SkillRuntimeState> onPersistentDeactivated)
         {
             if (levelData == null) return;
 
@@ -61,6 +63,8 @@ namespace Vamsurlike.Skills
 
                 owned.IsActive = false;
                 owned.CooldownTimer = levelData.cooldown;
+                // 지속시간 종료 — 다음 활성화까지 비주얼을 꺼둔다 (재활성화 시 실행자가 다시 표시).
+                onPersistentDeactivated?.Invoke(owned);
                 return;
             }
 

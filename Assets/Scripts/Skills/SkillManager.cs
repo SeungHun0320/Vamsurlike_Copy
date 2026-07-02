@@ -122,6 +122,7 @@ namespace Vamsurlike.Skills
                 failedCastRetryDelay,
                 IsPersistent,
                 TryCast,
+                owned => NotifySkillRemoved(owned.Skill.castType),
                 message => Debug.LogWarning(
                     $"[{nameof(SkillManager)}] {message} object={name}"));
 

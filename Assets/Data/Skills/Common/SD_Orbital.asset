@@ -82,7 +82,7 @@ MonoBehaviour:
     projectileCount: 1
     spreadAngle: 0
     pierceCount: 0
-    duration: 0.03
+    duration: 0
     tickInterval: 0.3
     areaRadius: 0
     orbitalCount: 3
