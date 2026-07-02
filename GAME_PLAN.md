@@ -865,73 +865,85 @@ float meleeRange          // 판정 거리
 
 ---
 
-### Phase 7. 스테이지와 보스 (데이터 테이블 기반)
+### Phase 7. 스테이지와 보스 (CSV 데이터 테이블 기반) ✅
 
 Done when: Stage_01에서 5분 생존 후 보스가 등장하고, 보스 처치/전멸 결과가 전원에게 동기화된다.
+
+> **구현 중 계획 변경:** 원안은 `ScriptableObject` 기반 `DataTableSO<TRow>` 제네릭 패턴이었으나, 실제로는 **CSV + `DataManager`** 조합으로 구현했다. 기획 데이터를 스프레드시트/텍스트로 다루기 쉽고, Unity YAML 에셋보다 diff/리뷰가 명확하다는 이유로 전환했다. 또한 단일 `GameState` enum 대신 **`GameFlowState`(전투 흐름) + `StagePhase`(콘텐츠 진행)**로 축을 분리했다 — "일시정지 여부"와 "웨이브/보스 중 어디인지"는 서로 다른 질문이라 하나의 enum에 섞으면 조건 분기가 늘어나기 때문이다. 아래는 실제 구현 기준으로 재작성한 내용이다.
 
 ---
 
 #### 데이터 테이블 설계
 
-"ScriptableObject 1개 = 데이터 1개" 방식 대신 **DataTableSO 패턴**을 사용한다.
-테이블 1개 에셋이 전체 행(row)을 보관하며, 인덱스 또는 ID로 조회한다. UE4 DataTable과 동일한 발상.
+`Assets/Scripts/Data/Runtime/DataManager.cs`가 CSV를 읽어 `IReadOnlyDictionary<int, T>`로 캐싱하는 정적 로더다. 테이블 추가 시 ① 프로퍼티 ② `LoadTable` 한 줄 ③ `Make*` 팩토리 메서드만 추가하면 된다.
 
 ```csharp
-// 공통 제네릭 베이스 — Assets/Scripts/Data/DataTableSO.cs
-public abstract class DataTableSO<TRow> : ScriptableObject
-    where TRow : struct
+// Assets/Scripts/Data/Runtime/DataManager.cs (요지)
+public static class DataManager
 {
-    [SerializeField] private List<TRow> rows = new();
+    public static IReadOnlyDictionary<int, EnemyScalingData> EnemyScaling { get; private set; }
+    public static IReadOnlyDictionary<int, StageData>        Stages       { get; private set; }
+    public static IReadOnlyDictionary<int, WaveData>         Waves        { get; private set; }
 
-    public IReadOnlyList<TRow> Rows       => rows;
-    public int                 Count      => rows.Count;
-    public TRow                this[int i] => rows[i];
-
-    public bool TryGet(int index, out TRow row)
+    public static void Initialize()
     {
-        if (index < 0 || index >= rows.Count) { row = default; return false; }
-        row = rows[index];
-        return true;
+        if (IsInitialized) return;
+        EnemyScaling = LoadTable("Data/EnemyScalingTable", MakeScaling, d => d.Id);
+        Stages       = LoadTable("Data/StageTable",        MakeStage,   d => d.Id);
+        Waves        = LoadTable("Data/WaveTable",         MakeWave,    d => d.Id);
+        DataValidator.Validate(EnemyScaling, Stages, Waves);
+        IsInitialized = true;
     }
 }
 ```
+
+- CSV 원본은 `Assets/Data/Stages/*.csv` (편집), 런타임 로드는 `Assets/Resources/Data/*.csv`에서 `Resources.Load<TextAsset>`으로 읽는다. 두 위치는 수동 동기화가 필요하다는 한계가 있다 (아래 "Phase 7 정리" 참고).
+- `CSVParser`가 헤더 기반 컬럼 파싱 + 타입 변환(`Int`/`Float`/`Bool`/`Str`/`Enum<T>`)을 전담하고, `DataValidator`가 로드 직후 참조 무결성(`waveGroupId` 존재 여부 등)을 검사한다.
+- 행 타입은 `record`가 아닌 불변 `sealed class`(`StageData`, `WaveData`, `EnemyScalingData`)로 구현했다.
 
 ---
 
 #### 테이블 스키마
 
-**StageTableSO** — `Assets/Data/Stages/StageTable.asset`
+**StageTable.csv** — `Assets/Resources/Data/StageTable.csv`
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
-| `stageId` | `int` | 고유 ID (1부터) |
+| `id` | `int` | 고유 ID (1부터) |
 | `stageName` | `string` | "Stage 01 — Survival" |
 | `durationSeconds` | `float` | 생존 목표 시간 (기본 300초) |
-| `waveGroupId` | `int` | WaveTableSO에서 이 ID와 일치하는 행들을 시퀀스로 사용 |
-| `bossData` | `EnemyDataSO` | 보스 스폰 데이터 (null이면 보스 없음) |
+| `waveGroupId` | `int` | WaveTable에서 이 ID와 일치하는 행들을 시퀀스로 사용 |
+| `bossEnemyName` | `string` | `EnemySpawnManager`에 등록된 보스 스폰 이름 (비어 있으면 보스 없음, `StageData.HasBoss`) |
 | `clearCondition` | `StageClearCondition` | `TimeSurvival` / `BossKill` / `BothRequired` |
 
-**WaveTableSO** — `Assets/Data/Stages/WaveTable.asset`
+**WaveTable.csv** — `Assets/Resources/Data/WaveTable.csv`
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
-| `waveGroupId` | `int` | StageRow.waveGroupId와 매핑 |
+| `id` | `int` | 고유 ID |
+| `waveGroupId` | `int` | StageData.waveGroupId와 매핑 |
 | `sequenceIndex` | `int` | 웨이브 순서 (0부터, 오름차순) |
-| `entries` | `WaveEntryData[]` | 적 종류 + 수 + 스폰 간격 (spawnActionName이 비어 있을 때 사용) |
+| `entries` | `string` (직렬화된 리스트) | 적 종류 + 수 + 스폰 간격. `spawnActionName`이 비어 있을 때 사용 |
 | `waveDuration` | `float` | 이 웨이브 종료 후 다음까지 대기 시간(초) |
 | `loopFromHere` | `bool` | 이 행 이후 루프 시작점 여부 |
 | `spawnActionName` | `string` | 호출할 커스텀 스폰 함수 이름. 비어 있으면 entries 기반 기본 스폰 실행 |
 
 ```csharp
-[Serializable]
-public struct WaveRow
+// Assets/Scripts/Data/Runtime/WaveData.cs
+public sealed class WaveEntry
 {
-    public int             waveGroupId;
-    public int             sequenceIndex;
-    public WaveEntryData[] entries;
-    public float           waveDuration;
-    public bool            loopFromHere;
-    public string          spawnActionName; // 예: "SpawnEliteRing", "SpawnBossMinions"
+    public string EnemyName     { get; }
+    public int    Count         { get; }
+    public float  SpawnInterval { get; }
+}
+
+public sealed class WaveData
+{
+    public int                      Id, WaveGroupId, SequenceIndex;
+    public float                    WaveDuration;
+    public bool                     LoopFromHere;
+    public string                   SpawnActionName;
+    public IReadOnlyList<WaveEntry> Entries;
 }
 ```
 
@@ -939,168 +951,122 @@ public struct WaveRow
 
 #### Named Spawn Action 패턴
 
-`spawnActionName`이 지정된 웨이브는 `entries` 대신 이름으로 등록된 커스텀 함수를 실행한다.
+`spawnActionName`이 지정된 웨이브는 `entries` 대신 이름으로 등록된 커스텀 함수를 실행한다. 계획대로 구현됨.
 
-**WaveSpawnActionRegistry** — `WaveController`가 소유하는 딕셔너리 레지스트리
+**`WaveController`가 소유하는 딕셔너리 레지스트리**
 
 ```csharp
-// WaveController 내부
-private readonly Dictionary<string, Func<WaveRow, IEnumerator>> spawnActions = new();
+// Assets/Scripts/Stage/WaveController.cs
+private readonly Dictionary<string, Func<WaveData, IEnumerator>> spawnActions = new();
 
 private void RegisterSpawnActions()
 {
-    spawnActions["SpawnEliteRing"]    = SpawnEliteRing;
-    spawnActions["SpawnBossMinions"]  = SpawnBossMinions;
-    spawnActions["SpawnAmbush"]       = SpawnAmbush;
+    spawnActions.Clear();
+    spawnActions["SpawnEliteRing"]   = SpawnEliteRing;
+    spawnActions["SpawnBossMinions"] = SpawnBossMinions;
     // 새 스폰 패턴 추가 시 이곳에만 등록
 }
 ```
 
-**WaveController 디스패치 흐름**
+**디스패치 흐름 (`ExecuteWave`)**
 
 ```csharp
-private IEnumerator ExecuteWave(WaveRow wave)
+private IEnumerator ExecuteWave(WaveData wave)
 {
-    if (!string.IsNullOrEmpty(wave.spawnActionName) &&
-        spawnActions.TryGetValue(wave.spawnActionName, out var action))
+    if (!string.IsNullOrEmpty(wave.SpawnActionName))
     {
-        yield return StartCoroutine(action(wave));   // 커스텀 스폰
+        if (spawnActions.TryGetValue(wave.SpawnActionName, out var action))
+            yield return StartCoroutine(action(wave));
+        else
+        {
+            Debug.LogWarning($"[WaveController] 미등록 spawnActionName='{wave.SpawnActionName}' → 기본 스폰 실행");
+            yield return StartCoroutine(DefaultSpawnWave(wave));
+        }
     }
     else
     {
-        yield return StartCoroutine(DefaultSpawnWave(wave));  // entries 기반 기본 스폰
+        yield return StartCoroutine(DefaultSpawnWave(wave));
     }
-    yield return new WaitForSeconds(wave.waveDuration);
+    yield return new WaitForSeconds(wave.WaveDuration);
 }
 ```
 
-**커스텀 스폰 함수 예시**
+- `SpawnEliteRing`: 플레이어 무리 중심 기준 원형 포위 스폰 (구현됨)
+- `SpawnBossMinions`: 현재는 `DefaultSpawnWave`로 위임 (보스 페이즈 전용 분기는 미구현 — 필요해지면 추가)
+- 미등록 이름 폴백 규칙(경고 로그 + 기본 스폰)은 계획대로 동작
 
-```csharp
-// 원형 포위 — 8방향에서 엘리트 동시 스폰
-private IEnumerator SpawnEliteRing(WaveRow wave)
-{
-    if (wave.entries.Length == 0) yield break;
-    var entry = wave.entries[0];
-    int count = Mathf.Max(1, entry.count);
-    for (int i = 0; i < count; i++)
-    {
-        float angle = i * (360f / count) * Mathf.Deg2Rad;
-        Vector3 pos = GetCenterPosition() +
-                      new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * spawnRadius;
-        spawnManager.SpawnEnemy(entry.enemyData, pos, hpMul, dmgMul);
-    }
-}
+**EnemyScalingTable.csv** — `Assets/Resources/Data/EnemyScalingTable.csv`
 
-// 보스 미니언 — 보스 HP 50% 이하 트리거로 호출
-private IEnumerator SpawnBossMinions(WaveRow wave) { ... }
-```
-
-**등록 규칙:**
-- 함수 이름은 `PascalCase` + `Spawn` 접두사 (`SpawnEliteRing`, `SpawnAmbush`)
-- 시그니처 고정: `IEnumerator FuncName(WaveRow wave)`
-- 코드에 없는 이름을 테이블에 입력하면 기본 스폰으로 폴백 (LogWarning 출력)
-
-```csharp
-// 미등록 이름 경고
-if (!string.IsNullOrEmpty(wave.spawnActionName) &&
-    !spawnActions.ContainsKey(wave.spawnActionName))
-{
-    Debug.LogWarning($"[WaveController] 미등록 spawnActionName='{wave.spawnActionName}' → 기본 스폰 실행");
-}
-```
-
-**EnemyScalingTableSO** — `Assets/Data/Stages/EnemyScalingTable.asset`
-
-시간 경과에 따른 난이도 배율을 인라인 수식 대신 테이블로 관리. `WaveController`에서 경과 시간 기준으로 가장 가까운 행을 조회한다.
+시간 경과에 따른 난이도 배율을 인라인 수식 대신 테이블로 관리. `DataManager.GetScaling(elapsedSeconds)`가 스텝 함수로 조회한다.
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
+| `id` | `int` | 고유 ID |
 | `timeMinutes` | `float` | 이 행이 적용되는 시작 분 |
 | `hpMultiplier` | `float` | 기준 HP 배율 |
 | `damageMultiplier` | `float` | 기준 공격력 배율 |
 | `spawnRateMultiplier` | `float` | 스폰 속도 배율 |
 
-```text
-예시 행:
- 0분:  HP ×1.00 / Dmg ×1.00 / Rate ×1.00
- 2분:  HP ×1.30 / Dmg ×1.20 / Rate ×1.40
- 5분:  HP ×1.75 / Dmg ×1.50 / Rate ×2.00
-10분:  HP ×2.50 / Dmg ×2.00 / Rate ×3.00
-```
-
-→ §8의 인라인 공식(`1 + tMin * 0.15f` 등)을 이 테이블로 대체.  
-  디자이너가 코드 수정 없이 Inspector에서 직접 수치 조정 가능.
-
-**Co-op 배율은 테이블 분리 없이 코드에서 플레이어 수 기반으로 곱한다** (플레이어 수는 런타임 값이라 테이블화 불필요).
-
----
-
-#### 조회 유틸리티
-
 ```csharp
-// WaveController 내부에서 사용
-private ScalingRow GetCurrentScaling(EnemyScalingTableSO table, float elapsedSeconds)
+// Assets/Scripts/Data/Runtime/DataManager.cs
+public static EnemyScalingData GetScaling(float elapsedSeconds)
 {
     float elapsedMinutes = elapsedSeconds / 60f;
-    ScalingRow result = table[0];
-    for (int i = 0; i < table.Count; i++)
+    EnemyScalingData result = null;
+    foreach (var row in EnemyScaling.Values)
     {
-        if (table[i].timeMinutes <= elapsedMinutes)
-            result = table[i];
-        else
-            break;
+        if (row.TimeMinutes > elapsedMinutes) break;
+        result = row;
     }
-    return result;
+    return result ?? new EnemyScalingData(0, 0f, 1f, 1f, 1f);
 }
 ```
+
+Co-op 배율은 계획대로 테이블 분리 없이 `WaveController.DefaultSpawnWave`에서 플레이어 수 기반으로 곱한다 (`hpMul *= 1 + (playerCount-1)*0.3`, `rateMul *= 1 + (playerCount-1)*0.5`).
 
 ---
 
 #### 구현 항목
 
 **데이터 테이블 인프라**
-- [ ] `DataTableSO<TRow>` 제네릭 베이스 구현 (`Assets/Scripts/Data/DataTableSO.cs`)
-- [ ] `StageTableSO` + `StageRow` 구조체 구현
-- [ ] `WaveTableSO` + `WaveRow` 구조체 구현 (기존 `WaveDataSO` 대체)
-- [ ] `EnemyScalingTableSO` + `ScalingRow` 구조체 구현
-- [ ] `StageClearCondition` enum 추가 (`TimeSurvival`, `BossKill`, `BothRequired`)
+- [x] `DataManager` 정적 로더 구현 (`Assets/Scripts/Data/Runtime/DataManager.cs`) — 계획의 `DataTableSO<TRow>` 대신 CSV+Dictionary 방식으로 대체
+- [x] `StageData` 레코드 + `StageTable.csv` 로딩 구현
+- [x] `WaveData`/`WaveEntry` 레코드 + `WaveTable.csv` 로딩 구현
+- [x] `EnemyScalingData` 레코드 + `EnemyScalingTable.csv` 로딩 구현
+- [x] `CSVParser`, `DataValidator` 구현 (헤더 파싱, 타입 변환, 참조 무결성 검사)
+- [x] `StageClearCondition` enum 추가 (`TimeSurvival`, `BossKill`, `BothRequired`)
 
 **WaveController 리팩터링**
-- [ ] `WaveDataSO` 폐기 — `WaveDataSO[]` 직접 참조를 `WaveTableSO` + `StageTableSO` 참조로 교체 (Phase 3에서 임시 사용한 구조를 이 단계에서 완전히 제거)
-- [ ] 인라인 난이도 공식 → `EnemyScalingTableSO.GetCurrentScaling()` 조회로 교체
-- [ ] `waveGroupId` 기반으로 해당 스테이지 웨이브 행만 필터링해 시퀀스 실행
-- [ ] `RegisterSpawnActions()` 구현 (딕셔너리 등록)
-- [ ] `ExecuteWave()` 디스패치 로직 구현 (`spawnActionName` → 커스텀 / 기본 폴백)
-- [ ] 커스텀 스폰 함수 1~2종 구현 (`SpawnEliteRing` 등)
+- [x] `WaveDataSO` 폐기 — `DataManager.Waves`/`GetWaveSequence(groupId)` 조회로 교체
+- [x] 인라인 난이도 공식 → `DataManager.GetScaling()` 조회로 교체
+- [x] `waveGroupId` 기반으로 해당 스테이지 웨이브 행만 필터링해 시퀀스 실행 (`GetWaveSequence`)
+- [x] `RegisterSpawnActions()` 구현
+- [x] `ExecuteWave()` 디스패치 로직 구현
+- [x] 커스텀 스폰 함수 구현 (`SpawnEliteRing`, `SpawnBossMinions`)
 
 **데이터 에셋 작성**
-- [ ] `StageTable.asset` — Stage_01 행 1개 작성
-- [ ] `WaveTable.asset` — Stage_01용 웨이브 4~6행 작성 (loopLastWave 행 포함)
-- [ ] `EnemyScalingTable.asset` — 0 / 2 / 5 / 10 / 15 / 20분 기준 6행 작성
+- [x] `StageTable.csv` — Stage_01 행 작성
+- [x] `WaveTable.csv` — Stage_01용 웨이브 시퀀스 작성 (루프 포함)
+- [x] `EnemyScalingTable.csv` — 시간대별 스케일링 행 작성
 
 **스테이지 런타임**
-- [ ] `StageRuntime`에 생존 타이머 추가 (서버 전용, `ElapsedTime` NetworkVariable 동기화)
-- [ ] `GameState` enum에 `BossPhase`, `Clear`, `GameOver` 추가
-- [ ] 생존 타이머가 `StageRow.durationSeconds` 도달 → `BossPhase` 전환 + 보스 스폰
-- [ ] `StageRuntime.LoadStage(int stageId)` — `StageTableSO`에서 행 조회 후 WaveController에 전달
+- [x] `StageRuntime`에 생존 타이머 추가 (서버 전용, `ElapsedTime` NetworkVariable 동기화)
+- [x] `GameFlowState`(`Gameplay`/`LevelingUp`/`ChestOpening`/`Clear`/`GameOver`) + `StagePhase`(`Waves`/`Boss`) 분리 구현 — 원안의 단일 `GameState` enum 대신 책임 분리 (`GameFlowCoordinator`가 전이 로직 전담)
+- [x] 생존 타이머가 `StageData.DurationSeconds` 도달 → `StagePhase.Boss` 전환 + 보스 스폰 (`StageRuntime.CheckBossPhase`)
+- [x] `StageRuntime.LoadStage(int stageId)` — `DataManager.Stages`에서 조회 후 WaveController에 전달
 
 **보스**
-- [ ] `BossNetworkBase : EnemyNetworkBase` 구현 (고유 페이즈 전환 로직)
-- [ ] 보스 HP `NetworkVariable<float>` → 전체 클라이언트 HUD 동기화 (`BossHealthBar`)
-- [ ] 보스 처치 → `GameState.Clear`
-- [ ] 전원 동시 다운 → `GameState.GameOver` (영구 사망 없음. 다운 타이머 만료 시 자동 부활. `BeginDowned()` 직후 `CheckGameOver()` 호출 — `IsDowned == true`인 플레이어가 전원이면 즉시 GameOver. 다운 중이 아닌 플레이어가 한 명이라도 있으면 GameOver 아님)
+- [x] `BossNetworkBase : EnemyNetworkBase` 구현 — 단, 페이즈 전환은 `BossNetworkBase` 자체가 아니라 별도 `BossPatternController`/`BossMissile`이 담당 (보스 판정 자체는 `EnemyDataSO.isBoss` 플래그 기준으로 `EnemyNetworkBase`가 처리)
+- [x] 보스 HP `NetworkVariable<float>` → 전체 클라이언트 HUD 동기화 (Phase 8.2 `BossStatusAdapter`/세그먼트 HP 바로 완성)
+- [x] 보스 처치 → `GameFlowState.Clear` (`EnemyNetworkBase.HandleDeath`가 `wasBoss && IsBossPhase`일 때 `ForceTransition(Clear)`)
+- [x] 전원 동시 다운 → `GameFlowState.GameOver` (`StageRuntime.CheckGameOver()` — `CanAct == true`인 플레이어가 하나도 없으면 확정, 확정 시 전원 부활 타이머 중단)
 
-**결과 화면 (최소)**
-- [ ] 승리/패배 `[ClientRpc]` 동기화
-- [ ] 결과 UI (Phase 8에서 정식화, 여기서는 텍스트 표시만)
+**결과 화면**
+- [x] 승리/패배 동기화 및 결과 UI → Phase 8.4a에서 `MatchResultEntry` 기반으로 정식 구현되며 이 항목을 흡수함 (별도 임시 ClientRpc 없이 바로 정식 버전으로 감)
 
 **Phase 7 정리**
 - [x] Phase 7 임시 Editor 세팅 스크립트 제거 (`SetupPhase7Assets`, `SetupBossMissilePrefab`, `SetupBossAnimator`)
-- [ ] 스테이지 CSV 원본 정책 확정
-  - 런타임 로드는 `Assets/Resources/Data/StageTable.csv` 기준
-  - 편집 원본은 `Assets/Data/Stages/StageTable.csv`로 유지하되, 변경 시 Resources CSV와 동기화 필요
-  - 장기적으로는 CSV 이중 관리를 줄이기 위해 DataTableSO 또는 단일 Import 흐름으로 통합
+- [x] 스테이지 CSV 원본 정책 확정 — 편집 원본 `Assets/Data/Stages/*.csv`, 런타임 로드 `Assets/Resources/Data/*.csv`로 이원화하고 변경 시 수동 동기화하는 방식으로 확정. CSV 이중 관리 자동화(빌드 전 동기화 스크립트 등)는 아직 없음 — 필요성이 커지면 별도 항목으로 추가
 
 예상 기간: 6~9일
 
@@ -1390,22 +1356,24 @@ StageResultUI
 
 ---
 
-##### Phase 8.4a 구현 항목
+##### Phase 8.4a 구현 항목 ✅
 
-- [ ] `PlayerMatchStats` NetworkBehaviour 구현 및 `NetworkedPlayer` 프리팹에 추가
-  - `KillCount`, `TotalDamage`, `SurvivalTime`, `Level`, `DamagePerSource` 필드
-- [ ] `EnemyNetworkBase.TakeDamage(float amount, ulong attackerClientId, int sourceSkillId)` 서명 변경
-  - `lastAttackerClientId`, `lastSourceSkillId` 갱신 (비귀속 `ulong.MaxValue` 제외)
-  - 데미지 적용 후 공격자 `PlayerMatchStats.AddDamage(actual, sourceSkillId)` 호출
+> 실제 구현은 `sourceSkillId: int` 대신 **`skillTag: string`**(스킬 SO 이름 등)을 사용한다. `SourceDamageEntry` 대신 `MatchResultEntry`에 `SkillDamageEntry Skill0~Skill3` (상위 4개, `SkillEntryCount`로 개수 표시) 필드를 인라인으로 넣어 별도 RPC/타입 없이 한 번에 전송한다.
+
+- [x] `PlayerMatchStats` NetworkBehaviour 구현 및 `NetworkedPlayer` 프리팹에 추가
+  - `KillCount`, `TotalDamage`, `SurvivalTime`, `Level`, `DamagePerSkill`(`Dictionary<string,float>`) 필드
+- [x] `EnemyNetworkBase.TakeDamage(float amount, ulong attackerClientId, string skillTag)` 서명 변경
+  - `lastAttackerClientId` 갱신 (비귀속 `NoAttacker` 기본값 제외)
+  - 데미지 적용 후 공격자 `PlayerMatchStats.AddDamage(actual, skillTag)` 호출
   - HP=0 시 `lastAttackerClientId`로 `AddKill()` 호출
-- [ ] 전체 호출처에 `attackerClientId` + `sourceSkillId` 전달 (표 참조: NetworkProjectile / OrbitingProjectileMode / AuraNetworkSkill / BlackHoleNetworkSkill / ClusterGrenadeNetworkSkill / GrenadeNetworkSkill / MeleeNetworkSkill / OrbitalNetworkSkill / ChestRewardApplier / DebugEnemyCommands)
-- [ ] `PlayerMatchStats`에 레벨 필드 추가 — `SharedLevelSystem`에서 종료 시 `SetLevel(int)` 호출
-- [ ] `StageRuntime`에 "최종 CanAct=false 전환 시각" 기록 로직 추가 (`SetSurvivalTime` 판단 기준)
-- [ ] `MatchResultEntry : INetworkSerializable` 구현 (`FixedString32Bytes displayName`)
-- [ ] `SourceDamageEntry : INetworkSerializable` 구현 (스킬별 데미지 상세가 필요할 때 사용)
-- [ ] `StageResultBroadcaster` 구현 — `GameFlowCoordinator.ForceTransition` 호출 시 `BuildEntries()` + `SendMatchResultClientRpc(entries)` 일원화
-- [ ] `StageResultViewModel`에 `OnResultReceived(MatchResultEntry[])` 추가
-- [ ] `StageResultUI` 확장 — row prefab 연결, 스킬별 데미지 기여 펼침 표시
+- [x] 전체 호출처에 `attackerClientId` + `skillTag` 전달 — `NetworkProjectile`, `OrbitingProjectileMode`, `AuraNetworkSkill`, `BlackHoleNetworkSkill`, `MeleeNetworkSkill`, `OrbitalNetworkSkill`, `SkillAreaDamage`(Grenade/ClusterGrenade/OrbitalGrenade가 공유 사용)에 반영. `ChestRewardApplier`, `NetworkedItemPickup`, `DebugEnemyCommands`, `EnemyAI`, `BossPatternController`, `BossMissile`은 의도적으로 비귀속(기본값) 유지
+- [x] `PlayerMatchStats`에 레벨 필드 추가 — `SharedLevelSystem`에서 종료 시 `SetLevel(int)` 호출
+- [x] `StageRuntime`/`StageResultBroadcaster`에 생존 시간 기록 로직 추가 (`CanAct` 기준으로 `SetSurvivalTime` 호출)
+- [x] `MatchResultEntry : INetworkSerializable` 구현 (`FixedString64Bytes displayName`)
+- [x] `SkillDamageEntry : INetworkSerializable` 구현 (스킬별 데미지 상세, `MatchResultEntry`에 인라인 포함)
+- [x] `StageResultBroadcaster` 구현 — `GameFlowCoordinator.CurrentFlow.OnValueChanged` 감지 시 `BuildEntries()` + `SendMatchResultClientRpc(entries)` 일원화 (`hasBroadcast` 가드로 중복 전송 방지)
+- [x] `StageResultViewModel`/`UIEventHub.Flow`에 `MatchResultPayload` 수신 경로 추가
+- [x] `StageResultUI` 확장 — row prefab 연결, 스킬별 데미지 기여 표시
 
 ##### Phase 8.4b 메뉴 / 로딩 / 설정
 
@@ -1486,13 +1454,102 @@ Bootstrap → MainMenu(접속) → Stage_01(로딩 화면) → 게임 → 결과
 
 #### Phase 8.5 이펙트
 
-- [ ] GameEventSO, EventListener 구현
+Phase 8.5의 목표는 "서버 판정은 그대로 두고, 클라이언트 표현 계층만 풍부하게 만든다"이다. 데미지, 사망, 드랍, 보스 패턴 판정은 서버가 결정하고, VFX/SFX/카메라 쉐이크/데미지 텍스트는 전부 클라이언트 로컬에서 재생한다.
+
+**이벤트 흐름**
+
+```text
+Server 판정
+  → ClientRpc로 연출 의도 전달(position, radius, direction, targetId, cueId 등 최소 payload)
+  → 클라이언트 VFXEventBridge가 GameEventSO / VFXSpawnEventSO 발행
+  → EventListener / VFXSpawner가 풀에서 프리팹을 꺼내 재생
+  → ParticleSystem 종료 또는 VFXLifetime 만료 시 풀로 반환
+```
+
+`ClientRpc` 내부에서 바로 `Instantiate`/`Destroy`를 늘리지 않는다. 기존 `SkillVFXController`, `EnemyNetworkBase`의 임시 VFX 경로는 이 흐름으로 점진적으로 이동한다.
+
+**기존 인프라 재사용 (신규 구현 전 확인)**
+
+- **풀링**: `Assets/Scripts/Network/PoolManager.cs`에 이미 non-network `GameObjectPool`(`PoolManager.GetGO`/`ReturnGO`, Warmup 포함)이 있다. `PooledVFX`는 새 풀을 만들지 않고 이 `PoolManager.GetGO`/`ReturnGO`를 감싸는 얇은 래퍼로 구현한다. `PoolManager`의 `goConfigs`(Inspector 등록)에 VFX 프리팹을 추가하면 워밍업도 그대로 재사용된다.
+- **이벤트 채널 위치**: Phase 8.0에서 확정한 `UIEventHub`류 채널은 전부 `Assets/Scripts/UI/Events/`에 있지만, `GameEventSO`/`VFXSpawnEventSO`류는 UI 상태가 아니라 게임플레이 연출 트리거이므로 UI 폴더에 두지 않는다. `Assets/Scripts/Core/Events/`가 과거 계획의 흔적으로 빈 폴더(.meta만 존재)로 남아있는데, 이건 재사용하지 않고 다른 시스템들과 동일하게 **`Assets/Scripts/VFX/`** 폴더를 신설해 `GameEventSO`, `EventListener`, `VFXCue`, `VFXSpawnEventSO`, `VFXCatalogSO`, `VFXEventBridge`, `PooledVFX`, `VFXLifetime`, `VFXSpawner`, `CameraShakeEventSO`, `FloatingTextEventSO`를 배치한다. 빈 `Core/Events/` 폴더는 정리 대상으로 남겨둔다.
+
+**VFX 이벤트 채널**
+
+| 채널 | 용도 | payload |
+|---|---|---|
+| `GameEventSO` | 사망, 보스 등장, 상자 오픈처럼 단순 fire-and-forget 연출 | 없음 또는 최소 |
+| `VFXSpawnEventSO` | 위치/반경/방향/색/지속시간이 필요한 VFX | `VFXCue` |
+| `CameraShakeEventSO` | 로컬 카메라 흔들림 | 세기, 시간, 거리 감쇠 기준점 |
+| `FloatingTextEventSO` | 데미지/회복/획득 텍스트 | 숫자, 색상, 월드 좌표 |
+
+```csharp
+public struct VFXCue
+{
+    public int     cueId;
+    public Vector3 position;
+    public Vector3 direction;
+    public float   radius;
+    public float   duration;
+    public Color   color;
+    public ulong   targetNetworkObjectId;
+}
+```
+
+`cueId`는 문자열 대신 고정 ID를 사용한다. 표시 이름과 프리팹 연결은 로컬 카탈로그(`VFXCatalogSO`)에서 조회한다.
+
+**VFX 프리팹 규약**
+
+```text
+Assets/Prefabs/VFX/
+  VFX_OneShot_HitSpark.prefab
+  VFX_OneShot_EnemyDeath.prefab
+  VFX_Loop_Aura.prefab
+  VFX_Telegraph_Circle.prefab
+  VFX_Telegraph_Cone.prefab
+  VFX_Pickup_XPAbsorb.prefab
+```
+
+- One-shot VFX: `ParticleSystem` + `PooledVFX`(`PoolManager.GetGO`/`ReturnGO` 래퍼) + `VFXLifetime`
+- Loop VFX: 명시적 stop 이벤트 또는 소유자 despawn 시 풀 반환
+- Telegraph VFX: 파티클보다 투명 메쉬/LineRenderer/전용 셰이더를 우선 사용
+- Damage Text: TMP 월드 텍스트를 풀링하며, 피격 VFX와 같은 이벤트에서 분기
+- 런타임 `new Material()`은 원칙적으로 금지. 적 피격 플래시는 `MaterialPropertyBlock` 사용
+- 런타임 `Shader.Find()`는 초기화/폴백에서만 허용. 평상시에는 Material/Shader를 Inspector 또는 Catalog에 연결
+
+**Built-in RP 셰이더 운용**
+
+현재 프로젝트는 `GraphicsSettings.m_CustomRenderPipeline`이 비어 있으므로 Built-in Render Pipeline 기준으로 작업한다. Built-in RP는 Unity 6에서 deprecated 상태지만 Unity 6 LTS 범위에서는 유지보수 대상이므로 MVP 구현에는 사용 가능하다. 단, URP 이전 시 셰이더는 재작성 또는 별도 SubShader 추가가 필요할 수 있다.
+
+Built-in RP에서는 Shader Graph 의존 대신 ShaderLab/HLSL 기반 `.shader` 파일을 기본으로 한다.
+
+| 용도 | 권장 구현 |
+|---|---|
+| 히트 스파크, 폭발, 픽업 | ParticleSystem + Additive/Alpha Blend 머티리얼 |
+| 오라, 블랙홀, 진화 스킬 | ParticleSystem + UV Scroll/Dissolve/Rim 계열 셰이더 |
+| 바닥 위험 범위 | 투명 원형/부채꼴 메쉬 + `ZWrite Off`, `Blend SrcAlpha OneMinusSrcAlpha` |
+| 피격 플래시 | 공유 머티리얼 유지 + `MaterialPropertyBlock`으로 `_HitFlash`, `_FlashColor` 제어 |
+| 보스 BigShot | 투사체 파티클 + 발사 예열 텔레그래프 + 충돌 one-shot |
+
+**카메라 쉐이크 규칙**
+
+- 클라이언트 로컬에서만 실행한다.
+- 내 공격/근처 폭발/보스 패턴별 세기를 분리한다.
+- 월드 좌표가 있는 이벤트는 거리 감쇠를 적용한다.
+- LevelingUp/ChestOpening처럼 `Time.timeScale = 0` 상태에서도 필요한 UI성 연출은 unscaled time을 사용한다.
+
+- [ ] `Assets/Scripts/VFX/` 폴더 신설, 빈 `Assets/Scripts/Core/Events/` 폴더 정리(삭제 또는 용도 재확정)
+- [ ] `GameEventSO`, `EventListener` 구현
+- [ ] `VFXCue`, `VFXSpawnEventSO`, `VFXCatalogSO`, `VFXEventBridge` 구현
+- [ ] `PooledVFX`, `VFXLifetime`, `VFXSpawner` 구현 — 신규 풀 대신 `PoolManager.GetGO`/`ReturnGO` 래핑 (`Instantiate`/`Destroy` 대신 풀 반환)
 - [ ] 피격 이펙트 구현 (적/보스 피격 시 짧은 플래시, 히트 스파크, 데미지 텍스트 연동)
 - [ ] 사망 이펙트 구현 (적/보스 사망 VFX, 보스 사망 연출)
 - [ ] 스킬 이펙트 보강 (투사체, 수류탄, 근접, 오라, 진화 스킬별 식별 가능한 VFX)
 - [ ] 아이템/XP 픽업 이펙트 구현 (흡수, 획득, 상자 오픈 피드백)
 - [ ] 보스 패턴 이펙트 보강 (텔레그래프, 미사일 발사, BigShot 연출)
-- [ ] 카메라 쉐이크 (클라이언트 로컬)
+- [ ] 카메라 쉐이크 구현 (클라이언트 로컬, 거리 감쇠, 이벤트 기반)
+- [ ] Built-in RP용 공용 VFX 셰이더 작성 (Additive, Alpha Blend, Telegraph, HitFlash)
+- [ ] 기존 `SkillVFXController`, `EnemyNetworkBase`의 직접 생성 VFX 경로를 이벤트+풀링 경로로 마이그레이션
+- [ ] 성능 기준 확인: 런타임 VFX/데미지 텍스트 `Instantiate`/`Destroy` 없음, 동시 one-shot VFX 80개 + 데미지 텍스트 100개에서 60fps 유지
 
 #### Phase 8.6 오디오
 
