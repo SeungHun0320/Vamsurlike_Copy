@@ -166,6 +166,11 @@ namespace Vamsurlike.Network
             return gameStartService?.RequestStartGame() ?? false;
         }
 
+        public bool RequestReturnToLobby()
+        {
+            return gameStartService?.RequestReturnToLobby() ?? false;
+        }
+
         private void RegisterMessagingHandlers()
         {
             lobbyHostService?.RegisterMessageHandler();
