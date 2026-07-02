@@ -14,11 +14,11 @@ namespace Vamsurlike.Items
             this.rng = rng;
         }
 
-        public ChestChoiceData[] Build(UpgradeCatalog catalog, SkillManager skillManager)
+        public ChestChoiceData[] Build(UpgradeCatalog catalog, SkillManager skillManager, PassiveStatHandler passiveStatHandler)
         {
             var choices = new List<ChestChoiceData>(3);
 
-            List<ChestChoiceData> evolutionCards = CombineSystem.GetEvolutionCards(skillManager);
+            List<ChestChoiceData> evolutionCards = CombineSystem.GetEvolutionCards(skillManager, passiveStatHandler);
             AddRandomCards(choices, evolutionCards, 3);
 
             List<ChestChoiceData> skillCards = BuildSkillCards(catalog, skillManager);

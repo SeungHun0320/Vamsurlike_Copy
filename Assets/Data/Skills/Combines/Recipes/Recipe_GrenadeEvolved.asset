@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: Recipe_ClusterGrenade
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Items.CombineRecipeSO
   sourceSkill: {fileID: 11400000, guid: d8c71cede9483044492e25fd88689cf3, type: 2}
-  sourceSkill2: {fileID: 11400000, guid: 7af840a663adfec4d848ee4c5241a8b3, type: 2}
+  requiredPassiveType: 8
   evolvedSkill: {fileID: 11400000, guid: c48048563989ee04896a6da7cc6a903e, type: 2}

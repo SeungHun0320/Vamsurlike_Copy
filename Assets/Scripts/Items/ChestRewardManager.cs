@@ -92,7 +92,8 @@ namespace Vamsurlike.Items
                     continue;
 
                 var skillManager = GetSkillManager(clientId);
-                ChestChoiceData[] choices = choiceBuilder.Build(catalog, skillManager);
+                var passiveStatHandler = GetPassiveStatHandler(clientId);
+                ChestChoiceData[] choices = choiceBuilder.Build(catalog, skillManager, passiveStatHandler);
 
                 if (choices.Length == 0)
                 {
@@ -247,6 +248,13 @@ namespace Vamsurlike.Items
             if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)) return null;
             if (client.PlayerObject == null) return null;
             return client.PlayerObject.GetComponent<Skills.SkillManager>();
+        }
+
+        private Upgrades.PassiveStatHandler GetPassiveStatHandler(ulong clientId)
+        {
+            if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)) return null;
+            if (client.PlayerObject == null) return null;
+            return client.PlayerObject.GetComponent<Upgrades.PassiveStatHandler>();
         }
 
         private bool CanClientChooseReward(ulong clientId)

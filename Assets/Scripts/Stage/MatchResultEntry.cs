@@ -13,6 +13,9 @@ namespace Vamsurlike.Stage
         public int   KillCount;
         public float TotalDamage;
         public float SurvivalTime;
+        // Phase 7.5 — 다운(1단계 진입) / 사망(2단계 진입) 횟수
+        public int   DownCount;
+        public int   DeathCount;
 
         public int SkillEntryCount;
         public SkillDamageEntry Skill0, Skill1, Skill2, Skill3;
@@ -25,6 +28,8 @@ namespace Vamsurlike.Stage
             s.SerializeValue(ref KillCount);
             s.SerializeValue(ref TotalDamage);
             s.SerializeValue(ref SurvivalTime);
+            s.SerializeValue(ref DownCount);
+            s.SerializeValue(ref DeathCount);
             s.SerializeValue(ref SkillEntryCount);
             s.SerializeValue(ref Skill0);
             s.SerializeValue(ref Skill1);

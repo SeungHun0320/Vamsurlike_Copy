@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 using Vamsurlike.Stage;
 using Vamsurlike.UI.Events;
 
@@ -61,6 +62,18 @@ namespace Vamsurlike.UI.ViewModels
         {
             if (entries == null) return System.Array.Empty<PlayerResultViewModel>();
 
+            // 막대 그래프는 팀 내 최대치 대비 상대값이라, 먼저 지표별 최대치를 한 번 구해둔다.
+            float maxDamage = 0f;
+            int   maxKills  = 0, maxDowns = 0, maxDeaths = 0;
+            for (int i = 0; i < entries.Length; i++)
+            {
+                var e = entries[i];
+                if (e.TotalDamage > maxDamage) maxDamage = e.TotalDamage;
+                if (e.KillCount   > maxKills)  maxKills  = e.KillCount;
+                if (e.DownCount   > maxDowns)  maxDowns  = e.DownCount;
+                if (e.DeathCount  > maxDeaths) maxDeaths = e.DeathCount;
+            }
+
             var vms = new PlayerResultViewModel[entries.Length];
             for (int i = 0; i < entries.Length; i++)
             {
@@ -68,13 +81,29 @@ namespace Vamsurlike.UI.ViewModels
                 vms[i] = new PlayerResultViewModel
                 {
                     PlayerName   = e.DisplayName.ToString(),
-                    StatsSummary = $"Lv.{e.Level}  킬 {e.KillCount}  " +
-                                   $"데미지 {e.TotalDamage:N0}  생존 {FormatTime(e.SurvivalTime)}",
+                    StatsSummary = $"Lv.{e.Level}  생존 {FormatTime(e.SurvivalTime)}",
+                    Bars         = BuildBarVMs(e, maxDamage, maxKills, maxDowns, maxDeaths),
                     Skills       = BuildSkillVMs(e),
                 };
             }
             return vms;
         }
+
+        private static StatBarViewModel[] BuildBarVMs(
+            MatchResultEntry e, float maxDamage, int maxKills, int maxDowns, int maxDeaths)
+        {
+            return new[]
+            {
+                new StatBarViewModel { Label = "데미지", ValueText = e.TotalDamage.ToString("N0"), Fill = NormalizeFill(e.TotalDamage, maxDamage) },
+                new StatBarViewModel { Label = "킬수",   ValueText = e.KillCount.ToString(),        Fill = NormalizeFill(e.KillCount, maxKills) },
+                new StatBarViewModel { Label = "다운",   ValueText = e.DownCount.ToString(),         Fill = NormalizeFill(e.DownCount, maxDowns) },
+                new StatBarViewModel { Label = "사망",   ValueText = e.DeathCount.ToString(),        Fill = NormalizeFill(e.DeathCount, maxDeaths) },
+            };
+        }
+
+        // maxValue가 0이면(전원 0) 빈 막대로 표시 — 나눗셈으로 NaN이 나오지 않도록 방어
+        private static float NormalizeFill(float value, float maxValue) =>
+            maxValue > 0f ? Mathf.Clamp01(value / maxValue) : 0f;
 
         private static SkillResultViewModel[] BuildSkillVMs(MatchResultEntry e)
         {

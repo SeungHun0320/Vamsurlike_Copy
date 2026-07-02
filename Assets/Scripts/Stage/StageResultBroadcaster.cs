@@ -67,6 +67,8 @@ namespace Vamsurlike.Stage
                     KillCount       = statsComp.KillCount,
                     TotalDamage     = statsComp.TotalDamage,
                     SurvivalTime    = statsComp.SurvivalTime,
+                    DownCount       = statsComp.DownCount,
+                    DeathCount      = statsComp.DeathCount,
                     SkillEntryCount = sortedSkills.Length,
                     Skill0          = MakeSkillEntry(sortedSkills, 0),
                     Skill1          = MakeSkillEntry(sortedSkills, 1),

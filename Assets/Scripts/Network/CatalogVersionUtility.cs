@@ -59,7 +59,7 @@ namespace Vamsurlike.Network
             {
                 if (recipe == null) { sb.Append("null|"); continue; }
                 sb.Append(recipe.sourceSkill  != null ? recipe.sourceSkill.name  : "null").Append('|')
-                  .Append(recipe.sourceSkill2 != null ? recipe.sourceSkill2.name : "null").Append('|')
+                  .Append((int)recipe.requiredPassiveType).Append('|')
                   .Append(recipe.evolvedSkill != null ? recipe.evolvedSkill.name : "null").Append('|');
             }
         }

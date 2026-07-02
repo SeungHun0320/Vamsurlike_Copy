@@ -18,6 +18,9 @@ namespace Vamsurlike.Player
         public float TotalDamage  { get; private set; }
         public float SurvivalTime { get; private set; }
         public int   Level        { get; private set; }
+        // Phase 7.5 — 다운(1단계 진입) / 사망(2단계 진입) 횟수
+        public int   DownCount    { get; private set; }
+        public int   DeathCount   { get; private set; }
 
         // 스킬별 데미지 누적 (서버 전용, 결과 전송 시 직렬화)
         public readonly Dictionary<string, float> DamagePerSkill = new();
@@ -43,6 +46,18 @@ namespace Vamsurlike.Player
         {
             if (!IsServer) return;
             KillCount++;
+        }
+
+        public void AddDown()
+        {
+            if (!IsServer) return;
+            DownCount++;
+        }
+
+        public void AddDeath()
+        {
+            if (!IsServer) return;
+            DeathCount++;
         }
 
         public void SetSurvivalTime(float time)   { if (IsServer) SurvivalTime = time; }

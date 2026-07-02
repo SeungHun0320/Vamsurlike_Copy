@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: Recipe_PierceShotgun
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Items.CombineRecipeSO
   sourceSkill: {fileID: 11400000, guid: 7a1c7f92b9506f84dadff95298203c39, type: 2}
-  sourceSkill2: {fileID: 11400000, guid: 7cbf607b28960c84d859ef9c01110a2c, type: 2}
+  requiredPassiveType: 11
   evolvedSkill: {fileID: 11400000, guid: 9e0d1001c4cedb14c9fdb3ffa1bbe023, type: 2}

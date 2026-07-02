@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: Recipe_BlackHole
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Items.CombineRecipeSO
   sourceSkill: {fileID: 11400000, guid: e603e60704790f640b25324af560590d, type: 2}
-  sourceSkill2: {fileID: 11400000, guid: f7ab802c08310f24cb973e738ed34271, type: 2}
+  requiredPassiveType: 9
   evolvedSkill: {fileID: 11400000, guid: ec3d52f482b66b84c9c55b11f34933b3, type: 2}

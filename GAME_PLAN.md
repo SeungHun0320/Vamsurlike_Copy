@@ -1097,7 +1097,7 @@ Done when: 패시브 스킬 12종이 레벨업/상자 카드로 등장해 정상
 - [x] `SD_DamageAura.asset` duration 값 설정 (Lv1 3 / Lv2 3.5)
 - [x] `SD_Orbital.asset` Lv3 `duration: 0.03` → `0` 정정 (동일 버그의 또 다른 사례)
 - [x] `SkillExecutionScheduler`에 `onPersistentDeactivated` 콜백 추가, `SkillManager`가 `NotifySkillRemoved` 재사용으로 연결 — 지속형 스킬 비활성화 시 VFX 숨김/재활성화 시 재표시
-- [ ] 에디터에서 회귀 테스트 (오라/궤도 Lv3가 duration 종료 후 실제로 비주얼이 꺼지고 쿨다운 뒤 재발동하는지 눈으로 확인 — 코드 리뷰만으론 런타임 타이밍 확인 불가)
+- [x] 에디터에서 회귀 테스트 (오라/궤도 Lv3가 duration 종료 후 실제로 비주얼이 꺼지고 쿨다운 뒤 재발동하는지 눈으로 확인) — 사용자 확인 완료
 
 ---
 
@@ -1140,7 +1140,7 @@ Done when: 패시브 스킬 12종이 레벨업/상자 카드로 등장해 정상
 - [x] 스킬 가속 → 쿨다운 배율 반영 (`SkillExecutionScheduler.Tick`에 `cooldownMultiplier` 파라미터 추가, `SkillManager`가 `1/(1+haste/100)` 계산해 전달)
 - [x] 투사체 개수 패시브 → `SkillCastContext.BonusProjectileCount`로 노출하고 투사체 기반 스킬 4종(`ProjectileSkill`/`PierceShotgunSkill`/`ScatterShotSkill`/`UltimateSkill`) 전부에 반영
 - [x] `UpgradeOptionSO` 신규 8종 asset 작성(기존 4종은 이미 존재) + `UpgradeCatalog.asset`에 등록
-- [ ] 에디터 회귀 테스트 — 방어력/체력재생/크리티컬/스킬가속/투사체 증가가 실제 플레이에서 체감되는지, 범위 배율 미적용 스킬 목록 재확인
+- [x] 에디터 회귀 테스트 — 방어력/체력재생/크리티컬/스킬가속/투사체 증가가 실제 플레이에서 체감되는지, 범위 배율 미적용 스킬 목록 재확인 — 사용자 확인 완료
 
 **만렙 캐핑 (사용자 확인 후 추가 구현)**
 
@@ -1182,21 +1182,27 @@ Done when: 패시브 스킬 12종이 레벨업/상자 카드로 등장해 정상
 - `SkillManager.EvolveSkill(source, evolved, source2 = null)`의 `source2` 파라미터는 이제 항상 null로만 호출되므로 제거하고 `SkillInventory.Evolve()`의 `source2` 분기도 함께 정리 (죽은 코드 방지)
 - 패시브는 진화의 "재료"가 아니라 "자격 조건"이라 진화해도 소모/제거되지 않는다 (VS의 패시브 아이템처럼 계속 보유)
 
-- [ ] `PassiveStatHandler`에 `passiveLevels` 추적 + `HasPassive()` 추가
-- [ ] `CombineRecipeSO`에서 `sourceSkill2`/`IsCombine` 제거, `requiredPassiveType: UpgradeEffectType` 추가
-- [ ] `CombineSystem.GetEvolutionCards`/`ChestRewardManager` 호출부에 `PassiveStatHandler` 파라미터 반영
-- [ ] `SkillManager.EvolveSkill`/`SkillInventory.Evolve`에서 `source2` 관련 코드 제거
-- [ ] 기존 레시피 4종 재설계 — 각 레시피에 어떤 패시브를 요구할지 기획 확정 필요 (예: 관통 폭발탄 ← 기본 투사체 만렙 + 피해량 패시브 보유)
-- [ ] 조합 스킬 액티브 수치 자체도 강화 (밸런스 확정 필요 — "조합 스킬은 엄청 강하다" 요구사항은 여기서 반영)
+- [x] `PassiveStatHandler`에 `passiveLevels` 추적 + `HasPassive()`/`GetPassiveLevel()` 추가
+- [x] `CombineRecipeSO`에서 `sourceSkill2`/`IsCombine` 제거, `requiredPassiveType: UpgradeEffectType` 추가
+- [x] `CombineSystem.GetEvolutionCards`에 `PassiveStatHandler` 파라미터 추가, `ChestChoiceBuilder.Build`/`ChestRewardManager` 호출부까지 배선
+- [x] `SkillManager.EvolveSkill`/`SkillInventory.Evolve`에서 `source2` 관련 코드 제거
+- [x] 기존 레시피 4종 재설계 (요구 패시브는 임시 배정 — 밸런스 확정 전까지 조정 가능한 placeholder):
+  - `Recipe_GrenadeEvolved`(수류탄→클러스터 수류탄): `PassiveAreaSize`(범위 크기)
+  - `Recipe_OrbitalGrenade`(궤도체→궤도 수류탄): `PassiveProjectileCount`(투사체)
+  - `Recipe_BlackHole`(오라→블랙홀): `PassiveDuration`(유지시간)
+  - `Recipe_PierceShotgun`(산탄→관통 샷건): `PassiveCritChance`(치명타 확률)
+- [ ] 조합 스킬 액티브 수치 자체도 강화 (밸런스 확정 필요 — "조합 스킬은 엄청 강하다" 요구사항은 여기서 반영, 아직 미착수)
 
 ---
 
 #### 통계 확장 (다운·사망 횟수 + 막대그래프)
 
-- [ ] `PlayerMatchStats`에 `DownCount`, `DeathCount` 필드 추가 (다운: `PlayerReviveHandler` 1단계 진입 시 카운트, 사망: 2단계 DeadWaiting 진입 시 카운트)
-- [ ] `MatchResultEntry` 직렬화 필드 추가 (payload 크기 재확인)
-- [ ] `StageResultUI`의 텍스트 행을 가로 막대 그래프 행으로 변경 (Image `fillAmount` 기반, 항목별 최대값 대비 정규화)
-- [ ] 막대 그래프 대상: 데미지, 킬수, 다운, 사망 등 팀원 간 비교가 의미 있는 지표 우선
+- [x] `PlayerMatchStats`에 `DownCount`, `DeathCount` 필드 추가 (다운: `PlayerReviveHandler.BeginDowned` 1단계 진입 시 카운트, 사망: `BeginDeadWait` 2단계 진입 시 카운트 — 기존 `deathCount` 페널티 계산용 로컬 카운터와는 별개로 통계용 카운터를 붙임)
+- [x] `MatchResultEntry`에 `DownCount`/`DeathCount` 직렬화 필드 추가, `StageResultBroadcaster.BuildEntries`에 반영
+- [x] `PlayerResultViewModel`에 `StatBarViewModel[] Bars` 추가, `StageResultViewModel.BuildVMs`가 데미지/킬수/다운/사망 4개 지표를 팀 내 최대치 대비 정규화(0~1)해서 계산 (전원 0이면 빈 막대, `NormalizeFill`이 0-division 방어)
+- [x] `StatBarRowUI`(신규 스크립트) 구현 — `Image.fillAmount`로 막대 표시. `PlayerResultRowUI`가 스킬 행과 동일한 패턴(`Instantiate` 후 `Bind`)으로 항목마다 하나씩 생성
+- [x] `PlayerResultRowUI`의 높이 계산(`ApplyPreferredHeight`)에 막대 4개분 높이 반영 (막대는 스킬 목록과 달리 접이식이 아니라 항상 표시)
+- [ ] **에디터 작업 필요 (스크립트만으로 완결 불가)**: `StatBarRow` 프리팹 신규 제작 (레이블 TMP_Text + 값 TMP_Text + `Image`(Filled/Horizontal) 자식 구성 후 `StatBarRowUI` 부착), 기존 `PlayerResultRow` 프리팹에 `barContainer`(세로 정렬 컨테이너)를 추가하고 `PlayerResultRowUI`의 `barContainer`/`barRowPrefab` 필드에 연결
 
 ---
 

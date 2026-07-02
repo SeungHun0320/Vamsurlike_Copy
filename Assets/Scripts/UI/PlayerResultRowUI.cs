@@ -12,6 +12,8 @@ namespace Vamsurlike.UI
     {
         [SerializeField] private TMP_Text  playerNameText;
         [SerializeField] private TMP_Text  statsText;
+        [SerializeField] private Transform barContainer;
+        [SerializeField] private StatBarRowUI barRowPrefab;
         [SerializeField] private Button    expandButton;
         [SerializeField] private TMP_Text  expandIcon;
         [SerializeField] private GameObject skillList;
@@ -20,6 +22,8 @@ namespace Vamsurlike.UI
 
         [Header("Layout")]
         [SerializeField] private float collapsedHeight = 48f;
+        [SerializeField] private float barRowHeight = 20f;
+        [SerializeField] private float barRowSpacing = 2f;
         [SerializeField] private float skillRowHeight = 28f;
         [SerializeField] private float skillRowSpacing = 2f;
         [SerializeField] private int rebuildFrames = 2;
@@ -27,6 +31,7 @@ namespace Vamsurlike.UI
         private RectTransform rowRect;
         private RectTransform skillListRect;
         private RectTransform skillListContentRect;
+        private RectTransform barContainerRect;
         private LayoutElement rowLayout;
         private Coroutine rebuildCoroutine;
         private PlayerResultViewModel currentVm;
@@ -36,6 +41,7 @@ namespace Vamsurlike.UI
             rowRect = transform as RectTransform;
             skillListRect = skillList != null ? skillList.transform as RectTransform : null;
             skillListContentRect = skillListContent as RectTransform;
+            barContainerRect = barContainer as RectTransform;
             rowLayout = GetComponent<LayoutElement>();
             if (rowLayout == null)
                 rowLayout = gameObject.AddComponent<LayoutElement>();
@@ -61,6 +67,21 @@ namespace Vamsurlike.UI
 
             if (playerNameText != null) playerNameText.text = vm.PlayerName;
             if (statsText      != null) statsText.text      = vm.StatsSummary;
+
+            if (barContainer != null)
+            {
+                foreach (Transform child in barContainer)
+                    Destroy(child.gameObject);
+
+                if (barRowPrefab != null && vm.Bars != null)
+                {
+                    foreach (var bar in vm.Bars)
+                    {
+                        var row = Instantiate(barRowPrefab, barContainer);
+                        row.Bind(bar);
+                    }
+                }
+            }
 
             SkillResultViewModel[] skills = vm.Skills;
 
@@ -109,6 +130,12 @@ namespace Vamsurlike.UI
         private void ApplyPreferredHeight()
         {
             float height = collapsedHeight;
+
+            // 막대 그래프는 접이식이 아니라 항상 보이므로 기본 높이에 매번 더한다.
+            int barCount = currentVm?.Bars?.Length ?? 0;
+            if (barCount > 0)
+                height += barCount * barRowHeight + Mathf.Max(0, barCount - 1) * barRowSpacing;
+
             int skillCount = currentVm?.SkillCount ?? 0;
             if (currentVm != null && currentVm.IsExpanded)
                 height += skillCount * skillRowHeight + Mathf.Max(0, skillCount - 1) * skillRowSpacing;
@@ -138,6 +165,7 @@ namespace Vamsurlike.UI
         private void RebuildLayouts()
         {
             Canvas.ForceUpdateCanvases();
+            ForceRebuild(barContainerRect);
             ForceRebuild(skillListContentRect);
             ForceRebuild(skillListRect);
             ForceRebuild(rowRect);

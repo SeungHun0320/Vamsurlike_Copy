@@ -213,8 +213,7 @@ namespace Vamsurlike.Skills
 
         public bool EvolveSkill(
             SkillDataSO source,
-            SkillDataSO evolved,
-            SkillDataSO source2 = null)
+            SkillDataSO evolved)
         {
             if (!IsServer || source == null || evolved == null) return false;
 
@@ -222,7 +221,6 @@ namespace Vamsurlike.Skills
             if (!skillInventory.Evolve(
                     source,
                     evolved,
-                    source2,
                     removedSkillTypes,
                     out string failureReason))
             {

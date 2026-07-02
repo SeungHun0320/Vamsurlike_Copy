@@ -70,7 +70,6 @@ namespace Vamsurlike.Skills
         public bool Evolve(
             SkillDataSO source,
             SkillDataSO evolved,
-            SkillDataSO source2,
             List<SkillCastType> removedSkillTypes,
             out string failureReason)
         {
@@ -89,20 +88,12 @@ namespace Vamsurlike.Skills
                 return false;
             }
 
-            if (source2 != null && !TryGet(source2, out _))
-            {
-                failureReason = $"'{source2.name}' not owned.";
-                return false;
-            }
-
             evolutionLockedSkills.Add(source);
-            if (source2 != null)
-                evolutionLockedSkills.Add(source2);
 
             for (int i = skills.Count - 1; i >= 0; i--)
             {
                 SkillDataSO ownedSkill = skills[i].Skill;
-                if (ownedSkill != source && (source2 == null || ownedSkill != source2)) continue;
+                if (ownedSkill != source) continue;
 
                 removedSkillTypes?.Add(ownedSkill.castType);
                 skills.RemoveAt(i);

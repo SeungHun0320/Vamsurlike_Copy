@@ -120,8 +120,12 @@ namespace Vamsurlike.Player
             if (stats.IsDowned.Value || stats.IsDeadWaiting.Value) return;
 
             // 다운 직전까지의 생존 시간 기록 (부활 후 재다운 시 덮어씌움 → 최종값)
-            if (TryGetComponent<PlayerMatchStats>(out var matchStats) && StageRuntime.Instance != null)
-                matchStats.SetSurvivalTime(StageRuntime.Instance.ElapsedTime.Value);
+            if (TryGetComponent<PlayerMatchStats>(out var matchStats))
+            {
+                if (StageRuntime.Instance != null)
+                    matchStats.SetSurvivalTime(StageRuntime.Instance.ElapsedTime.Value);
+                matchStats.AddDown();
+            }
 
             stats.IsDowned.Value      = true;
             DownedTimeRemaining.Value = downedDuration;
@@ -159,6 +163,9 @@ namespace Vamsurlike.Player
             deathCount++;
             float waitDuration = baseDeadWaitDuration
                 * Mathf.Pow(1f + deathPenaltyRatio, deathCount - 1);
+
+            if (TryGetComponent<PlayerMatchStats>(out var matchStats))
+                matchStats.AddDeath();
 
             stats.IsDeadWaiting.Value = true;
             DeadWaitRemaining.Value   = waitDuration;
