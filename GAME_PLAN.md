@@ -1191,7 +1191,7 @@ Done when: 패시브 스킬 12종이 레벨업/상자 카드로 등장해 정상
   - `Recipe_OrbitalGrenade`(궤도체→궤도 수류탄): `PassiveProjectileCount`(투사체)
   - `Recipe_BlackHole`(오라→블랙홀): `PassiveDuration`(유지시간)
   - `Recipe_PierceShotgun`(산탄→관통 샷건): `PassiveCritChance`(치명타 확률)
-- [ ] 조합 스킬 액티브 수치 자체도 강화 (밸런스 확정 필요 — "조합 스킬은 엄청 강하다" 요구사항은 여기서 반영, 아직 미착수)
+- [→] 조합 스킬 액티브 수치 강화 + 요구 패시브 재검토는 **Phase 8.7(최적화/밸런스)로 이월** — 밸런스 작업을 한 번에 몰아서 하기 위해
 
 ---
 
@@ -1202,7 +1202,8 @@ Done when: 패시브 스킬 12종이 레벨업/상자 카드로 등장해 정상
 - [x] `PlayerResultViewModel`에 `StatBarViewModel[] Bars` 추가, `StageResultViewModel.BuildVMs`가 데미지/킬수/다운/사망 4개 지표를 팀 내 최대치 대비 정규화(0~1)해서 계산 (전원 0이면 빈 막대, `NormalizeFill`이 0-division 방어)
 - [x] `StatBarRowUI`(신규 스크립트) 구현 — `Image.fillAmount`로 막대 표시. `PlayerResultRowUI`가 스킬 행과 동일한 패턴(`Instantiate` 후 `Bind`)으로 항목마다 하나씩 생성
 - [x] `PlayerResultRowUI`의 높이 계산(`ApplyPreferredHeight`)에 막대 4개분 높이 반영 (막대는 스킬 목록과 달리 접이식이 아니라 항상 표시)
-- [ ] **에디터 작업 필요 (스크립트만으로 완결 불가)**: `StatBarRow` 프리팹 신규 제작 (레이블 TMP_Text + 값 TMP_Text + `Image`(Filled/Horizontal) 자식 구성 후 `StatBarRowUI` 부착), 기존 `PlayerResultRow` 프리팹에 `barContainer`(세로 정렬 컨테이너)를 추가하고 `PlayerResultRowUI`의 `barContainer`/`barRowPrefab` 필드에 연결
+- [x] `StatBarRow` 프리팹 제작 (Unity MCP로 직접 작업) — `Assets/Prefabs/UI/StatBarRow.prefab`: `LabelText`/`ValueText`(TMP, 16pt) + `BarBackground`(Image, alpha 0.12) 안에 `BarFill`(Image, Filled/Horizontal) 중첩, 루트에 `HorizontalLayoutGroup`+`LayoutElement`(preferredHeight 20)+`StatBarRowUI` 부착. 스크린샷으로 레이아웃 확인 완료
+- [x] `PlayerResultRow` 프리팹에 `BarContainer`(`VerticalLayoutGroup`+`ContentSizeFitter`, Header와 SkillList 사이) 추가, `PlayerResultRowUI`의 `barContainer`/`barRowPrefab` 필드 연결. 컴파일 에러 없음 확인
 
 ---
 
@@ -1757,6 +1758,8 @@ Built-in RP에서는 Shader Graph 의존 대신 ShaderLab/HLSL 기반 `.shader` 
 - [ ] Network Profiler + CPU Profiler로 병목 확인
 - [ ] Object Visibility 튜닝 (Phase 3 구현 기반, 가시 범위 수치 조정)
 - [ ] XP, 스폰, 스킬 수치 Co-op 밸런싱
+- [ ] (Phase 7.5에서 이월) 조합 스킬 액티브 수치 강화 — "조합 스킬은 엄청 강하다" 요구사항 반영
+- [ ] (Phase 7.5에서 이월) 조합 레시피 4종의 요구 패시브 재검토 — 현재는 placeholder(클러스터 수류탄←범위크기 / 궤도 수류탄←투사체 / 블랙홀←유지시간 / 관통샷건←치명타확률), 실제 플레이 느낌 보고 조정
 
 예상 기간: 1~2주
 
