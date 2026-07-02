@@ -378,11 +378,16 @@ Step Offset: 0.3 / Slope Limit: 45 / Skin Width: 0.08
 
 ```text
 FinalDamage = SkillBaseDamage[level]
-            * (1 + PlayerAttackMultiplier)
+            * PlayerDamageMultiplier
             * (1 - EnemyDefenseRate)
 
 EnemyDefenseRate = enemyDefense / (enemyDefense + 100)
+
+// PlayerDamageMultiplier 기본값 1 — 코드상 PassiveStatHandler.AttackMultiplier와 동일 개념.
+// 패시브 "피해량 +10%"는 이 값에 +0.1씩 가산한다 (1 + 0.1 형태로 다시 더하지 않음).
 ```
+
+> 플레이어가 받는 피해에 대한 `PlayerDefenseRate`는 아직 없다 (Phase 7.5에서 `PlayerNetworkStats.Defense` 필드와 함께 추가 예정 — 아래 §7.5 참고).
 
 ### 시간 기반 난이도 스케일링 (서버 WaveController)
 
@@ -1072,6 +1077,152 @@ Co-op 배율은 계획대로 테이블 분리 없이 `WaveController.DefaultSpaw
 
 ---
 
+### Phase 7.5. 패시브 스킬 & 전투 밸런스 확장
+
+Done when: 패시브 스킬 12종이 레벨업/상자 카드로 등장해 정상 적용되고, 만렙 스킬의 진화(조합) 결과가 패시브 효과를 동반하며, 결과 화면에 다운/사망 횟수가 막대그래프로 표시되고, 오라 스킬이 지속시간 종료 후 정상적으로 쿨다운에 들어간다.
+
+> **왜 8.5(이펙트) 이전에 넣는가**: 이 Phase는 전투 수치 공식(크리티컬, 스킬가속, 투사체 개수)과 스킬 구조(조합 스킬 하이브리드)를 바꾼다. Phase 8.5는 스킬별로 식별 가능한 VFX를 붙이는 작업이라, 스킬 메커니즘을 먼저 확정해야 VFX를 다시 만드는 일이 없다. 반대로 §메타 프로그레션(Phase 8.8)은 VFX와 무관한 독립 시스템이라 뒤로 미뤄도 된다.
+
+---
+
+#### 버그 픽스 (선행)
+
+**오라 스킬 지속시간 후 쿨다운 미적용**
+
+- 원인: `SkillExecutionScheduler.cs:57` `if (levelData.duration <= 0f) return;` — duration이 0이면 쿨다운 진입 로직(59~64줄)에 도달하지 못하고 `IsActive`가 영구 유지된다.
+- 현재 `SD_DamageAura.asset`은 `duration: 0`(상시 발동 설계)으로 되어 있어 지금은 의도적으로 쿨다운이 없는 상태.
+- 채택안: 오라를 "지속시간 있는 스킬"로 바꿔 `SD_DamageAura.asset`에 duration 값을 채운다. 다른 지속형 스킬(블랙홀 등)과 발동 패턴을 통일한다.
+- **VFX 연동 주의(Phase 8.5 연결점)**: 상시 오라 → duration 기반 오라로 바뀌면 연출도 "항상 loop 재생"에서 "켜짐(지속시간) → 꺼짐 → 쿨다운 → 재시작" 주기를 따라야 한다. Phase 8.5 `VFX_Loop_Aura.prefab`/`PooledVFX` 항목에 "오라 on/off 이벤트 연동" 체크리스트를 하나 추가해 둔다.
+
+- [ ] `SD_DamageAura.asset` duration 값 설정 (기획 수치 확정 필요)
+- [ ] `SkillExecutionScheduler.TickPersistent()`가 duration>0인 지속 스킬에서 정상적으로 쿨다운 전환되는지 회귀 테스트
+
+---
+
+#### 패시브 스킬 12종
+
+레퍼런스: 뱀서라이크류 "집중포화" 패시브 목록. `PassiveStatHandler`가 이미 5종(MaxHP/MoveSpeed/PickupRadius/AttackPower/SkillLevelUp/NewSkill)을 스위치문 패턴으로 처리 중이므로, 값 가산/배율형 9종은 동일 패턴으로 확장하고 신규 메커니즘 3종만 별도 설계한다.
+
+> **수치 표기 통일**: `PassiveStatHandler.AttackMultiplier`는 기본값 `1f`이고 `PassiveAttackPower`는 `option.value`를 그대로 가산한다 (`AttackMultiplier.Value += option.value`). 즉 "+10%"는 asset에 `value = 0.1`로 넣어야 하고, 5회 누적 시 `AttackMultiplier = 1.5`가 된다. §8 데미지 공식은 `FinalDamage = SkillBaseDamage * (1 + PlayerAttackMultiplier) * (1 - EnemyDefenseRate)`로 적혀 있어 "1 + 배율"처럼 보이지만, 실제 코드(`EnemyNetworkBase.TakeDamage`, `SkillCastContext.FinalDamage`)는 `damage * AttackMultiplier` 형태로 이미 "기본 1, 보너스는 +0.1씩 누적"을 전제로 구현돼 있다. 표기 혼동 방지를 위해 §8 문서도 이 Phase에서 `(1 + PlayerAttackMultiplier)` → `DamageMultiplier`(기본 1, 가산형)로 통일한다.
+
+**A. 기존 패턴 확장 (값 가산/배율)**
+
+| 패시브 | 레벨당 증가 | 최대치 | 비고 |
+|---|---|---|---|
+| 피해량 | +10% (`value=0.1`) | +50% | `AttackMultiplier`에 가산 (기존 패턴 그대로, 기본 1 기준) |
+| 이동 속도 | +8% | +40% | 기존 MoveSpeed 패시브와 동일 패턴 |
+| 최대 체력 | +150 | +750 | 기존 MaxHP 패시브와 동일 패턴 |
+| 방어력 | +8 | +40 | `StatType.Defense`는 정의만 있고 `PassiveStatHandler`에 미연결. **`PlayerNetworkStats`에는 방어력 자체가 없다** — `TakeDamage(float amount)`가 방어력을 전혀 보지 않고 HP에서 바로 차감하므로, 필드 추가 + 초기화 + 피격 공식 갱신까지 필요 (아래 체크리스트) |
+| 체력 재생 | +4/초 | +20/초 | `PlayerNetworkStats`에 초당 회복 필드 신규 필요. 적용 조건: `IsAlive && !IsDowned.Value && !IsDeadWaiting.Value`(즉 `CanAct`) && `HP.Value < MaxHP.Value`, `GameFlowCoordinator.IsGameplayActive`일 때만 서버 틱 |
+| 범위 크기 | +11% | +55% | 스킬 판정 반경(오라/근접/수류탄 스플래시 등)에 곱연산 — 배율 훅 필요 |
+| 유지시간 | +12% | +60% | 지속형 스킬 duration에 곱연산 |
+| 획득 반경 | +35% | +175% | 기존 PickupRadius 패시브와 동일 패턴 |
+| 경험치 | +10% | +50% | **개인 패시브인데 XP는 공유 풀이라 그대로는 안 붙는다.** `SharedLevelSystem.AddXP(int amount)`는 소유자 정보 없이 `SharedXP`에 바로 더하고, 실제 픽업 경로는 `XPOrbManager.TryPickup(orbId, clientId)` → `AddXP(orb.Xp)`. "누가 주웠는지"는 `TryPickup`이 이미 알고 있으므로, **`AddXP(int amount, ulong sourceClientId)` 오버로드를 추가해 픽업한 플레이어의 XP 배율만큼 가산량을 늘려 공유 풀에 넣는 방식**으로 확정한다 (팀 전체 배율이 아니라 "주운 사람 배율" 채택 — 개인 성장 보상 의미를 살리기 위함) |
+
+**B. 신규 메커니즘 (전투 공식/스케줄러에 훅 추가 필요)**
+
+| 패시브 | 레벨당 증가 | 최대치 | 필요 작업 |
+|---|---|---|---|
+| 치명타 확률 | +8% | +40% | 현재 §8 데미지 공식에 크리티컬 항이 없음. **판정 위치는 `EnemyNetworkBase.TakeDamage`로 확정** — 이 메서드가 이미 defense 반영 후 `finalDamage`를 계산해 `PlayerMatchStats.AddDamage`/`AddUltimateGaugeForDamage`/`ShowDamageClientRpc`(피격 텍스트)까지 한 번에 내보내는 유일한 지점이라, 여기서 크리티컬을 곱하면 통계·궁극기 게이지·VFX가 항상 같은 값을 본다. `SkillCastContext.FinalDamage`(스킬 캐스트 1회당 1번 계산)에서 미리 곱하면 다중 히트(관통/스플래시) 스킬이 한 번의 굴림 결과를 모든 타겟에 공유하게 되므로 채택하지 않는다. 서버 시드 기반 `System.Random`으로 판정 + 배율(기획 확정 필요) |
+| 스킬 가속 | +10 | +50 | `SkillExecutionScheduler` 쿨다운 계산에 전역 가속치 반영 (`쿨다운 = 기본 쿨다운 / (1 + 가속/100)` 형태) |
+| 투사체 | Lv1 +1 / Lv3 +2 / Lv5 +3 | +3 | 투사체 기반 스킬(NetworkProjectile/ScatterShot 등) 스폰 개수에 반영 — 스킬별 스폰 로직에 공통 훅 필요 |
+
+- [x] §8 데미지 공식 표기를 `PlayerDamageMultiplier`(기본 1, 가산형)로 통일 — 문서 수정 완료, 코드는 이미 이 방식으로 구현되어 있어 변경 불필요
+- [ ] `StatType`에 누락 항목 추가, `PassiveStatHandler`에 값가산 패시브 9종 연결
+- [ ] `PlayerNetworkStats`에 `Defense NetworkVariable<float>` 추가, `CharacterDataSO` 기본 방어력으로 초기화, `TakeDamage(float amount)`에 방어율 공식 반영 (§8 `EnemyDefenseRate` 공식과 동일하게 `defense/(defense+100)` 채택 여부 확정)
+- [ ] `PlayerNetworkStats`에 체력 재생 `NetworkVariable<float>` + 서버 틱 로직 추가 (`CanAct` && `HP < MaxHP` && `IsGameplayActive` 가드)
+- [ ] 범위/유지시간 배율을 스킬 실행부(`SkillExecutionScheduler`, 각 `*NetworkSkill`)에서 조회하는 공통 지점 설계 — 구현 전 패턴 제안 (RULES.md 패턴 제안 의무)
+- [ ] `SharedLevelSystem.AddXP(int amount, ulong sourceClientId)` 오버로드 추가, `XPOrbManager.TryPickup`에서 호출부 교체
+- [ ] 크리티컬 판정 로직을 `EnemyNetworkBase.TakeDamage`에 추가 (서버 시드 `System.Random`, §8 공식 갱신)
+- [ ] 스킬 가속 → 쿨다운 배율 반영
+- [ ] 투사체 개수 패시브 → 스폰 로직 공통 훅
+- [ ] `UpgradeOptionSO` 신규 12종 asset 작성 + 레벨업/상자 카탈로그 등록
+
+---
+
+#### 조합 스킬 → 패시브 + 액티브 하이브리드
+
+현재 `CombineRecipeSO`는 sourceSkill(+sourceSkill2) → evolvedSkill 단순 치환이고, 진화 스킬도 결국 `SkillDataSO` + castType으로 동일하게 액티브 실행된다. 스킬 시스템과 패시브 시스템 사이에 연결점이 없는 현재 구조를 확장해야 패시브 효과를 동시에 줄 수 있다.
+
+**설계 방향 (구현 전 확정 필요 — RULES.md 패턴 제안 의무)**
+- `SkillDataSO`에 `PassiveBonusData[] passiveBonuses` 필드 추가 (StatType + value 페어)
+- 스킬 습득/진화 시점에 `PassiveStatHandler`가 해당 보너스를 적용/해제 — 스킬 인벤토리가 패시브 핸들러를 아는 최소 결합으로 연결
+- 진화(`EvolveSkill`) 시: 기존 sourceSkill이 부여했던 패시브 제거 → evolvedSkill의 패시브 재적용. "조합 스킬은 엄청 강하다" 요구사항에 맞춰 대폭 강화된 수치로 설계
+
+- [ ] 패턴 제안 문서화 (예: Decorator vs 직접 호출 비교) 후 구현 착수
+- [ ] `SkillDataSO`에 `passiveBonuses` 필드 추가
+- [ ] `SkillManager.EvolveSkill()`에 패시브 적용/제거 연동
+- [ ] 조합 스킬 3~4종에 강화된 패시브 수치 부여 (밸런스 확정 필요)
+
+---
+
+#### 통계 확장 (다운·사망 횟수 + 막대그래프)
+
+- [ ] `PlayerMatchStats`에 `DownCount`, `DeathCount` 필드 추가 (다운: `PlayerReviveHandler` 1단계 진입 시 카운트, 사망: 2단계 DeadWaiting 진입 시 카운트)
+- [ ] `MatchResultEntry` 직렬화 필드 추가 (payload 크기 재확인)
+- [ ] `StageResultUI`의 텍스트 행을 가로 막대 그래프 행으로 변경 (Image `fillAmount` 기반, 항목별 최대값 대비 정규화)
+- [ ] 막대 그래프 대상: 데미지, 킬수, 다운, 사망 등 팀원 간 비교가 의미 있는 지표 우선
+
+---
+
+예상 기간: 6~10일
+
+---
+
+### Phase 7.6. 메타 프로그레션 (골드 & 영구 업그레이드, 세션 한정)
+
+Done when: 스테이지에서 골드를 드랍/획득하면 세션 동안 누적되고, 로비에서 그 골드로 13종 영구 업그레이드를 구매하면 다음 스테이지 시작 시 캐릭터 기본 스탯에 반영된다. **영속 저장(재시작 후 유지)은 이 Phase 범위 밖 — Phase 9에서 추가한다.**
+
+> VFX·오디오·최적화(8.5~8.7)와 독립적인 신규 시스템이라 8.5보다 먼저 당겨왔다. 단 세이브/불러오기(파일 저장, 로드 실패 처리)까지 포함하면 다시 커지므로, 이 Phase에서는 **세션 메모리에만 보관**하고 디스크 영속화는 Phase 9의 `SaveManager` 구현으로 미룬다 — 앱을 재시작하면 골드/업그레이드가 초기화된다는 뜻이며, 로비 UI에 그 사실을 안내 문구로 표시한다.
+>
+> 로비 상점 UI는 Phase 8.1에서 확립되는 MVVM 패턴(View/ViewModel 분리)을 그대로 따르면 된다 — Phase 8.0~8.4b는 문서상 뒤에 있지만 실제 코드베이스에는 이미 구현·커밋되어 있으므로 순서상 막히는 부분은 없다.
+
+**골드 드랍 (인게임)**
+
+기존 XP 오브와 동일하게 NetworkObject가 아닌 서버 데이터 목록 + 클라이언트 비주얼 프록시 방식을 재사용한다 (§7 XP 오브 처리 방식과 동일 패턴). 드랍 소스는 `DropTableSO`에 골드 확률/수량을 추가하는 방식이며, 픽업 즉시 서버가 세션 내 누적 골드에 더하고 스테이지 종료 시 `PlayerMatchStats`를 거쳐 결과 화면으로 전달한다.
+
+- [ ] `DropTableSO`에 골드 드랍 확률/수량 필드 추가
+- [ ] `GoldOrbVisualProxy` 구현 (`XPOrbVisualProxy` 복사 후 분리 — XP와 책임이 다르므로 유지보수를 위해 별도 클래스로 둔다)
+- [ ] `PlayerMatchStats`에 `GoldEarned` 필드 추가, `MatchResultEntry`에 반영
+
+**세션 메모리 저장 (임시 — 영속화는 Phase 9)**
+
+- [ ] `MetaProgressionState` (비-Network 순수 C# 클래스, `GameInstance`가 보유) 구현 — 총 보유 골드, 영구 업그레이드 13종 각 레벨을 앱 실행 중에만 유지
+- [ ] 이 클래스의 필드 구조를 Phase 9 `SaveManager`가 그대로 직렬화할 수 있게 설계 (나중에 저장/로드 코드만 갈아 끼우면 되도록)
+- [ ] 로비 UI에 "이번 세션에만 유지되며 게임 재시작 시 초기화됨" 안내 표시 (Phase 9에서 SaveManager 붙으면 이 문구 제거)
+
+**로비 영구 업그레이드 상점**
+
+레퍼런스: "집중포화" 업그레이드 목록.
+
+| 업그레이드 | 기본값 | 1회당 | 최대 횟수 | 최대치 |
+|---|---|---|---|---|
+| 피해량 | 100% | +0.1배 | 8 | 1.8배 |
+| 방어력 | 챔피언별 상이 | +5 | 5 | +25 |
+| 최대 체력 | 챔피언별 상이 | +0.1배 | 5 | 1.5배 |
+| 체력 재생 | 0 | +3/초 | 5 | +15/초 |
+| 이동 속도 | 100% | +5% | 4 | +20% |
+| 획득 반경 | 100% | +25% | 3 | +75% |
+| 범위 크기 | 100% | +5% | 4 | +20% |
+| 지속시간 | 100% | +5% | 4 | +20% |
+| 치명타 확률 | 5% | +5% | 4 | +20% |
+| 스킬 가속 | 0 | +5 | 4 | +20 (챔피언 스킬 누적 200회 사용 임무 해금 후) |
+| 경험치 | 100% | +5% | 5 | +25% |
+| 투사체 | 0 | +1 | 2 | +2 |
+| 골드 | 100% | +15% | 3 | +45% |
+
+이 표는 Phase 7.5의 패시브 스킬(인게임 한정, 레벨업으로 습득) 목록과 이름이 겹치지만 별개 시스템이다 — 패시브는 한 판 안에서만 유효하고, 여기 업그레이드는 골드로 사서 (세션 동안) 모든 판에 영구 적용된다.
+
+- [ ] `PermanentUpgradeTable.csv` + `DataManager` 로딩 추가 (레벨별 비용/효과, §7 DataManager 패턴 재사용)
+- [ ] 로비 상점 UI (View/ViewModel, MVVM 규칙 준수) — 13종 카드/행, 보유 골드 표시, 구매 버튼, 최대 레벨 도달 시 비활성화
+- [ ] 스킬 누적 사용 횟수 카운트 → 스킬 가속 해금 조건 연동 (카운트 위치: `SkillExecutionScheduler` 또는 `SkillManager` 중 확정 필요)
+- [ ] 영구 업그레이드 적용 지점: 스테이지 진입 시 `CharacterDataSO` 베이스 스탯 위에 영구 업그레이드 배율을 곱해 `PlayerNetworkStats` 초기화 (서버 전용 계산 — RULES.md 서버 권한 원칙 준수)
+- [ ] 결과 화면에 이번 판 획득 골드 표시
+
+예상 기간: 4~6일 (세이브 제외로 기존 5~8일에서 단축)
+
+---
+
 ### Phase 8. UI, 이펙트, 오디오, 최적화, 밸런스
 
 Done when: HUD/다운·부활/결과/메인 메뉴 UI가 이벤트 기반으로 동작하고, 이펙트·오디오·최적화·밸런스가 붙어 4인 루프가 에러 없이 완성된다.
@@ -1460,8 +1611,8 @@ Phase 8.5의 목표는 "서버 판정은 그대로 두고, 클라이언트 표�
 
 ```text
 Server 판정
-  → ClientRpc로 연출 의도 전달(position, radius, direction, targetId, cueId 등 최소 payload)
-  → 클라이언트 VFXEventBridge가 GameEventSO / VFXSpawnEventSO 발행
+  → ClientRpc로 연출 의도 전달(position, radius, direction, targetId, cueId 등 primitive payload)
+  → 클라이언트 VFXEventBridge가 로컬 VFXCue로 변환 후 GameEventSO / VFXSpawnEventSO 발행
   → EventListener / VFXSpawner가 풀에서 프리팹을 꺼내 재생
   → ParticleSystem 종료 또는 VFXLifetime 만료 시 풀로 반환
 ```
@@ -1478,7 +1629,7 @@ Server 판정
 | 채널 | 용도 | payload |
 |---|---|---|
 | `GameEventSO` | 사망, 보스 등장, 상자 오픈처럼 단순 fire-and-forget 연출 | 없음 또는 최소 |
-| `VFXSpawnEventSO` | 위치/반경/방향/색/지속시간이 필요한 VFX | `VFXCue` |
+| `VFXSpawnEventSO` | 위치/반경/방향/색/지속시간이 필요한 VFX | 로컬 전용 `VFXCue` |
 | `CameraShakeEventSO` | 로컬 카메라 흔들림 | 세기, 시간, 거리 감쇠 기준점 |
 | `FloatingTextEventSO` | 데미지/회복/획득 텍스트 | 숫자, 색상, 월드 좌표 |
 
@@ -1495,7 +1646,7 @@ public struct VFXCue
 }
 ```
 
-`cueId`는 문자열 대신 고정 ID를 사용한다. 표시 이름과 프리팹 연결은 로컬 카탈로그(`VFXCatalogSO`)에서 조회한다.
+`VFXCue`는 클라이언트 로컬 이벤트 payload이며 NGO RPC에 그대로 싣지 않는다. RPC payload는 primitive 인자로 분해하거나, 배열/커스텀 struct가 꼭 필요할 때만 `INetworkSerializable`을 명시 구현한다. `cueId`는 문자열 대신 고정 ID를 사용하고, 표시 이름과 프리팹 연결은 로컬 카탈로그(`VFXCatalogSO`)에서 조회한다.
 
 **VFX 프리팹 규약**
 
@@ -1537,7 +1688,7 @@ Built-in RP에서는 Shader Graph 의존 대신 ShaderLab/HLSL 기반 `.shader` 
 - 월드 좌표가 있는 이벤트는 거리 감쇠를 적용한다.
 - LevelingUp/ChestOpening처럼 `Time.timeScale = 0` 상태에서도 필요한 UI성 연출은 unscaled time을 사용한다.
 
-- [ ] `Assets/Scripts/VFX/` 폴더 신설, 빈 `Assets/Scripts/Core/Events/` 폴더 정리(삭제 또는 용도 재확정)
+- [ ] `Assets/Scripts/VFX/` 폴더 신설, 빈 `Assets/Scripts/Core/Events/` 폴더는 Unity 참조 확인 후 정리(삭제 또는 용도 재확정)
 - [ ] `GameEventSO`, `EventListener` 구현
 - [ ] `VFXCue`, `VFXSpawnEventSO`, `VFXCatalogSO`, `VFXEventBridge` 구현
 - [ ] `PooledVFX`, `VFXLifetime`, `VFXSpawner` 구현 — 신규 풀 대신 `PoolManager.GetGO`/`ReturnGO` 래핑 (`Instantiate`/`Destroy` 대신 풀 반환)
@@ -1548,6 +1699,7 @@ Built-in RP에서는 Shader Graph 의존 대신 ShaderLab/HLSL 기반 `.shader` 
 - [ ] 보스 패턴 이펙트 보강 (텔레그래프, 미사일 발사, BigShot 연출)
 - [ ] 카메라 쉐이크 구현 (클라이언트 로컬, 거리 감쇠, 이벤트 기반)
 - [ ] Built-in RP용 공용 VFX 셰이더 작성 (Additive, Alpha Blend, Telegraph, HitFlash)
+- [ ] `AreaCircleVFX`, `MeleeArcVFX`의 런타임 `new Material(Shader.Find(...))` 제거 및 Catalog/Prefab Material 참조로 전환
 - [ ] 기존 `SkillVFXController`, `EnemyNetworkBase`의 직접 생성 VFX 경로를 이벤트+풀링 경로로 마이그레이션
 - [ ] 성능 기준 확인: 런타임 VFX/데미지 텍스트 `Instantiate`/`Destroy` 없음, 동시 one-shot VFX 80개 + 데미지 텍스트 100개에서 60fps 유지
 
@@ -1578,7 +1730,11 @@ Done when: Windows Server Build를 별도 실행해 서버 역할만 담당하�
 - [ ] 서버 시작 시 자동으로 Relay Allocation → 코드 콘솔 출력
 - [ ] 서버 실행 배치 파일 작성 (클릭 한 번으로 서버 시작)
 - [ ] 서버 로그 파일 출력 (`Application.logMessageReceived` → txt 저장)
-- [ ] SaveManager 구현 (로컬 세이브: 설정, 통계)
+- [ ] `Assets/Scripts/Core/SaveManager.cs` 신규 구현 — `ICoreFacade.SaveSettings/LoadSettings`(설정값 PlayerPrefs)와는 별도로 골드/영구 업그레이드 레벨/누적 통계를 저장하는 책임 분리
+  - 저장 포맷: JSON(Newtonsoft Json, §7 필수 패키지에 이미 포함) 로컬 파일, `Application.persistentDataPath` 사용
+  - 저장 항목: Phase 7.6 `MetaProgressionState`(세션 메모리)와 동일한 구조 — 총 보유 골드, 영구 업그레이드 13종 각 레벨, 누적 통계(총 플레이 횟수·최고 생존시간·총 킬수 등, 범위는 기획 확정 필요)
+  - 로드 실패/파일 없음 시 기본값으로 안전 초기화 (RULES.md 예외 처리 규칙)
+  - `UNITY_SERVER` 빌드에서 클라이언트 전용 저장 로직이 서버 프로세스에 끼어들지 않는지 확인 (`#if !UNITY_SERVER` 등)
 - [ ] LAN 직접 IP 접속 지원 (같은 네트워크면 Relay 없이 연결)
 - [ ] 4인 원격 플레이 안정성 테스트 (30분 생존 스테이지 기준 크래시 없음)
 - [ ] 서버 치트 방지 기초 (속도 검증, 데미지 서버 내부 계산 재확인)
@@ -1606,9 +1762,13 @@ Phase 6: 아이템 & 조합
   ↓
 Phase 7: 스테이지 & 보스
   ↓
+Phase 7.5: 패시브 스킬 & 전투 밸런스 확장 (신설)
+  ↓
+Phase 7.6: 메타 프로그레션 — 골드 & 영구 업그레이드, 세션 한정 (신설)
+  ↓
 Phase 8: UI / 이펙트 / 오디오 / 최적화 / 밸런스
   ↓
-Phase 9: 로컬 서버 빌드 안정화 (Windows, Relay 코드 공유)
+Phase 9: 로컬 서버 빌드 안정화 (Windows, Relay 코드 공유 + SaveManager로 Phase 7.6 데이터 영속화)
 ```
 
 ---
