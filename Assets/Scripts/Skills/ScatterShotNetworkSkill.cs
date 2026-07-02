@@ -37,7 +37,8 @@ namespace Vamsurlike.Skills
             isBurstActive = true;
             context.CoroutineRunner.StartSkillCoroutine(FireBurstCoroutine(
                 skill.projectilePrefab, levelData, context.FinalDamage,
-                context.OwnerClientId, context.CasterTransform, direction, skill.name, context.SpeedMultiplier));
+                context.OwnerClientId, context.CasterTransform, direction, skill.name, context.SpeedMultiplier,
+                context.BonusProjectileCount));
 
             return true;
         }
@@ -45,9 +46,9 @@ namespace Vamsurlike.Skills
         private IEnumerator FireBurstCoroutine(
             GameObject prefab, SkillLevelData levelData, float finalDamage,
             ulong ownerClientId, Transform casterTransform, Vector3 baseForward, string skillName,
-            float speedMultiplier = 1f)
+            float speedMultiplier = 1f, int bonusProjectileCount = 0)
         {
-            int count = Mathf.Max(1, levelData.scatterBulletCount);
+            int count = Mathf.Max(1, levelData.scatterBulletCount + bonusProjectileCount);
             float halfSpread = levelData.scatterAngle * 0.5f;
             // 샷당 반동 강도: 총 각도를 총알 수로 나눈 값의 2배 → 누적 시 전체 부채꼴에 걸쳐 분산
             float kickRange = levelData.scatterAngle / count * 2f;

@@ -26,7 +26,7 @@ namespace Vamsurlike.Skills
                 : context.CasterTransform.position + Vector3.up * DefaultSpawnHeight;
             spawnPos += direction * context.SpawnForwardOffset;
 
-            int count = Mathf.Max(1, levelData.projectileCount);
+            int count = Mathf.Max(1, levelData.projectileCount + context.BonusProjectileCount);
             float spread = Mathf.Max(0f, levelData.spreadAngle);
             int spawnedCount = 0;
             float finalDamage = context.FinalDamage;

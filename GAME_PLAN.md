@@ -1130,15 +1130,17 @@ Done when: 패시브 스킬 12종이 레벨업/상자 카드로 등장해 정상
 | 투사체 | Lv1 +1 / Lv3 +2 / Lv5 +3 | +3 | 투사체 기반 스킬(NetworkProjectile/ScatterShot 등) 스폰 개수에 반영 — 스킬별 스폰 로직에 공통 훅 필요 |
 
 - [x] §8 데미지 공식 표기를 `PlayerDamageMultiplier`(기본 1, 가산형)로 통일 — 문서 수정 완료, 코드는 이미 이 방식으로 구현되어 있어 변경 불필요
-- [ ] `StatType`에 누락 항목 추가, `PassiveStatHandler`에 값가산 패시브 9종 연결
-- [ ] `PlayerNetworkStats`에 `Defense NetworkVariable<float>` 추가, `CharacterDataSO` 기본 방어력으로 초기화, `TakeDamage(float amount)`에 방어율 공식 반영 (§8 `EnemyDefenseRate` 공식과 동일하게 `defense/(defense+100)` 채택 여부 확정)
-- [ ] `PlayerNetworkStats`에 체력 재생 `NetworkVariable<float>` + 서버 틱 로직 추가 (`CanAct` && `HP < MaxHP` && `IsGameplayActive` 가드)
-- [ ] 범위/유지시간 배율을 스킬 실행부(`SkillExecutionScheduler`, 각 `*NetworkSkill`)에서 조회하는 공통 지점 설계 — 구현 전 패턴 제안 (RULES.md 패턴 제안 의무)
-- [ ] `SharedLevelSystem.AddXP(int amount, ulong sourceClientId)` 오버로드 추가, `XPOrbManager.TryPickup`에서 호출부 교체
-- [ ] 크리티컬 판정 로직을 `EnemyNetworkBase.TakeDamage`에 추가 (서버 시드 `System.Random`, §8 공식 갱신)
-- [ ] 스킬 가속 → 쿨다운 배율 반영
-- [ ] 투사체 개수 패시브 → 스폰 로직 공통 훅
-- [ ] `UpgradeOptionSO` 신규 12종 asset 작성 + 레벨업/상자 카탈로그 등록
+- [x] `PassiveStatHandler`에 값가산 패시브 9종 연결. **`StatType`은 확장하지 않음** — 실제로는 `PassiveStatHandler`가 `StatType`이 아니라 `UpgradeEffectType`(이미 사용 중이던 enum)으로 패시브를 식별하고 있었음을 확인, `UpgradeEffectType`에 8개 값을 append했다 (`StatType`은 코드베이스 전체에서 참조가 없는 미사용 enum으로 확인 — 손대지 않음)
+  - `passiveLevels: Dictionary<UpgradeEffectType, int>` 추적 + `HasPassive`/`GetPassiveLevel` 추가 (조합 스킬 진화 조건에서 사용)
+- [x] `PlayerNetworkStats`에 `Defense`/`HealthRegenPerSecond NetworkVariable<float>` 추가, `CharacterDataSO.baseDefense`로 초기화(필드는 이미 있었으나 미사용 상태였음), `TakeDamage`에 §8과 동일한 `defense/(defense+100)` 공식 반영
+- [x] `PlayerNetworkStats.Update()`에 체력 재생 틱 추가 (`CanAct && HP<MaxHP && IsGameplayActive` 가드) — `ServerBehaviour`가 클라이언트 인스턴스는 `enabled=false` 처리하므로 서버에서만 실행됨
+- [x] `AreaMultiplier`/`DurationMultiplier`를 `SkillCastContext`에 추가하고 `AuraSkill`(반경)·`OrbitalSkill`(반경)·`SkillExecutionScheduler`(지속형 스킬의 duration/cooldown)에 적용 — **범위 배율은 Aura/Orbital 두 개만 참고 구현 완료. Melee/Grenade/BlackHole 등 나머지 반경·유지시간 사용 스킬은 아직 미적용 (후속 작업 필요)**
+- [x] `SharedLevelSystem.AddXP(int, ulong sourceClientId)` 오버로드 추가, `XPOrbManager.TryPickup`에서 호출부 교체. 기존 `AddXP(int)`는 `sourceClientId=ulong.MaxValue`(배율 미적용)로 위임해 상자 폴백/디버그 커맨드 호출부는 그대로 둠
+- [x] 크리티컬 판정을 `EnemyNetworkBase.TakeDamage`에 추가 (인스턴스별 `System.Random`, 비귀속 데미지는 크리티컬 제외). **크리티컬 배율 1.5배는 기획 미확정 임시값** (`EnemyNetworkBase.CritDamageMultiplier` 상수, 조정 시 여기만 수정). 기존 `FloatingTextManager`의 매직넘버 기반 "50 데미지 이상이면 노란색" 임시 판정을 실제 `isCrit` 플래그로 교체
+- [x] 스킬 가속 → 쿨다운 배율 반영 (`SkillExecutionScheduler.Tick`에 `cooldownMultiplier` 파라미터 추가, `SkillManager`가 `1/(1+haste/100)` 계산해 전달)
+- [x] 투사체 개수 패시브 → `SkillCastContext.BonusProjectileCount`로 노출하고 투사체 기반 스킬 4종(`ProjectileSkill`/`PierceShotgunSkill`/`ScatterShotSkill`/`UltimateSkill`) 전부에 반영
+- [x] `UpgradeOptionSO` 신규 8종 asset 작성(기존 4종은 이미 존재) + `UpgradeCatalog.asset`에 등록
+- [ ] 에디터 회귀 테스트 — 방어력/체력재생/크리티컬/스킬가속/투사체 증가가 실제 플레이에서 체감되는지, 범위 배율 미적용 스킬 목록 재확인
 
 ---
 

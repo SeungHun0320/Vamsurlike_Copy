@@ -30,7 +30,8 @@ namespace Vamsurlike.Skills
             // in 파라미터는 코루틴에 캡처 불가 — 필요한 값만 추출
             context.CoroutineRunner.StartSkillCoroutine(FireWavesCoroutine(
                 skill.projectilePrefab, levelData, context.FinalDamage,
-                context.OwnerClientId, context.CasterTransform, skill.name, context.VFX));
+                context.OwnerClientId, context.CasterTransform, skill.name, context.VFX,
+                context.BonusProjectileCount));
 
             return true;
         }
@@ -40,10 +41,11 @@ namespace Vamsurlike.Skills
             ulong ownerClientId,
             Transform casterTransform,
             string skillName,
-            ISkillVFXBroadcaster vfx)
+            ISkillVFXBroadcaster vfx,
+            int bonusProjectileCount = 0)
         {
             int waveCount = Mathf.Max(1, levelData.waveCount);
-            int bulletsPerWave = Mathf.Max(1, levelData.projectileCount);
+            int bulletsPerWave = Mathf.Max(1, levelData.projectileCount + bonusProjectileCount);
             float waveDelay = Mathf.Max(0f, levelData.waveDelay);
             float rotPerWave = levelData.rotationPerWave;
             float angleStep = 360f / bulletsPerWave;

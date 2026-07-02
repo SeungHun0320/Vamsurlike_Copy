@@ -6,12 +6,19 @@ using Vamsurlike.Player;
 using Vamsurlike.Skills;
 using Vamsurlike.Stage;
 using Vamsurlike.UI;
+using Vamsurlike.Upgrades;
 
 namespace Vamsurlike.Enemy
 {
     public class EnemyNetworkBase : NetworkBehaviour
     {
         private static readonly Color BossTelegraphColor = new(1f, 0.1f, 0.05f, 0.9f);
+
+        // 치명타 데미지 배율 — 기획 확정 전 기본값 (Phase 7.5)
+        private const float CritDamageMultiplier = 1.5f;
+
+        // RULES.md: 랜덤은 시드 기반 System.Random 인스턴스 사용
+        private readonly System.Random critRng = new();
 
         [SerializeField] private EnemyDataSO data;
 
@@ -86,11 +93,23 @@ namespace Vamsurlike.Enemy
                 return;
             }
 
-            // GAME_PLAN 공식: FinalDamage = amount * (1 + attackMul) * (1 - defenseRate)
-            // attackMul은 Phase 5 PassiveStatHandler 구현 전까지 0
+            // GAME_PLAN §8 공식: FinalDamage = amount * PlayerDamageMultiplier * (1 - EnemyDefenseRate)
+            // PlayerDamageMultiplier는 SkillCastContext.FinalDamage에서 이미 적용된 상태로 amount에 실려 들어온다.
             float defense     = Mathf.Max(0f, data != null ? data.defense : 0f);
             float defenseRate = defense / (defense + 100f);
             float finalDamage = Mathf.Max(1f, amount * (1f - defenseRate));
+
+            // 치명타 판정 — 플레이어 귀속 데미지에만 적용 (환경/디버그/아이템 비귀속 데미지는 크리티컬 없음)
+            bool isCrit = false;
+            if (attackerClientId != NoAttacker)
+            {
+                float critChance = GetPassiveStatHandler(attackerClientId)?.CritChance.Value ?? 0f;
+                if (critChance > 0f && critRng.NextDouble() < critChance)
+                {
+                    isCrit = true;
+                    finalDamage *= CritDamageMultiplier;
+                }
+            }
 
             HP.Value = Mathf.Max(0f, HP.Value - finalDamage);
 
@@ -102,7 +121,7 @@ namespace Vamsurlike.Enemy
             }
 
             float offset = data != null ? data.floatingTextHeightOffset : 2f;
-            ShowDamageClientRpc(finalDamage, transform.position + Vector3.up * offset);
+            ShowDamageClientRpc(finalDamage, isCrit, transform.position + Vector3.up * offset);
 
             if (HP.Value <= 0f)
                 HandleDeath();
@@ -121,6 +140,14 @@ namespace Vamsurlike.Enemy
             if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client)) return null;
             if (client.PlayerObject == null) return null;
             return client.PlayerObject.GetComponent<SkillManager>();
+        }
+
+        private PassiveStatHandler GetPassiveStatHandler(ulong clientId)
+        {
+            if (NetworkManager.Singleton == null) return null;
+            if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client)) return null;
+            if (client.PlayerObject == null) return null;
+            return client.PlayerObject.GetComponent<PassiveStatHandler>();
         }
 
         // 서버가 지정한 보스 광역기 범위를 Damage Aura와 같은 원형 VFX로 전 클라이언트에 표시.
@@ -177,9 +204,9 @@ namespace Vamsurlike.Enemy
         }
 
         [ClientRpc]
-        private void ShowDamageClientRpc(float damage, Vector3 worldPosition)
+        private void ShowDamageClientRpc(float damage, bool isCrit, Vector3 worldPosition)
         {
-            FloatingTextManager.Instance?.ShowDamage(damage, worldPosition);
+            FloatingTextManager.Instance?.ShowDamage(damage, worldPosition, isCrit);
         }
 
         [ClientRpc]

@@ -90,7 +90,7 @@ namespace Vamsurlike.Stage
             }
 
             activeOrbs.Remove(orbId);
-            SharedLevelSystem.Instance?.AddXP(orb.Xp);
+            SharedLevelSystem.Instance?.AddXP(orb.Xp, clientId);
             DestroyOrbVisualClientRpc(orbId);
             return true;
         }

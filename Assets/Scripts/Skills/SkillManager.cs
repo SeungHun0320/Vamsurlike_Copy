@@ -117,6 +117,14 @@ namespace Vamsurlike.Skills
                 || !GameFlowCoordinator.Instance.IsGameplayActive)
                 return;
 
+            float durationMultiplier = passiveStatHandler != null
+                ? passiveStatHandler.DurationMultiplier.Value
+                : 1f;
+            // §7.5 스킬 가속 공식: 쿨다운 = 기본 쿨다운 / (1 + 가속/100)
+            float cooldownMultiplier = passiveStatHandler != null
+                ? 1f / (1f + passiveStatHandler.SkillHaste.Value / 100f)
+                : 1f;
+
             executionScheduler.Tick(
                 skillInventory.Skills,
                 failedCastRetryDelay,
@@ -124,7 +132,9 @@ namespace Vamsurlike.Skills
                 TryCast,
                 owned => NotifySkillRemoved(owned.Skill.castType),
                 message => Debug.LogWarning(
-                    $"[{nameof(SkillManager)}] {message} object={name}"));
+                    $"[{nameof(SkillManager)}] {message} object={name}"),
+                durationMultiplier,
+                cooldownMultiplier);
 
             SyncManualCooldown();
         }
@@ -315,6 +325,12 @@ namespace Vamsurlike.Skills
             float attackMultiplier = passiveStatHandler != null
                 ? passiveStatHandler.AttackMultiplier.Value
                 : 1f;
+            float areaMultiplier = passiveStatHandler != null
+                ? passiveStatHandler.AreaMultiplier.Value
+                : 1f;
+            int bonusProjectileCount = passiveStatHandler != null
+                ? passiveStatHandler.BonusProjectileCount
+                : 0;
             float baseSpeed = characterData != null ? characterData.baseMoveSpeed : 1f;
             float currentSpeed = playerStats != null
                 ? playerStats.MoveSpeed.Value
@@ -339,7 +355,9 @@ namespace Vamsurlike.Skills
                 spawnForwardOffset,
                 casterForward,
                 attackMultiplier,
-                speedMultiplier);
+                speedMultiplier,
+                areaMultiplier,
+                bonusProjectileCount);
 
             return executor.TryExecute(context);
         }

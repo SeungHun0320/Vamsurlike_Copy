@@ -24,7 +24,7 @@ namespace Vamsurlike.Skills
             }
 
             Vector3 origin = context.CasterTransform.position + Vector3.up * DefaultSpawnHeight;
-            int count = Mathf.Max(1, levelData.scatterBulletCount);
+            int count = Mathf.Max(1, levelData.scatterBulletCount + context.BonusProjectileCount);
             float spreadAngle = Mathf.Max(0f, levelData.scatterAngle);
 
             for (int i = 0; i < count; i++)

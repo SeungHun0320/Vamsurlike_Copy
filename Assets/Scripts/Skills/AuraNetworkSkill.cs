@@ -30,7 +30,7 @@ namespace Vamsurlike.Skills
             if (skill == null || levelData == null || context.CasterTransform == null)
                 return false;
 
-            float radius = levelData.areaRadius > 0f ? levelData.areaRadius : levelData.range;
+            float radius = (levelData.areaRadius > 0f ? levelData.areaRadius : levelData.range) * context.AreaMultiplier;
             if (!serverBroadcastSent || !Mathf.Approximately(serverRadius, radius))
             {
                 serverBroadcastSent = true;

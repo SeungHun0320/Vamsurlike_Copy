@@ -2,6 +2,7 @@ using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Data;
 using Vamsurlike.Network;
+using Vamsurlike.Stage;
 
 namespace Vamsurlike.Player
 {
@@ -31,6 +32,18 @@ namespace Vamsurlike.Player
 
         public NetworkVariable<float> PickupRadius { get; } = new(
             2f,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
+
+        // 방어력 — TakeDamage에서 §8 EnemyDefenseRate와 동일한 공식으로 피해 감소에 사용 (Phase 7.5)
+        public NetworkVariable<float> Defense { get; } = new(
+            0f,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
+
+        // 초당 체력 재생량 — 패시브로만 증가, 기본 0 (Phase 7.5)
+        public NetworkVariable<float> HealthRegenPerSecond { get; } = new(
+            0f,
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
 
@@ -66,14 +79,19 @@ namespace Vamsurlike.Player
             HP.Value           = MaxHP.Value;
             MoveSpeed.Value    = Mathf.Max(0f, moveSpeed);
             PickupRadius.Value = data != null ? data.basePickupRadius : 2f;
+            Defense.Value      = data != null ? Mathf.Max(0f, data.baseDefense) : 0f;
         }
 
+        // GAME_PLAN §8 EnemyDefenseRate와 동일한 공식 (defense/(defense+100)) — 플레이어 피격에도 동일 적용
         public void TakeDamage(float amount)
         {
             if (!EnsureServerAuthority(nameof(TakeDamage))) return;
             if (amount <= 0f || !IsAlive || IsDowned.Value) return;
 
-            HP.Value = Mathf.Max(0f, HP.Value - amount);
+            float defenseRate = Defense.Value / (Defense.Value + 100f);
+            float finalDamage = Mathf.Max(1f, amount * (1f - defenseRate));
+
+            HP.Value = Mathf.Max(0f, HP.Value - finalDamage);
 
             if (HP.Value <= 0f)
                 GetComponent<PlayerReviveHandler>()?.BeginDowned();
@@ -84,6 +102,15 @@ namespace Vamsurlike.Player
             if (!EnsureServerAuthority(nameof(Heal))) return;
             if (amount <= 0f || !IsAlive) return;
             HP.Value = Mathf.Min(MaxHP.Value, HP.Value + amount);
+        }
+
+        // ServerBehaviour가 클라이언트 인스턴스에서 enabled=false 처리하므로 서버에서만 실행된다.
+        private void Update()
+        {
+            if (HealthRegenPerSecond.Value <= 0f || !CanAct || HP.Value >= MaxHP.Value) return;
+            if (GameFlowCoordinator.Instance == null || !GameFlowCoordinator.Instance.IsGameplayActive) return;
+
+            HP.Value = Mathf.Min(MaxHP.Value, HP.Value + HealthRegenPerSecond.Value * Time.deltaTime);
         }
     }
 }

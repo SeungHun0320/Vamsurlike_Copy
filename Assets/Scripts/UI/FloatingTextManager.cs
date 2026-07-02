@@ -10,7 +10,6 @@ namespace Vamsurlike.UI
         [SerializeField] private FloatingText floatingTextPrefab;
         [SerializeField] private Color damageColor = Color.white;
         [SerializeField] private Color criticalColor = Color.yellow;
-        [SerializeField] private float criticalThreshold = 50f;
 
         private void Awake()
         {
@@ -23,7 +22,7 @@ namespace Vamsurlike.UI
             if (Instance == this) Instance = null;
         }
 
-        public void ShowDamage(float damage, Vector3 worldPosition)
+        public void ShowDamage(float damage, Vector3 worldPosition, bool isCrit = false)
         {
             if (floatingTextPrefab == null)
             {
@@ -31,7 +30,7 @@ namespace Vamsurlike.UI
                 return;
             }
 
-            Color color = damage >= criticalThreshold ? criticalColor : damageColor;
+            Color color = isCrit ? criticalColor : damageColor;
             GameObject prefab = floatingTextPrefab.gameObject;
             GameObject go = PoolManager.Instance != null
                 ? PoolManager.Instance.GetGO(prefab, worldPosition, Quaternion.identity)

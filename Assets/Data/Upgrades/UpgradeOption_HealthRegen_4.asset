@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c06d7311fe912164797a9af24ae31a5c, type: 3}
+  m_Name: UpgradeOption_HealthRegen_4
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Upgrades.UpgradeOptionSO
+  upgradeName: 체력 재생 +4
+  description: "초당 체력 재생이 4 증가합니다."
+  icon: {fileID: 0}
+  effectType: 7
+  value: 4
+  skillData: {fileID: 0}

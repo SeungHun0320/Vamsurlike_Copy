@@ -38,7 +38,7 @@ namespace Vamsurlike.Skills
                 return false;
 
             int   count    = Mathf.Max(1, levelData.orbitalCount);
-            float radius   = Mathf.Max(0.1f, levelData.orbitalRadius);
+            float radius   = Mathf.Max(0.1f, levelData.orbitalRadius * context.AreaMultiplier);
             float hitRadius = Mathf.Max(0.05f, levelData.orbitalHitRadius);
             float rotSpeed = levelData.orbitalRotationSpeed;
 

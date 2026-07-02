@@ -38,7 +38,12 @@ namespace Vamsurlike.Stage
             if (Instance == this) Instance = null;
         }
 
-        public void AddXP(int amount)
+        // 소유자 불명 호출(상자 폴백 XP, 디버그 명령 등) — 배율 없이 그대로 적용
+        public void AddXP(int amount) => AddXP(amount, ulong.MaxValue);
+
+        // sourceClientId: 오브를 주운 플레이어. XP는 여전히 공유 풀(SharedXP) 하나로 들어가지만,
+        // 가산량 자체를 주운 플레이어의 PassiveStatHandler.XPMultiplier만큼 늘려서 넣는다.
+        public void AddXP(int amount, ulong sourceClientId)
         {
             if (!IsServer) return;
             if (amount <= 0)
@@ -47,8 +52,22 @@ namespace Vamsurlike.Stage
                 return;
             }
 
-            SharedXP.Value += amount;
+            float multiplier = GetXPMultiplier(sourceClientId);
+            int scaledAmount = Mathf.Max(1, Mathf.RoundToInt(amount * multiplier));
+
+            SharedXP.Value += scaledAmount;
             CheckLevelUp();
+        }
+
+        private static float GetXPMultiplier(ulong clientId)
+        {
+            if (clientId == ulong.MaxValue) return 1f;
+            if (NetworkManager.Singleton == null) return 1f;
+            if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client)) return 1f;
+            if (client.PlayerObject == null) return 1f;
+            return client.PlayerObject.TryGetComponent<PassiveStatHandler>(out var passive)
+                ? passive.XPMultiplier.Value
+                : 1f;
         }
 
         internal void CheckLevelUp()
