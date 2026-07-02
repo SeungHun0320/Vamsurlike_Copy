@@ -17,4 +17,5 @@ MonoBehaviour:
   icon: {fileID: 0}
   effectType: 9
   value: 0.12
+  maxLevel: 5
   skillData: {fileID: 0}

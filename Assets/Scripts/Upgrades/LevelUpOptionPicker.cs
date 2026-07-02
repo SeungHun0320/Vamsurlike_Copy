@@ -29,6 +29,7 @@ namespace Vamsurlike.Upgrades
             UpgradeCatalog catalog,
             int count,
             SkillManager skillManager,
+            PassiveStatHandler passiveStatHandler,
             ulong clientId,
             Action<string> logWarning)
         {
@@ -58,6 +59,9 @@ namespace Vamsurlike.Upgrades
                         break;
 
                     default:
+                        // 순수 패시브 — maxLevel(최대 픽 횟수)에 도달했으면 카드 풀에서 제외한다.
+                        if (passiveStatHandler != null &&
+                            passiveStatHandler.GetPassiveLevel(option.effectType) >= option.maxLevel) continue;
                         pool.Add(i);
                         break;
                 }
@@ -81,7 +85,11 @@ namespace Vamsurlike.Upgrades
             return result;
         }
 
-        public int[] BuildCurrentLevels(int[] optionIndices, UpgradeCatalog catalog, SkillManager skillManager)
+        public int[] BuildCurrentLevels(
+            int[] optionIndices,
+            UpgradeCatalog catalog,
+            SkillManager skillManager,
+            PassiveStatHandler passiveStatHandler = null)
         {
             var levels = new int[optionIndices.Length];
             for (int i = 0; i < optionIndices.Length; i++)
@@ -89,11 +97,21 @@ namespace Vamsurlike.Upgrades
                 if (!catalog.IsValidIndex(optionIndices[i])) continue;
 
                 UpgradeOptionSO option = catalog.options[optionIndices[i]];
-                if (option == null || option.skillData == null || skillManager == null) continue;
-                if (option.effectType != UpgradeEffectType.SkillLevelUp &&
-                    option.effectType != UpgradeEffectType.NewSkill) continue;
+                if (option == null) continue;
 
-                levels[i] = skillManager.GetSkillLevel(option.skillData);
+                bool isSkillOption = option.skillData != null &&
+                    (option.effectType == UpgradeEffectType.SkillLevelUp ||
+                     option.effectType == UpgradeEffectType.NewSkill);
+
+                if (isSkillOption)
+                {
+                    if (skillManager != null)
+                        levels[i] = skillManager.GetSkillLevel(option.skillData);
+                }
+                else if (passiveStatHandler != null)
+                {
+                    levels[i] = passiveStatHandler.GetPassiveLevel(option.effectType);
+                }
             }
 
             return levels;

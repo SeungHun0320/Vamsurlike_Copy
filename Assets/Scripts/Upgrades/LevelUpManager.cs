@@ -110,13 +110,15 @@ namespace Vamsurlike.Upgrades
             foreach (ulong clientId in NetworkManager.ConnectedClientsIds)
             {
                 SkillManager skillManager = GetPlayerSkillManager(clientId);
+                PassiveStatHandler passiveStatHandler = GetPlayerPassiveStatHandler(clientId);
                 int[] indices = optionPicker.GenerateOptions(
                     catalog,
                     3,
                     skillManager,
+                    passiveStatHandler,
                     clientId,
                     message => Debug.LogWarning($"[{nameof(LevelUpManager)}] {message}"));
-                int[] levels = optionPicker.BuildCurrentLevels(indices, catalog, skillManager);
+                int[] levels = optionPicker.BuildCurrentLevels(indices, catalog, skillManager, passiveStatHandler);
 
                 if (!CanClientChooseUpgrade(clientId))
                 {
@@ -237,6 +239,13 @@ namespace Vamsurlike.Upgrades
             return client.PlayerObject.GetComponent<SkillManager>();
         }
 
+        private PassiveStatHandler GetPlayerPassiveStatHandler(ulong clientId)
+        {
+            if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)) return null;
+            if (client.PlayerObject == null) return null;
+            return client.PlayerObject.GetComponent<PassiveStatHandler>();
+        }
+
         private bool CanClientChooseUpgrade(ulong clientId)
         {
             if (!NetworkManager.ConnectedClients.TryGetValue(clientId, out var client)) return false;
@@ -271,9 +280,10 @@ namespace Vamsurlike.Upgrades
             if (optionIndices == null || optionIndices.Length == 0) return;
 
             SkillManager skillManager = GetPlayerSkillManager(clientId);
+            PassiveStatHandler passiveStatHandler = GetPlayerPassiveStatHandler(clientId);
             var catalog = UpgradeCatalog.Instance;
             int[] currentLevels = catalog != null
-                ? optionPicker.BuildCurrentLevels(optionIndices, catalog, skillManager)
+                ? optionPicker.BuildCurrentLevels(optionIndices, catalog, skillManager, passiveStatHandler)
                 : Array.Empty<int>();
 
             var nextQueue = new Queue<QueuedLevelUpOptions>();
@@ -400,9 +410,10 @@ namespace Vamsurlike.Upgrades
                 deferredPlayerOptions.Remove(clientId);
 
             SkillManager skillManager = GetPlayerSkillManager(clientId);
+            PassiveStatHandler passiveStatHandler = GetPlayerPassiveStatHandler(clientId);
             var catalog = UpgradeCatalog.Instance;
             int[] currentLevels = catalog != null
-                ? optionPicker.BuildCurrentLevels(next.OptionIndices, catalog, skillManager)
+                ? optionPicker.BuildCurrentLevels(next.OptionIndices, catalog, skillManager, passiveStatHandler)
                 : next.CurrentLevels;
 
             playerOptions[clientId] = next.OptionIndices;

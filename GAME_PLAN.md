@@ -1142,6 +1142,26 @@ Done when: 패시브 스킬 12종이 레벨업/상자 카드로 등장해 정상
 - [x] `UpgradeOptionSO` 신규 8종 asset 작성(기존 4종은 이미 존재) + `UpgradeCatalog.asset`에 등록
 - [ ] 에디터 회귀 테스트 — 방어력/체력재생/크리티컬/스킬가속/투사체 증가가 실제 플레이에서 체감되는지, 범위 배율 미적용 스킬 목록 재확인
 
+**만렙 캐핑 (사용자 확인 후 추가 구현)**
+
+> 스펙 표를 다시 보니 12종 패시브 전부 "레벨당 증가 × 5회 = 최대치"로 정확히 맞아떨어진다 (예: 피해량 10%×5=50%). 그런데 코드를 보니 액티브 스킬은 `SkillDataSO.maxLevel`로 이미 만렙 캐핑이 있었지만(`LevelUpOptionPicker`가 필터링), 패시브는 `UpgradeOptionSO`에 `maxLevel` 필드 자체가 없어 **기존 4종(HP/이동속도/공격력/획득반경) 포함해서 전부 무한 픽 가능한 상태**였다. 상자(`ChestChoiceBuilder`)는 `skillData == null`인 순수 패시브를 애초에 후보에서 제외하므로, 레벨업 카드(`LevelUpOptionPicker`) 쪽만 고치면 된다.
+
+- [x] `UpgradeOptionSO`에 `maxLevel = 5` 필드 추가 (`SkillDataSO.maxLevel`과 동일 역할, 패시브 12종 전부에 명시적으로 5 설정)
+- [x] `LevelUpOptionPicker.GenerateOptions`에 `PassiveStatHandler` 파라미터 추가, `default:` 분기에서 `GetPassiveLevel(effectType) >= maxLevel`이면 카드 풀에서 제외
+- [x] `LevelUpOptionPicker.BuildCurrentLevels`도 패시브의 현재 픽 횟수를 반환하도록 확장 (기존엔 액티브 스킬만 표시하고 패시브는 항상 0으로 표시됨)
+- [x] `LevelUpManager`에 `GetPlayerPassiveStatHandler` 추가, 3개 호출부(즉시 발급/재요청/이연 발급) 전부 배선
+
+**기존 4종 패시브 수치를 이번 스펙 기준으로 정정**
+
+> 기존 `UpgradeOption_MaxHP_40`(40) / `MoveSpeed_05`(0.5, flat) / `PickupRadius_1`(1, flat)은 이번 12종 스펙(150 / 8% / 35%)과 단위·수치가 안 맞았다. `Attack_010`(0.1 = 10%)만 이미 스펙과 일치. 이동속도/획득반경은 스펙상 "%"인데 기존 코드는 `stats.MoveSpeed.Value += value` 식 **flat 가산**이었어서, 데미지 배율(`AttackMultiplier`)과 동일하게 배율 방식으로 구조 자체를 바꿨다.
+
+- [x] `PlayerNetworkStats`에 `baseMoveSpeed`/`basePickupRadius` 기준치 필드 추가, `ApplyMoveSpeedMultiplier`/`ApplyPickupRadiusMultiplier` 메서드로 매번 기준치×배율 재계산 (MaxHP처럼 소비하는 곳이 여러 곳이라 각 소비 지점에 배율을 따로 곱하는 대신, `PlayerNetworkStats.MoveSpeed`/`PickupRadius` 자체를 항상 "최종값"으로 유지하는 기존 방식을 그대로 살렸다)
+- [x] `PassiveStatHandler`에 `MoveSpeedMultiplier`/`PickupRadiusMultiplier` 추가 (기본 1, AttackMultiplier와 동일 패턴)
+- [x] `UpgradeOption_MaxHP_40.asset` value 40→150 (flat 유지, 배율 전환 아님 — 스펙 자체가 flat)
+- [x] `UpgradeOption_MoveSpeed_05.asset` value 0.5→0.08 (flat→배율 전환)
+- [x] `UpgradeOption_PickupRadius_1.asset` value 1→0.35 (flat→배율 전환)
+- [x] `UpgradeOption_Attack_010.asset`은 그대로, `maxLevel: 5`만 추가
+
 ---
 
 #### 조합 스킬 진화 조건 개편 — 액티브 만렙 + 패시브 보유

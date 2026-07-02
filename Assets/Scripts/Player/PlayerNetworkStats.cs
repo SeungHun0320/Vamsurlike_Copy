@@ -63,6 +63,11 @@ namespace Vamsurlike.Player
         // 이동/스킬 사용 가능 여부
         public bool CanAct => IsAlive && !IsDowned.Value && !IsDeadWaiting.Value;
 
+        // 이동속도/획득반경 기준치 — 패시브 배율(PassiveStatHandler.MoveSpeedMultiplier 등) 적용 시
+        // 매번 이 값 기준으로 MoveSpeed.Value/PickupRadius.Value를 다시 계산한다 (§7.5 배율 방식 통일).
+        private float baseMoveSpeed;
+        private float basePickupRadius;
+
         protected override void OnServerSpawned()
         {
             InitializeFromData(characterData);
@@ -72,14 +77,29 @@ namespace Vamsurlike.Player
         {
             if (!EnsureServerAuthority(nameof(InitializeFromData))) return;
 
-            float maxHP     = data != null ? data.baseHP        : fallbackMaxHP;
-            float moveSpeed = data != null ? data.baseMoveSpeed : fallbackMoveSpeed;
+            float maxHP = data != null ? data.baseHP : fallbackMaxHP;
+            baseMoveSpeed    = Mathf.Max(0f, data != null ? data.baseMoveSpeed : fallbackMoveSpeed);
+            basePickupRadius = data != null ? data.basePickupRadius : 2f;
 
             MaxHP.Value        = Mathf.Max(1f, maxHP);
             HP.Value           = MaxHP.Value;
-            MoveSpeed.Value    = Mathf.Max(0f, moveSpeed);
-            PickupRadius.Value = data != null ? data.basePickupRadius : 2f;
+            MoveSpeed.Value    = baseMoveSpeed;
+            PickupRadius.Value = basePickupRadius;
             Defense.Value      = data != null ? Mathf.Max(0f, data.baseDefense) : 0f;
+        }
+
+        // PassiveStatHandler가 MoveSpeedMultiplier/PickupRadiusMultiplier를 갱신할 때마다 호출.
+        // 기준치(baseMoveSpeed/basePickupRadius)에 배율을 다시 곱해 최종값을 갱신한다.
+        public void ApplyMoveSpeedMultiplier(float multiplier)
+        {
+            if (!EnsureServerAuthority(nameof(ApplyMoveSpeedMultiplier))) return;
+            MoveSpeed.Value = Mathf.Max(0f, baseMoveSpeed * multiplier);
+        }
+
+        public void ApplyPickupRadiusMultiplier(float multiplier)
+        {
+            if (!EnsureServerAuthority(nameof(ApplyPickupRadiusMultiplier))) return;
+            PickupRadius.Value = Mathf.Max(0f, basePickupRadius * multiplier);
         }
 
         // GAME_PLAN §8 EnemyDefenseRate와 동일한 공식 (defense/(defense+100)) — 플레이어 피격에도 동일 적용

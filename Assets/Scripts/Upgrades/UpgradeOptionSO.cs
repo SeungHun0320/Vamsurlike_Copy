@@ -34,6 +34,10 @@ namespace Vamsurlike.Upgrades
         // PassiveStat 계열: 증가량
         public float value;
 
+        // PassiveStat 계열 전용: 최대 픽 횟수 (SkillDataSO.maxLevel과 동일 역할).
+        // SkillLevelUp/NewSkill은 대신 skillData.maxLevel을 사용하므로 이 필드를 참조하지 않는다.
+        [Min(1)] public int maxLevel = 5;
+
         // SkillLevelUp / NewSkill: 대상 스킬 SO 직접 참조
         public SkillDataSO skillData;
     }

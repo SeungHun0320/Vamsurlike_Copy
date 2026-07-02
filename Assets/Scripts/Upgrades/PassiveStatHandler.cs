@@ -20,6 +20,17 @@ namespace Vamsurlike.Upgrades
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
 
+        // 이동속도/획득반경 배율 — 기본 1, PlayerNetworkStats.ApplyMoveSpeedMultiplier 등을 통해 반영 (Phase 7.5)
+        public NetworkVariable<float> MoveSpeedMultiplier { get; } = new(
+            1f,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
+
+        public NetworkVariable<float> PickupRadiusMultiplier { get; } = new(
+            1f,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
+
         // 범위/유지시간 배율 — SkillCastContext를 통해 개별 스킬 실행부가 조회 (Phase 7.5)
         public NetworkVariable<float> AreaMultiplier { get; } = new(
             1f,
@@ -112,13 +123,13 @@ namespace Vamsurlike.Upgrades
                     break;
 
                 case UpgradeEffectType.PassiveMoveSpeed:
-                    if (stats != null)
-                        stats.MoveSpeed.Value += option.value;
+                    MoveSpeedMultiplier.Value += option.value;
+                    stats?.ApplyMoveSpeedMultiplier(MoveSpeedMultiplier.Value);
                     break;
 
                 case UpgradeEffectType.PassivePickupRadius:
-                    if (stats != null)
-                        stats.PickupRadius.Value += option.value;
+                    PickupRadiusMultiplier.Value += option.value;
+                    stats?.ApplyPickupRadiusMultiplier(PickupRadiusMultiplier.Value);
                     break;
 
                 case UpgradeEffectType.PassiveAttackPower:

@@ -12,9 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c06d7311fe912164797a9af24ae31a5c, type: 3}
   m_Name: UpgradeOption_MoveSpeed_05
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Upgrades.UpgradeOptionSO
-  upgradeName: "\uC774\uB3D9\uC18D\uB3C4 +0.5"
-  description: "\uC774\uB3D9 \uC18D\uB3C4\uAC00 0.5 \uC99D\uAC00\uD569\uB2C8\uB2E4."
+  upgradeName: 이동 속도 +8%
+  description: "이동 속도가 8% 증가합니다."
   icon: {fileID: 0}
   effectType: 1
-  value: 0.5
+  value: 0.08
+  maxLevel: 5
   skillData: {fileID: 0}
