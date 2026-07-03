@@ -17,7 +17,7 @@ MonoBehaviour:
   hp: 30
   moveSpeed: 10
   attackPower: 8
-  defense: 0
+  defense: 1
   attackRange: 1.5
   attackInterval: 0.8
   xpDrop: 8

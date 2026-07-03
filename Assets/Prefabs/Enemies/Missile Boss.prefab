@@ -120,6 +120,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Enemy.BossMissile
   ShowTopMostFoldoutHeaderGroup: 1
   hitRadius: 1.5
+  vfxSpawnEvent: {fileID: 11400000, guid: e74307a1129b4948a03e4dbc39979768, type: 2}
+  impactVFXDuration: 0.3
 --- !u!1 &5948511398921709243
 GameObject:
   m_ObjectHideFlags: 0

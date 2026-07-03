@@ -4,7 +4,9 @@ using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Data;
 using Vamsurlike.Items;
+using Vamsurlike.Network;
 using Vamsurlike.Upgrades;
+using Vamsurlike.VFX;
 
 namespace Vamsurlike.Skills
 {
@@ -24,6 +26,10 @@ namespace Vamsurlike.Skills
         [SerializeField] private float orbitalHeightOffset = 0.9f;
         [SerializeField] private float meleeVisualForwardOffsetRatio = 0.5f;
         [SerializeField] private float meleeVisualHeightOffset = 2.2f;
+
+        [Header("Ultimate VFX")]
+        [SerializeField] private VFXSpawnEventSO vfxSpawnEvent;
+        [SerializeField] private float ultimateVFXDuration = 0.5f;
 
         private readonly Dictionary<SkillCastType, GameObject> vfxPrefabsByType = new();
         private readonly Dictionary<SkillCastType, AreaCircleVFX> areaCircleVfxByType = new();
@@ -168,7 +174,7 @@ namespace Vamsurlike.Skills
         [ClientRpc]
         private void ShowUltimateClientRpc(Vector3 position)
         {
-            _ = position;
+            vfxSpawnEvent?.Raise(new VFXCue(VFXCueIds.Ultimate, position, Vector3.up, 1f, ultimateVFXDuration, Color.white));
         }
 
         [ClientRpc]
@@ -186,13 +192,13 @@ namespace Vamsurlike.Skills
             // 망치 VFX
             if (!TryGetVFXPrefab(SkillCastType.Melee, out GameObject prefab)) return;
 
-            GameObject visual = Instantiate(
+            GameObject visual = SpawnPooledVisual(
                 prefab,
                 position
                 + flatForward * range * meleeVisualForwardOffsetRatio
                 + Vector3.up * meleeVisualHeightOffset,
                 Quaternion.LookRotation(flatForward, Vector3.up));
-            Destroy(visual, MeleeVisualDuration);
+            StartCoroutine(ReturnVisualAfterDelay(prefab, visual, MeleeVisualDuration));
         }
 
         [ClientRpc]
@@ -279,7 +285,7 @@ namespace Vamsurlike.Skills
             GameObject prefab)
         {
             GameObject visual = prefab != null
-                ? Instantiate(prefab, from, Quaternion.identity)
+                ? SpawnPooledVisual(prefab, from, Quaternion.identity)
                 : null;
 
             float safeFlightTime = Mathf.Max(Mathf.Epsilon, flightTime);
@@ -297,7 +303,33 @@ namespace Vamsurlike.Skills
                 yield return null;
             }
 
-            if (visual != null) Destroy(visual);
+            ReturnVisual(prefab, visual);
+        }
+
+        private static GameObject SpawnPooledVisual(GameObject prefab, Vector3 position, Quaternion rotation)
+        {
+            return PoolManager.Instance != null
+                ? PoolManager.Instance.GetGO(prefab, position, rotation)
+                : Instantiate(prefab, position, rotation);
+        }
+
+        private static IEnumerator ReturnVisualAfterDelay(GameObject prefab, GameObject visual, float delay)
+        {
+            if (visual == null) yield break;
+            yield return new WaitForSeconds(Mathf.Max(0f, delay));
+            ReturnVisual(prefab, visual);
+        }
+
+        private static void ReturnVisual(GameObject prefab, GameObject visual)
+        {
+            if (visual == null) return;
+            if (prefab != null && PoolManager.Instance != null)
+            {
+                PoolManager.Instance.ReturnGO(prefab, visual);
+                return;
+            }
+
+            Destroy(visual);
         }
 
         private void SpawnAreaCircleVFX(

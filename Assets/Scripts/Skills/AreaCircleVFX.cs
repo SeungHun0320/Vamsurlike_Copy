@@ -8,9 +8,9 @@ namespace Vamsurlike.Skills
         [SerializeField] private int segments = 96;
         [SerializeField] private float lineWidth = 0.08f;
         [SerializeField] private float heightOffset = 0.05f;
+        [SerializeField] private Material lineMaterial;
 
         private LineRenderer lineRenderer;
-        private Material runtimeMaterial;
         private Transform followTarget;
         private float duration;
         private float elapsed;
@@ -24,8 +24,8 @@ namespace Vamsurlike.Skills
             lineRenderer.widthMultiplier = lineWidth;
             lineRenderer.positionCount = Mathf.Max(12, segments);
 
-            runtimeMaterial = new Material(Shader.Find("Sprites/Default"));
-            lineRenderer.material = runtimeMaterial;
+            if (lineMaterial != null)
+                lineRenderer.sharedMaterial = lineMaterial;
         }
 
         public void Initialize(float radius, float lifeTime, Color color, Transform target = null)
@@ -79,10 +79,5 @@ namespace Vamsurlike.Skills
             transform.position = pos;
         }
 
-        private void OnDestroy()
-        {
-            if (runtimeMaterial != null)
-                Destroy(runtimeMaterial);
-        }
     }
 }

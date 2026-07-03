@@ -1,6 +1,8 @@
 using Unity.Netcode;
 using UnityEngine;
+using Vamsurlike.Network;
 using Vamsurlike.Player;
+using Vamsurlike.VFX;
 
 namespace Vamsurlike.Enemy
 {
@@ -13,6 +15,11 @@ namespace Vamsurlike.Enemy
         private static readonly Quaternion ModelOffset = Quaternion.Euler(0f, 90f, 0f);
 
         [SerializeField] private float hitRadius = 1.5f;
+        [SerializeField] private VFXSpawnEventSO vfxSpawnEvent;
+        [SerializeField] private float impactVFXDuration = 0.3f;
+
+        private GameObject sourcePrefab;
+        private bool       wasPoolSpawned;
 
         private enum Mode { Linear, Mortar }
         private Mode    mode;
@@ -32,6 +39,29 @@ namespace Vamsurlike.Enemy
         private float   flightTime;
         private float   elapsed;
         private float   impactRadius;
+
+        // 서버 전용 팩토리 — BossPatternController가 호출. PoolManager를 거쳐 스폰하고,
+        // 반환된 BossMissile에 InitLinear/InitMortar로 이어서 초기화한다.
+        public static BossMissile SpawnAt(GameObject prefab, Vector3 position, Quaternion rotation)
+        {
+            if (prefab == null) return null;
+            if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return null;
+
+            bool usingPool = PoolManager.Instance != null;
+            NetworkObject obj = PoolManager.GetOrInstantiateNetworkObject(prefab, position, rotation, nameof(BossMissile));
+            if (obj == null) return null;
+
+            if (!obj.TryGetComponent<BossMissile>(out var missile))
+            {
+                Debug.LogWarning($"[{nameof(BossMissile)}] prefab에 BossMissile 컴포넌트가 없습니다. prefab={prefab.name}");
+                return null;
+            }
+
+            missile.sourcePrefab   = prefab;
+            missile.wasPoolSpawned = usingPool;
+            obj.Spawn(true);
+            return missile;
+        }
 
         // BossPatternController에서 Spawn() 직후 호출 — SpreadShot
         public void InitLinear(Vector3 direction, float missileSpeed, float missileDamage, float lifetime)
@@ -102,6 +132,7 @@ namespace Vamsurlike.Enemy
 
             if (t >= 1f)
             {
+                PlayImpactVFX(targetPos);
                 DamageInRadius(targetPos, impactRadius);
                 DespawnSelf();
             }
@@ -119,6 +150,7 @@ namespace Vamsurlike.Enemy
                 if ((client.PlayerObject.transform.position - transform.position).sqrMagnitude > sqrR) continue;
                 if (client.PlayerObject.TryGetComponent(out PlayerNetworkStats stats))
                     stats.TakeDamage(damage);
+                PlayImpactVFX(transform.position);
                 DespawnSelf();
                 return;
             }
@@ -139,16 +171,32 @@ namespace Vamsurlike.Enemy
             }
         }
 
+        private void PlayImpactVFX(Vector3 position)
+        {
+            if (!IsServer) return;
+            PlayImpactVFXClientRpc(position);
+        }
+
+        [ClientRpc]
+        private void PlayImpactVFXClientRpc(Vector3 position)
+        {
+            vfxSpawnEvent?.Raise(new VFXCue(VFXCueIds.BossImpact, position, Vector3.up, 1f, impactVFXDuration, Color.white));
+        }
+
         private void DespawnSelf()
         {
             active = false;
-            if (IsSpawned) NetworkObject.Despawn(true);
+            if (!IsSpawned) return;
+            NetworkObject.Despawn(!wasPoolSpawned);
         }
 
         public override void OnNetworkDespawn()
         {
             base.OnNetworkDespawn();
             active = false;
+            if (!IsServer || !wasPoolSpawned || sourcePrefab == null) return;
+            if (PoolManager.Instance != null)
+                PoolManager.Instance.ReturnNetworkObject(sourcePrefab, NetworkObject);
         }
     }
 }

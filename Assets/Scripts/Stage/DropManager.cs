@@ -8,7 +8,9 @@ namespace Vamsurlike.Stage
     // 서버 전용. 적 사망 보상(XP, 아이템) 처리 진입점.
     public class DropManager : MonoBehaviour
     {
-        private const float GoldScatterRadius = 0.6f;
+        // 같은 지점(또는 근처)에서 여러 적이 죽을 때 XP/아이템/골드가 전부 한 자리에 겹쳐
+        // 보이지 않도록 모든 드랍 타입에 공통으로 적용하는 스캐터 반경.
+        private const float DropScatterRadius = 0.6f;
 
         private readonly System.Random rng = new();
 
@@ -18,7 +20,7 @@ namespace Vamsurlike.Stage
             if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
 
             if (data.xpDrop > 0 && XPOrbManager.Instance != null)
-                XPOrbManager.Instance.SpawnOrb(position, data.xpDrop);
+                XPOrbManager.Instance.SpawnOrb(ScatterPosition(position, DropScatterRadius), data.xpDrop);
 
             if (data.dropTable != null)
             {
@@ -32,7 +34,7 @@ namespace Vamsurlike.Stage
             var item = table.Roll(rng);
             if (item == null || item.pickupPrefab == null) return;
 
-            if (!NetworkedItemPickup.SpawnAt(item, position))
+            if (!NetworkedItemPickup.SpawnAt(item, ScatterPosition(position, DropScatterRadius)))
                 Debug.LogWarning($"[{nameof(DropManager)}] 아이템 드랍 스폰 실패: {item.name}", this);
         }
 
@@ -42,11 +44,11 @@ namespace Vamsurlike.Stage
             int gold = table.RollGold(rng);
             if (gold <= 0 || GoldOrbManager.Instance == null) return;
 
-            GoldOrbManager.Instance.SpawnOrb(ScatterPosition(position, GoldScatterRadius), gold);
+            GoldOrbManager.Instance.SpawnOrb(ScatterPosition(position, DropScatterRadius), gold);
         }
 
-        // 여러 적이 비슷한 위치에서 죽을 때 골드 오브가 완전히 겹쳐 보이는 것을 방지하기 위해
         // 사망 지점 기준 원형 범위 내 랜덤 오프셋을 준다 (지면은 XZ 평면, Y는 그대로 유지).
+        // XP/아이템/골드 각각 독립적으로 호출되므로 같은 사망 지점에서 나온 드랍끼리도 서로 흩어진다.
         private Vector3 ScatterPosition(Vector3 origin, float radius)
         {
             double angle = rng.NextDouble() * System.Math.PI * 2.0;

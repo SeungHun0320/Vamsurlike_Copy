@@ -13,8 +13,9 @@ namespace Vamsurlike.Skills
         private const float LineWidth   = 0.06f;
         private const float HeightOffset = 0.05f;
 
+        [SerializeField] private Material lineMaterial;
+
         private LineRenderer lr;
-        private Material     mat;
         private float        duration;
         private float        elapsed;
 
@@ -25,8 +26,8 @@ namespace Vamsurlike.Skills
             lr.loop            = false;
             lr.widthMultiplier = LineWidth;
 
-            mat            = new Material(Shader.Find("Sprites/Default"));
-            lr.material    = mat;
+            if (lineMaterial != null)
+                lr.sharedMaterial = lineMaterial;
             lr.startColor  = ArcColor;
             lr.endColor    = new Color(ArcColor.r, ArcColor.g, ArcColor.b, 0f);
         }
@@ -70,10 +71,6 @@ namespace Vamsurlike.Skills
                 Destroy(gameObject);
         }
 
-        private void OnDestroy()
-        {
-            if (mat != null) Destroy(mat);
-        }
 
         // ── 스태틱 팩토리 ──────────────────────────────────────────
         public static void Spawn(Vector3 origin, Vector3 flatForward, float range, float halfAngleDeg, float lifeTime)

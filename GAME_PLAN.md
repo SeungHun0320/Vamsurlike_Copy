@@ -1231,7 +1231,6 @@ Done when: 스테이지에서 골드를 드랍/획득하면 세션 동안 누적
 
 - [x] `MetaProgressionState` (비-Network 순수 C# 클래스, `GameInstance`가 보유) 구현 — 총 보유 골드, 영구 업그레이드 13종 각 레벨을 앱 실행 중에만 유지
 - [x] 이 클래스의 필드 구조를 Phase 9 `SaveManager`가 그대로 직렬화할 수 있게 설계 (`BuildLevelSnapshot()` — int[] 스냅샷 방식, 나중에 저장/로드 코드만 갈아 끼우면 되도록)
-- [ ] 로비 UI에 "이번 세션에만 유지되며 게임 재시작 시 초기화됨" 안내 표시 (미구현 — Phase 9에서 SaveManager 붙일 때 함께 처리)
 - **정정**: 잠금해제(스킬 누적 사용 횟수 등) 조건은 전부 제외 — Phase 9에서 SaveManager를 실제로 붙일 때 같이 설계한다. `MetaProgressionState.TryPurchase`는 비용/최대레벨/보유골드만 검사한다.
 
 **로비 영구 업그레이드 상점**
@@ -1347,7 +1346,7 @@ Done when: HUD/다운·부활/결과/메인 메뉴 UI가 이벤트 기반으로 
 
 #### Phase 8.1 MVVM UI 기반
 
-- [ ] UI MVVM 기본 구조 확정
+- [X] UI MVVM 기본 구조 확정
   - View: 자신의 자식 Unity UI 컴포넌트 참조와 렌더링만 담당 (`HUDView`, `CoopStatusView`, `ResultView`)
   - ViewModel: 표시용 상태, 포맷팅, UI 이벤트 변환 담당 (`HUDViewModel`, `PlayerStatusViewModel`)
   - Model/Source: `PlayerNetworkStats`, `SharedLevelSystem`, `SkillManager`, `GameFlowCoordinator` 등 기존 런타임 상태
@@ -1355,12 +1354,12 @@ Done when: HUD/다운·부활/결과/메인 메뉴 UI가 이벤트 기반으로 
   - ViewModel은 런타임 Source를 직접 찾지 않고 `UIEventHub` 또는 이벤트 채널을 통해 상태 변경을 수신
   - ViewModel은 `Dispose`/`Unbind`로 이벤트 구독을 반드시 해제
   - 버튼 입력은 View → ViewModel → 기존 Manager/RPC 호출 순서로 전달
-- [ ] UI Prefab 규칙 확정
+- [X] UI Prefab 규칙 확정
   - View 스크립트는 UI 프리팹/패널 루트에만 둔다.
   - 하위 자식은 표시용 컴포넌트와 버튼/슬롯 단위 View만 둔다.
   - View는 Inspector에 연결된 자식 컴포넌트만 렌더링하고, 씬 탐색(`FindObjectOfType`, 태그 검색 등)을 하지 않는다.
   - 버튼 이벤트는 View에서 수신하고 ViewModel 명령 메서드로 전달한다.
-- [ ] UI 이벤트 기반 참조 구조 구현
+- [X] UI 이벤트 기반 참조 구조 구현
   - `PlayerNetworkStats` 변경 → `PlayerStatusChanged` 이벤트 발행
   - `SharedLevelSystem` 변경 → `SharedLevelChanged` 이벤트 발행
   - `SkillManager.OnSkillsSynced` → `SkillSlotsChanged` 이벤트로 변환
@@ -1731,20 +1730,24 @@ Built-in RP에서는 Shader Graph 의존 대신 ShaderLab/HLSL 기반 `.shader` 
 - 월드 좌표가 있는 이벤트는 거리 감쇠를 적용한다.
 - LevelingUp/ChestOpening처럼 `Time.timeScale = 0` 상태에서도 필요한 UI성 연출은 unscaled time을 사용한다.
 
-- [ ] `Assets/Scripts/VFX/` 폴더 신설, 빈 `Assets/Scripts/Core/Events/` 폴더는 Unity 참조 확인 후 정리(삭제 또는 용도 재확정)
-- [ ] `GameEventSO`, `EventListener` 구현
-- [ ] `VFXCue`, `VFXSpawnEventSO`, `VFXCatalogSO`, `VFXEventBridge` 구현
-- [ ] `PooledVFX`, `VFXLifetime`, `VFXSpawner` 구현 — 신규 풀 대신 `PoolManager.GetGO`/`ReturnGO` 래핑 (`Instantiate`/`Destroy` 대신 풀 반환)
-- [ ] 피격 이펙트 구현 (적/보스 피격 시 짧은 플래시, 히트 스파크, 데미지 텍스트 연동)
-- [ ] 사망 이펙트 구현 (적/보스 사망 VFX, 보스 사망 연출)
-- [ ] 스킬 이펙트 보강 (투사체, 수류탄, 근접, 오라, 진화 스킬별 식별 가능한 VFX)
-- [ ] 아이템/XP 픽업 이펙트 구현 (흡수, 획득, 상자 오픈 피드백)
-- [ ] 보스 패턴 이펙트 보강 (텔레그래프, 미사일 발사, BigShot 연출)
-- [ ] 카메라 쉐이크 구현 (클라이언트 로컬, 거리 감쇠, 이벤트 기반)
-- [ ] Built-in RP용 공용 VFX 셰이더 작성 (Additive, Alpha Blend, Telegraph, HitFlash)
-- [ ] `AreaCircleVFX`, `MeleeArcVFX`의 런타임 `new Material(Shader.Find(...))` 제거 및 Catalog/Prefab Material 참조로 전환
-- [ ] 기존 `SkillVFXController`, `EnemyNetworkBase`의 직접 생성 VFX 경로를 이벤트+풀링 경로로 마이그레이션
-- [ ] 성능 기준 확인: 런타임 VFX/데미지 텍스트 `Instantiate`/`Destroy` 없음, 동시 one-shot VFX 80개 + 데미지 텍스트 100개에서 60fps 유지
+- [X] `Assets/Scripts/VFX/` 폴더 신설, 빈 `Assets/Scripts/Core/Events/` 폴더는 Unity 참조 확인 후 정리(삭제 또는 용도 재확정)
+- [X] `GameEventSO`, `EventListener` 구현
+- [X] `VFXCue`, `VFXSpawnEventSO`, `VFXCatalogSO`, `VFXEventBridge` 구현
+- [X] `PooledVFX`, `VFXLifetime`, `VFXSpawner` 구현 — 신규 풀 대신 `PoolManager.GetGO`/`ReturnGO` 래핑 (`Instantiate`/`Destroy` 대신 풀 반환)
+- [X] 피격 이펙트 구현
+  - [X] 적/보스 피격 시 짧은 플래시 구현 (`EnemyNetworkBase` + `MaterialPropertyBlock`, 런타임 Material 생성 없음)
+  - [X] 데미지 텍스트 연동 유지 (`ShowDamageClientRpc` → `FloatingTextManager`, 기존 풀링 경로)
+  - [X] 히트 스파크 prefab 연결 지점 구현 (`EnemyNetworkBase.hitSparkPrefab`, `PoolManager.GetGO`/`ReturnGO` 경유)
+  - [X] 히트 스파크 prefab 제작 및 Enemy/Boss prefab에 배정
+- [X] 사망 이펙트 구현 (적/보스 사망 VFX, 보스 사망 연출) — `VFX_OneShot_EnemyDeath.prefab`/`VFX_OneShot_BossDeath.prefab`(보스는 3배 스케일)을 `VFXCatalogSO`(`VFXCueIds.EnemyDeath`/`BossDeath`)에 등록하고, `EnemyNetworkBase.PlayDeathVFXClientRpc`가 `VFXSpawnEventSO`를 Raise → `VFXSpawner`(신규 배치, `Managers/VFXSpawner`)가 풀에서 꺼내 재생. 기존 히트 플래시/스파크와 달리 처음부터 GAME_PLAN 정식 이벤트 경로로 구현해 `VFXEventBridge` 대신 씬 쪽 이벤트 채널을 직접 사용하는 실사용 사례를 만들었다
+- [X] 스킬 이펙트 보강 (투사체, 수류탄, 근접, 오라, 진화 스킬별 식별 가능한 VFX) — 조사 결과 투사체 계열(Basic/Pierce/Spread/BulletStorm/ScatterShot/PierceShotgun/OrbitalGrenade)은 `projectilePrefab` 자체가 날아다니는 것으로 이미 시각화되고, 근접/오라/블랙홀/수류탄/클러스터수류탄은 `SkillDataSO.vfxPrefab`이 이미 배정돼 있어 실제로 비어있던 건 **궁극기(Ultimate)뿐**이었다(`ShowUltimateClientRpc`가 `_ = position;`만 있는 완전 빈 스텁). `VFX_OneShot_Ultimate.prefab`(BossDeath 기반 2배 스케일) 제작 + `VFXCueIds.Ultimate` 추가해 정식 이벤트 경로로 연결, `SkillVFXController`/`NetworkedPlayer.prefab`에 `VFXSpawnEvent.asset` 참조 배선 완료
+- [x] 아이템/XP 픽업 이펙트 구현 (흡수, 획득) / [ ] 상자 오픈 피드백 — `VFX_Pickup_XPAbsorb.prefab`(`VFXCueIds.PickupAbsorb`)을 XP/골드 오브 픽업(`XPOrbManager`/`GoldOrbManager`)과 체력/미사일 아이템 픽업(`NetworkedItemPickup`)에 공통 연결. 상자는 카드 선택 화면으로 바로 전환돼 흡수 이펙트가 거의 안 보여서 의도적으로 제외 — "상자 오픈 피드백"은 월드 VFX보다 `ChestRewardUI` 쪽 카드 등장 연출(UI 애니메이션) 문제라 이번 스코프에서는 미착수로 남겨둠
+- [X] 보스 패턴 이펙트 보강 (텔레그래프, 미사일 발사, BigShot 연출) — 조사 결과 텔레그래프(Slam/Mortar 경고 원)와 미사일 비행 자체(BossMissile이 물리적으로 날아감)는 이미 있었지만, **착탄 순간 이펙트가 전혀 없었다**(데미지만 적용되고 아무것도 안 보임). `VFX_OneShot_BossImpact.prefab`(`VFXCueIds.BossImpact`)을 제작해 Slam 착지/Charge 충돌(`EnemyNetworkBase.PlayImpactVFX`, 카메라 쉐이크 동반)과 미사일 착탄(`BossMissile`, Mortar/SpreadShot/CircleBurst 공통)에 연결. 참고: `BossMissile`은 `PoolManager`를 거치지 않고 `Instantiate`/`Destroy`를 직접 쓰고 있어 성능 체크리스트 항목에서 별도로 짚어야 함
+- [X] 카메라 쉐이크 구현 (클라이언트 로컬, 거리 감쇠, 이벤트 기반) — `CameraShakeListener`(Main Camera 배치, `[DefaultExecutionOrder]`로 CinemachineBrain 이후 실행 보장) + `CameraShakeEventSO`(`Assets/Data/VFX/CameraShakeEvent.asset`). `EnemyNetworkBase`에서 치명타 피격(약함)/사망(중간, 보스는 배수 적용)에 연동. 아직 스킬/보스 패턴 임팩트 쪽 트리거는 미연동 — 필요 시 추가
+- [X] Built-in RP용 공용 VFX 셰이더 작성 (Additive, Alpha Blend, Telegraph, HitFlash) — HitFlash(MaterialPropertyBlock)와 Telegraph(AreaCircleVFX/MeleeArcVFX 머티리얼 참조)는 이미 완료돼 있었음. Additive/Alpha Blend는 커스텀 HLSL을 새로 작성하는 대신 유니티 내장 `Particles/Standard Unlit` 셰이더(Built-in RP 표준 파티클 셰이더)로 `VFX_Additive_Mat`/`VFX_AlphaBlend_Mat`(`Assets/Resources/Materials/`) 2종을 만들어 이번 세션에서 새로 만든 원샷 VFX 5종(EnemyDeath/BossDeath/Ultimate/PickupAbsorb/BossImpact)에 적용 — 기존에 이미 검증된 HitSpark/XPOrb 머티리얼은 회귀 위험을 피하려 건드리지 않음
+- [X] `AreaCircleVFX`, `MeleeArcVFX`의 런타임 `new Material(Shader.Find(...))` 제거 및 Inspector/Prefab Material 참조로 전환
+- [ ] 기존 `SkillVFXController`, `EnemyNetworkBase`의 직접 생성 VFX 경로를 이벤트+풀링 경로로 마이그레이션 — 참고: `VFXEventBridge`(서버 ClientRpc → `VFXSpawnEventSO`/`FloatingTextEventSO` 변환)는 구현은 됐지만 실제로 호출하는 곳이 아직 없다(오브젝트도 씬에 미배치, 카탈로그/이벤트 에셋도 카메라 쉐이크용 1개만 존재). `EnemyNetworkBase`는 현재 자체 ClientRpc(`ShowDamageClientRpc`/`PlayHitFlashClientRpc`/`PlayHitSparkClientRpc`/`PlayCameraShakeClientRpc`)로 직접 처리 중 — 이 마이그레이션 항목에서 VFXEventBridge 경로로 옮길지, 아니면 현재 직접 RPC 패턴을 계속 유지할지 결정 필요
+- [ ] 성능 기준 확인: 런타임 VFX/데미지 텍스트 `Instantiate`/`Destroy` 없음, 동시 one-shot VFX 80개 + 데미지 텍스트 100개에서 60fps 유지 — 실제 호스트 접속 없이는 부하 테스트 불가해 이번 세션에서 미검증. `BossMissile`이 `PoolManager`를 안 거치던 문제는 발견 즉시 수정(`BossMissile.SpawnAt` 팩토리 추가, `NetworkedItemPickup`과 동일한 sourcePrefab/wasPoolSpawned 패턴으로 `OnNetworkDespawn` 시 반납)
 
 #### Phase 8.6 오디오
 
@@ -1849,3 +1852,4 @@ Phase 9: 로컬 서버 빌드 안정화 (Windows, Relay 코드 공유 + SaveMana
 12. **ScriptableObject로 데이터를 관리한다.** 수치는 코드가 아니라 Inspector에서 조정한다. 동종 데이터가 여러 개 필요한 경우(스테이지, 웨이브, 난이도 스케일링 등)는 개별 `.asset` 파일 대신 `DataTableSO<TRow>` 패턴으로 단일 테이블 에셋에 행 단위로 관리한다.
 13. **매 Phase 끝마다 멀티플레이 가능한 상태를 만든다.** Phase 완료 기준은 항상 2인 이상 동작 확인이다.
 14. **Host 모드로 빠르게 반복하되, Server Build 경로를 Phase 1에 smoke test한다.** Windows Server Build 안정화는 Phase 9까지 미룬다. Linux/클라우드 배포는 장기 확장으로 별도 Phase에서 다룬다.
+

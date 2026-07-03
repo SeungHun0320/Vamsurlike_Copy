@@ -3,6 +3,7 @@ using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Network;
 using Vamsurlike.Player;
+using Vamsurlike.VFX;
 
 namespace Vamsurlike.Stage
 {
@@ -14,6 +15,8 @@ namespace Vamsurlike.Stage
         public static XPOrbManager Instance { get; private set; }
 
         [SerializeField] private GameObject orbVisualPrefab;
+        [SerializeField] private VFXSpawnEventSO vfxSpawnEvent;
+        [SerializeField] private float pickupVFXDuration = 0.15f;
 
         // 서버 전용
         private readonly Dictionary<ulong, XPOrbEntry> activeOrbs = new();
@@ -130,6 +133,9 @@ namespace Vamsurlike.Stage
             if (!orbVisuals.TryGetValue(id, out var go)) return;
             orbVisuals.Remove(id);
             if (go == null) return;
+
+            vfxSpawnEvent?.Raise(new VFXCue(
+                VFXCueIds.PickupAbsorb, go.transform.position, Vector3.up, 1f, pickupVFXDuration, Color.white));
 
             if (go.TryGetComponent<XPOrbVisualProxy>(out var proxy))
                 proxy.Clear();

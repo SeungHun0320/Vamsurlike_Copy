@@ -98,16 +98,28 @@ namespace Vamsurlike.Stage
             yield return new WaitForSeconds(wave.WaveDuration);
         }
 
-        // ─── Default Spawn ──────────────────────────────────────────────
-        private IEnumerator DefaultSpawnWave(WaveData wave)
+        // GAME_PLAN §8 Co-op 밸런싱: EnemyHP *= 1+(playerCount-1)*0.3, SpawnRate *= 1+(playerCount-1)*0.5.
+        // 모든 스폰 경로(기본/엘리트 링/보스 부하)가 동일한 배율을 쓰도록 한 곳에 모아둔다 —
+        // 예전엔 SpawnEliteRing이 이 계산을 누락해 인원수가 늘어도 엘리트만 안 강해지는 버그가 있었다.
+        private (float hpMul, float dmgMul, float rateMul) GetCurrentMultipliers()
         {
             float elapsed     = StageRuntime.Instance != null ? StageRuntime.Instance.ElapsedTime.Value : 0f;
             var   scaling     = DataManager.GetScaling(elapsed);
             int   playerCount = NetworkManager.Singleton.ConnectedClientsList.Count;
 
-            float hpMul   = scaling.HpMultiplier        * Mathf.Max(1f, 1f + (playerCount - 1) * 0.3f);
-            float dmgMul  = scaling.DamageMultiplier;
-            float rateMul = scaling.SpawnRateMultiplier  * Mathf.Max(1f, 1f + (playerCount - 1) * 0.5f);
+            float coopHpMul   = Mathf.Max(1f, 1f + (playerCount - 1) * 0.3f);
+            float coopRateMul = Mathf.Max(1f, 1f + (playerCount - 1) * 0.5f);
+
+            return (
+                scaling.HpMultiplier * coopHpMul,
+                scaling.DamageMultiplier,
+                scaling.SpawnRateMultiplier * coopRateMul);
+        }
+
+        // ─── Default Spawn ──────────────────────────────────────────────
+        private IEnumerator DefaultSpawnWave(WaveData wave)
+        {
+            (float hpMul, float dmgMul, float rateMul) = GetCurrentMultipliers();
 
             foreach (var entry in wave.Entries)
             {
@@ -127,18 +139,16 @@ namespace Vamsurlike.Stage
         {
             if (wave.Entries.Count == 0) yield break;
 
-            var   entry   = wave.Entries[0];
-            float elapsed = StageRuntime.Instance != null ? StageRuntime.Instance.ElapsedTime.Value : 0f;
-            var   scaling = DataManager.GetScaling(elapsed);
-            int   count   = Mathf.Max(1, entry.Count);
+            var   entry = wave.Entries[0];
+            int   count = Mathf.Max(1, entry.Count);
+            (float hpMul, float dmgMul, _) = GetCurrentMultipliers();
 
             for (int i = 0; i < count; i++)
             {
                 float   angle = i * (360f / count) * Mathf.Deg2Rad;
                 Vector3 pos   = GetCenterPosition() +
                                 new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * spawnRadius;
-                spawnManager.SpawnEnemyByName(entry.EnemyName, pos,
-                    scaling.HpMultiplier, scaling.DamageMultiplier);
+                spawnManager.SpawnEnemyByName(entry.EnemyName, pos, hpMul, dmgMul);
             }
         }
 

@@ -185,3 +185,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Items.NetworkedItemPickup
   ShowTopMostFoldoutHeaderGroup: 1
   itemData: {fileID: 0}
+  vfxSpawnEvent: {fileID: 11400000, guid: e74307a1129b4948a03e4dbc39979768, type: 2}
+  pickupVFXDuration: 0.15

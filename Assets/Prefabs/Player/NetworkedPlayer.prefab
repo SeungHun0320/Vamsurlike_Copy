@@ -674,6 +674,8 @@ MonoBehaviour:
   orbitalHeightOffset: 1
   meleeVisualForwardOffsetRatio: 0.5
   meleeVisualHeightOffset: 2.2
+  vfxSpawnEvent: {fileID: 11400000, guid: e74307a1129b4948a03e4dbc39979768, type: 2}
+  ultimateVFXDuration: 0.5
 --- !u!114 &3868694679171841
 MonoBehaviour:
   m_ObjectHideFlags: 0

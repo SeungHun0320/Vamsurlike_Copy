@@ -196,7 +196,10 @@ namespace Vamsurlike.Enemy
             FinishManualMovement(landedNormally ? landingPosition : transform.position);
 
             if (landedNormally)
+            {
+                enemyBase.PlayImpactVFX(landingPosition);
                 DamagePlayersInRadius(landingPosition, SlamRadius, enemyBase.ScaledAttackPower * SlamDamageScale);
+            }
 
             yield return new WaitForSeconds(SlamRecovery);
         }
@@ -251,6 +254,7 @@ namespace Vamsurlike.Enemy
 
             StopAgent();
             animator?.SetTrigger(AttackHash);
+            enemyBase.PlayImpactVFX(transform.position);
             DamagePlayersInRadius(transform.position, ChargeImpactRadius, enemyBase.ScaledAttackPower * ChargeDamageScale);
             yield return new WaitForSeconds(SlamRecovery);
         }
@@ -354,16 +358,8 @@ namespace Vamsurlike.Enemy
                 return;
             }
 
-            var go = Instantiate(missilePrefab, spawnPos, Quaternion.identity);
-            if (!go.TryGetComponent(out NetworkObject net))
-            {
-                Destroy(go);
-                return;
-            }
-
-            net.Spawn(true);
-            if (net.TryGetComponent(out BossMissile missile))
-                missile.InitLinear(direction, RingMissileSpeed, damage, RingMissileLife);
+            BossMissile missile = BossMissile.SpawnAt(missilePrefab, spawnPos, Quaternion.identity);
+            missile?.InitLinear(direction, RingMissileSpeed, damage, RingMissileLife);
         }
 
         private void SpawnMissile(Vector3 position, Vector3 direction)
@@ -374,13 +370,9 @@ namespace Vamsurlike.Enemy
                 return;
             }
 
-            var go = Instantiate(missilePrefab, position, Quaternion.LookRotation(direction));
-            if (!go.TryGetComponent(out NetworkObject net)) { Destroy(go); return; }
-
-            net.Spawn(true);
-            if (net.TryGetComponent(out BossMissile missile))
-                missile.InitLinear(direction, SpreadMissileSpeed,
-                    enemyBase.ScaledAttackPower * SpreadDamageScale, SpreadMissileLife);
+            BossMissile missile = BossMissile.SpawnAt(missilePrefab, position, Quaternion.identity);
+            missile?.InitLinear(direction, SpreadMissileSpeed,
+                enemyBase.ScaledAttackPower * SpreadDamageScale, SpreadMissileLife);
         }
 
         private void SpawnMortarMissile(Vector3 firePos, Vector3 target, float flightTime, float dmg, float blastRadius)
@@ -391,12 +383,8 @@ namespace Vamsurlike.Enemy
                 return;
             }
 
-            var go = Instantiate(missilePrefab, firePos, Quaternion.identity);
-            if (!go.TryGetComponent(out NetworkObject net)) { Destroy(go); return; }
-
-            net.Spawn(true);
-            if (net.TryGetComponent(out BossMissile missile))
-                missile.InitMortar(firePos, target, flightTime, dmg, blastRadius);
+            BossMissile missile = BossMissile.SpawnAt(missilePrefab, firePos, Quaternion.identity);
+            missile?.InitMortar(firePos, target, flightTime, dmg, blastRadius);
         }
 
         private Vector3 GetPlayerClusterCenter()

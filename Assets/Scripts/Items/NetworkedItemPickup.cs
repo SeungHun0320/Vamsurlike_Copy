@@ -6,6 +6,7 @@ using Vamsurlike.Enemy;
 using Vamsurlike.Network;
 using Vamsurlike.Player;
 using Vamsurlike.Stage;
+using Vamsurlike.VFX;
 
 namespace Vamsurlike.Items
 {
@@ -14,6 +15,8 @@ namespace Vamsurlike.Items
     public class NetworkedItemPickup : NetworkBehaviour
     {
         [SerializeField] private ItemDataSO itemData;
+        [SerializeField] private VFXSpawnEventSO vfxSpawnEvent;
+        [SerializeField] private float pickupVFXDuration = 0.15f;
         private GameObject sourcePrefab;
         private bool        wasPoolSpawned;
 
@@ -91,6 +94,9 @@ namespace Vamsurlike.Items
             if (ApplyEffect(client.PlayerObject.gameObject))
             {
                 ServerConsoleLogger.Log($"[검증] 아이템 픽업 승인 (client={clientId}, item={itemData.name})");
+                // 상자는 카드 선택 화면으로 전환되므로 흡수 이펙트가 거의 안 보임 — 생략
+                if (itemData.itemType != ItemType.Chest)
+                    PlayPickupVFXClientRpc();
                 DespawnToPool();
             }
             else
@@ -98,6 +104,13 @@ namespace Vamsurlike.Items
                 ServerConsoleLogger.Log($"[검증] 아이템 픽업 거부 — 효과 적용 실패 (client={clientId}, item={itemData.name})");
                 SendPickupRejected(clientId);
             }
+        }
+
+        [ClientRpc]
+        private void PlayPickupVFXClientRpc()
+        {
+            vfxSpawnEvent?.Raise(new VFXCue(
+                VFXCueIds.PickupAbsorb, transform.position, Vector3.up, 1f, pickupVFXDuration, Color.white));
         }
 
         // 서버 → 요청 클라이언트: 픽업 거절 통보 (pendingPickupRequests 정리 용도)
