@@ -117,9 +117,9 @@ ParticleSystem:
     enabled: 1
     startLifetime:
       serializedVersion: 2
-      minMaxState: 0
-      scalar: 0.18
-      minScalar: 5
+      minMaxState: 3
+      scalar: 0.207
+      minScalar: 0.15300001
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -170,9 +170,9 @@ ParticleSystem:
         m_RotationOrder: 4
     startSpeed:
       serializedVersion: 2
-      minMaxState: 0
-      scalar: 2.5
-      minScalar: 5
+      minMaxState: 3
+      scalar: 9.6
+      minScalar: 6.4
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -223,9 +223,9 @@ ParticleSystem:
         m_RotationOrder: 4
     startColor:
       serializedVersion: 2
-      minMaxState: 0
-      minColor: {r: 1, g: 1, b: 1, a: 1}
-      maxColor: {r: 1, g: 0.78, b: 0.28, a: 1}
+      minMaxState: 2
+      minColor: {r: 0.9, g: 0.94, b: 1, a: 1}
+      maxColor: {r: 0.6, g: 0.72, b: 0.85, a: 1}
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}
@@ -288,9 +288,9 @@ ParticleSystem:
         m_NumAlphaKeys: 2
     startSize:
       serializedVersion: 2
-      minMaxState: 0
-      scalar: 0.16
-      minScalar: 1
+      minMaxState: 3
+      scalar: 0.78000003
+      minScalar: 0.42000002
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -981,9 +981,9 @@ ParticleSystem:
       time: 0
       countCurve:
         serializedVersion: 2
-        minMaxState: 0
-        scalar: 14
-        minScalar: 30
+        minMaxState: 3
+        scalar: 28
+        minScalar: 1
         maxCurve:
           serializedVersion: 2
           m_Curve:
@@ -4920,4 +4920,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f59912b1f8431ea48865351a4355c41b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.VFX.VFXLifetime
-  defaultDuration: 0.35
+  defaultDuration: 0.27

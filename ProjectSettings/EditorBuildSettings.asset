@@ -7,13 +7,13 @@ EditorBuildSettings:
   m_Scenes:
   - enabled: 1
     path: Assets/Scenes/Bootstrap.unity
-    guid: bf76e207ed990ee4a9c7272330d056d3
+    guid: 1aa5b8410ea0ec5438d711c94492b496
   - enabled: 1
     path: Assets/Scenes/MainMenu.unity
-    guid: 09666bf799f151b47b92b03187e502c9
+    guid: 39684286c8ba6c340a56dbc4f640792a
   - enabled: 1
     path: Assets/Scenes/Stage_01.unity
-    guid: 711206e57689f1b498a0cdfac31441f9
+    guid: fe5bee0c0055b9d43ad2295c4c55d595
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 289c1b55c9541489481df5cc06664110, type: 3}
   m_UseUCBPForAssetBundles: 0
