@@ -32,6 +32,7 @@ namespace Vamsurlike.Skills
     }
 
     [RequireComponent(typeof(NetworkObject), typeof(SkillVFXController), typeof(PlayerNetworkController))]
+    [RequireComponent(typeof(PlayerMatchStats))]
     public class SkillManager : NetworkBehaviour, ISkillCoroutineRunner
     {
         private const float DefaultManualCooldown = 5f;

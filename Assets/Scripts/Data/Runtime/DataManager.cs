@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Vamsurlike.Stage;
+using Vamsurlike.Upgrades;
 
 namespace Vamsurlike.Data.Runtime
 {
@@ -11,9 +12,10 @@ namespace Vamsurlike.Data.Runtime
     {
         // ─── Public Tables ───────────────────────────────────────────────
 
-        public static IReadOnlyDictionary<int, EnemyScalingData> EnemyScaling { get; private set; }
-        public static IReadOnlyDictionary<int, StageData>        Stages       { get; private set; }
-        public static IReadOnlyDictionary<int, WaveData>         Waves        { get; private set; }
+        public static IReadOnlyDictionary<int, EnemyScalingData>      EnemyScaling      { get; private set; }
+        public static IReadOnlyDictionary<int, StageData>             Stages            { get; private set; }
+        public static IReadOnlyDictionary<int, WaveData>               Waves             { get; private set; }
+        public static IReadOnlyDictionary<int, PermanentUpgradeData>  PermanentUpgrades { get; private set; }
 
         public static bool IsInitialized { get; private set; }
 
@@ -23,15 +25,16 @@ namespace Vamsurlike.Data.Runtime
         {
             if (IsInitialized) return;
 
-            EnemyScaling = LoadTable("Data/EnemyScalingTable", MakeScaling, d => d.Id);
-            Stages       = LoadTable("Data/StageTable",        MakeStage,   d => d.Id);
-            Waves        = LoadTable("Data/WaveTable",         MakeWave,    d => d.Id);
+            EnemyScaling      = LoadTable("Data/EnemyScalingTable",      MakeScaling,           d => d.Id);
+            Stages            = LoadTable("Data/StageTable",             MakeStage,             d => d.Id);
+            Waves             = LoadTable("Data/WaveTable",              MakeWave,              d => d.Id);
+            PermanentUpgrades = LoadTable("Data/PermanentUpgradeTable",  MakePermanentUpgrade,  d => d.Id);
 
             DataValidator.Validate(EnemyScaling, Stages, Waves);
 
             IsInitialized = true;
             Debug.Log($"[DataManager] 초기화 완료 — " +
-                      $"Scaling:{EnemyScaling.Count} Stage:{Stages.Count} Wave:{Waves.Count}");
+                      $"Scaling:{EnemyScaling.Count} Stage:{Stages.Count} Wave:{Waves.Count} PermanentUpgrade:{PermanentUpgrades.Count}");
         }
 
         // ─── Scaling Lookup (시간 기반 스텝 함수) ────────────────────────
@@ -48,6 +51,17 @@ namespace Vamsurlike.Data.Runtime
             }
 
             return result ?? new EnemyScalingData(0, 0f, 1f, 1f, 1f);
+        }
+
+        // ─── Permanent Upgrade Lookup ─────────────────────────────────────
+
+        public static PermanentUpgradeData GetPermanentUpgrade(PermanentUpgradeType type)
+        {
+            foreach (var row in PermanentUpgrades.Values)
+                if (row.Type == type) return row;
+
+            Debug.LogWarning($"[DataManager] PermanentUpgradeTable에 type={type} 행이 없습니다.");
+            return null;
         }
 
         // ─── Wave Group Lookup ───────────────────────────────────────────
@@ -131,6 +145,19 @@ namespace Vamsurlike.Data.Runtime
                 entries.Add(new WaveEntry(eName, Mathf.Max(1, cnt), Mathf.Max(0f, ivl)));
 
             return new WaveData(id, groupId, seqIdx, Mathf.Max(0f, dur), loop, action, entries);
+        }
+
+        private static PermanentUpgradeData MakePermanentUpgrade(string[] cols, Dictionary<string, int> h, int line)
+        {
+            int   id            = CSVParser.Int  (cols, h["id"],            "id",            line);
+            var   type          = CSVParser.Enum<PermanentUpgradeType>(cols, h["type"],       "type",          line);
+            float perLevelValue = CSVParser.Float(cols, h["perLevelValue"], "perLevelValue", line);
+            int   maxLevel      = CSVParser.Int  (cols, h["maxLevel"],      "maxLevel",      line);
+            int   baseCost      = CSVParser.Int  (cols, h["baseCost"],      "baseCost",      line);
+            float costGrowth    = CSVParser.Float(cols, h["costGrowth"],   "costGrowth",    line);
+
+            return new PermanentUpgradeData(id, type, perLevelValue, Mathf.Max(1, maxLevel),
+                Mathf.Max(0, baseCost), Mathf.Max(1f, costGrowth));
         }
     }
 }

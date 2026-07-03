@@ -16,6 +16,8 @@ namespace Vamsurlike.Stage
         // Phase 7.5 — 다운(1단계 진입) / 사망(2단계 진입) 횟수
         public int   DownCount;
         public int   DeathCount;
+        // Phase 7.6 — 이번 판 획득 골드(개인 귀속, 클라이언트가 MetaProgressionState에 누적)
+        public int   GoldEarned;
 
         public int SkillEntryCount;
         public SkillDamageEntry Skill0, Skill1, Skill2, Skill3;
@@ -30,6 +32,7 @@ namespace Vamsurlike.Stage
             s.SerializeValue(ref SurvivalTime);
             s.SerializeValue(ref DownCount);
             s.SerializeValue(ref DeathCount);
+            s.SerializeValue(ref GoldEarned);
             s.SerializeValue(ref SkillEntryCount);
             s.SerializeValue(ref Skill0);
             s.SerializeValue(ref Skill1);

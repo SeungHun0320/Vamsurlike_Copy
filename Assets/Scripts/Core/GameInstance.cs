@@ -14,6 +14,9 @@ namespace Vamsurlike.Core
         // IWorldFacade는 서버에서만 실질적으로 동작
         public IWorldFacade World => worldFacade;
 
+        // Phase 7.6 — 골드/영구 업그레이드. 클라이언트 로컬, 세션 한정 (영속화는 Phase 9 SaveManager)
+        public MetaProgressionState MetaProgression { get; } = new();
+
         private void Awake()
         {
             if (I != null)

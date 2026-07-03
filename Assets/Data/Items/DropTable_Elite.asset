@@ -19,3 +19,6 @@ MonoBehaviour:
     chance: 0.1
   - item: {fileID: 11400000, guid: b071a133fe886fb40821ef13cdeb0c13, type: 2}
     chance: 0.05
+  goldDropChance: 0.5
+  minGold: 3
+  maxGold: 6

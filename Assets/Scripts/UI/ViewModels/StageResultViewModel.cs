@@ -81,7 +81,7 @@ namespace Vamsurlike.UI.ViewModels
                 vms[i] = new PlayerResultViewModel
                 {
                     PlayerName   = e.DisplayName.ToString(),
-                    StatsSummary = $"Lv.{e.Level}  생존 {FormatTime(e.SurvivalTime)}",
+                    StatsSummary = $"Lv.{e.Level}  생존 {FormatTime(e.SurvivalTime)}  획득 {e.GoldEarned}G",
                     Bars         = BuildBarVMs(e, maxDamage, maxKills, maxDowns, maxDeaths),
                     Skills       = BuildSkillVMs(e),
                 };

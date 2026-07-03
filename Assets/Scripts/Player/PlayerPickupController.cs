@@ -16,6 +16,7 @@ namespace Vamsurlike.Player
         private const float ItemPickupRadius = 1.5f;
 
         private readonly List<ulong>   nearbyOrbs           = new();
+        private readonly List<ulong>   nearbyGoldOrbs       = new();
         private readonly HashSet<ulong> pendingPickupRequests = new();
 
         private void Awake()
@@ -45,6 +46,7 @@ namespace Vamsurlike.Player
             checkTimer = CheckInterval;
 
             CheckXPPickups();
+            CheckGoldPickups();
             CheckItemPickups();
         }
 
@@ -57,6 +59,17 @@ namespace Vamsurlike.Player
             XPOrbManager.Instance.FillNearbyOrbIds(transform.position, radius, nearbyOrbs);
             foreach (ulong id in nearbyOrbs)
                 RequestXPPickupServerRpc(id);
+        }
+
+        private void CheckGoldPickups()
+        {
+            if (GoldOrbManager.Instance == null) return;
+
+            float radius = stats != null && stats.PickupRadius.Value > 0f
+                ? stats.PickupRadius.Value : 2f;
+            GoldOrbManager.Instance.FillNearbyOrbIds(transform.position, radius, nearbyGoldOrbs);
+            foreach (ulong id in nearbyGoldOrbs)
+                RequestGoldPickupServerRpc(id);
         }
 
         private void CheckItemPickups()
@@ -84,6 +97,12 @@ namespace Vamsurlike.Player
         private void RequestXPPickupServerRpc(ulong orbId)
         {
             XPOrbManager.Instance?.TryPickup(orbId, OwnerClientId);
+        }
+
+        [ServerRpc]
+        private void RequestGoldPickupServerRpc(ulong orbId)
+        {
+            GoldOrbManager.Instance?.TryPickup(orbId, OwnerClientId);
         }
     }
 }

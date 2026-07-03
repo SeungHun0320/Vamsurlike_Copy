@@ -60,14 +60,25 @@ namespace Vamsurlike.Upgrades
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
 
-        // 투사체 기반 스킬에 더할 추가 투사체 수 (구간별 증가 — 위 ProjectileCountByLevel 참고)
+        // 골드 획득 배율 — Phase 7.6 영구 업그레이드 전용 (인게임 패시브에는 대응 항목 없음).
+        // GoldOrbManager.TryPickup이 조회한다.
+        public NetworkVariable<float> GoldMultiplier { get; } = new(
+            1f,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
+
+        // Phase 7.6 영구 업그레이드(투사체)가 더하는 보너스 — PermanentUpgradeHandler가 스폰 시 1회 설정.
+        // 인게임 패시브(ProjectileCountByLevel)와는 합산되어 적용된다.
+        public int PermanentBonusProjectileCount { get; set; }
+
+        // 투사체 기반 스킬에 더할 추가 투사체 수 (구간별 증가 — 위 ProjectileCountByLevel 참고 + 영구 업그레이드분)
         public int BonusProjectileCount
         {
             get
             {
                 int level = GetPassiveLevel(UpgradeEffectType.PassiveProjectileCount);
                 int index = Mathf.Clamp(level, 0, ProjectileCountByLevel.Length - 1);
-                return ProjectileCountByLevel[index];
+                return ProjectileCountByLevel[index] + PermanentBonusProjectileCount;
             }
         }
 

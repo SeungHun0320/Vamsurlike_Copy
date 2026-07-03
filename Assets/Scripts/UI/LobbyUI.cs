@@ -13,7 +13,6 @@ namespace Vamsurlike.UI
     //
     // 필수 자식 구조:
     //   ServerIPRow/ServerIPText   (TextMeshProUGUI)
-    //   ServerIPRow/CopyButton     (Button)
     //   ColorPaletteArea/          (Button × 9 — 버튼 Image 자체가 스와치)
     //   StartGameButton            (Button)   — 방장에게만 표시
     //   WaitingText                (TextMeshProUGUI) — 비방장에게만 표시
@@ -24,10 +23,11 @@ namespace Vamsurlike.UI
         private LobbySlotUI[]    playerSlots;
         private Button[]         colorButtons;
         private TextMeshProUGUI  serverIpText;
-        private Button           copyIpButton;
         private Button           startGameButton;
         private TextMeshProUGUI  waitingText;
         private Button           disconnectButton;
+        private Button           shopButton;
+        private PermanentUpgradeShopUI shopPanel;
 
         private void Awake()
         {
@@ -51,8 +51,9 @@ namespace Vamsurlike.UI
             if (ipRow != null)
             {
                 serverIpText = ipRow.Find("ServerIPText")?.GetComponent<TextMeshProUGUI>();
-                copyIpButton = ipRow.Find("CopyButton")?.GetComponent<Button>();
-                if (copyIpButton != null) copyIpButton.onClick.AddListener(CopyIp);
+                Transform copyButton = ipRow.Find("CopyButton");
+                if (copyButton != null)
+                    Destroy(copyButton.gameObject);
             }
 
             startGameButton = transform.Find("StartGameButton")?.GetComponent<Button>();
@@ -62,6 +63,8 @@ namespace Vamsurlike.UI
 
             disconnectButton = transform.Find("DisconnectButton")?.GetComponent<Button>();
             if (disconnectButton != null) disconnectButton.onClick.AddListener(OnDisconnect);
+
+            BindShopObjects();
         }
 
         private void OnEnable()
@@ -87,6 +90,53 @@ namespace Vamsurlike.UI
             }
             if (playerSlots != null)
                 foreach (var slot in playerSlots) slot?.Unbind();
+            SetShopVisible(false);
+        }
+
+        private void BindShopObjects()
+        {
+            shopButton = FindSceneComponent<Button>("LobbyShopButton");
+            shopPanel = FindSceneComponent<PermanentUpgradeShopUI>("PermanentUpgradeShop");
+
+            if (shopButton != null)
+            {
+                shopButton.onClick.RemoveListener(OpenShop);
+                shopButton.onClick.AddListener(OpenShop);
+                shopButton.gameObject.SetActive(false);
+            }
+
+            if (shopPanel != null)
+                shopPanel.gameObject.SetActive(false);
+        }
+
+        private static T FindSceneComponent<T>(string objectName) where T : Component
+        {
+            var objects = Resources.FindObjectsOfTypeAll<GameObject>();
+            for (int i = 0; i < objects.Length; i++)
+            {
+                if (objects[i].name != objectName || !objects[i].scene.IsValid())
+                    continue;
+
+                var component = objects[i].GetComponent<T>();
+                if (component != null)
+                    return component;
+            }
+
+            return null;
+        }
+
+        private void OpenShop()
+        {
+            if (shopPanel == null) return;
+            shopPanel.OpenPanel();
+        }
+
+        private void SetShopVisible(bool visible)
+        {
+            if (shopButton != null)
+                shopButton.gameObject.SetActive(visible);
+            if (!visible && shopPanel != null && shopPanel.gameObject.activeSelf)
+                shopPanel.gameObject.SetActive(false);
         }
 
         private void OnClientChanged(ulong _) => Refresh();
@@ -100,6 +150,7 @@ namespace Vamsurlike.UI
             bool isHost = GameNetworkManager.Instance?.IsLocalLobbyHost ?? false;
             if (startGameButton != null) startGameButton.gameObject.SetActive(isHost);
             if (waitingText     != null) waitingText.gameObject.SetActive(!isHost);
+            SetShopVisible(true);
 
             bool canPick = NetworkManager.Singleton != null
                 && NetworkManager.Singleton.IsConnectedClient
@@ -143,10 +194,5 @@ namespace Vamsurlike.UI
         private void OnStartGame()  => GameNetworkManager.Instance?.RequestStartGame();
         private void OnDisconnect() => GameNetworkManager.Instance?.Disconnect();
 
-        private void CopyIp()
-        {
-            if (serverIpText != null)
-                GUIUtility.systemCopyBuffer = serverIpText.text;
-        }
     }
 }

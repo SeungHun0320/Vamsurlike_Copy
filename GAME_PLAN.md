@@ -1223,15 +1223,16 @@ Done when: 스테이지에서 골드를 드랍/획득하면 세션 동안 누적
 
 기존 XP 오브와 동일하게 NetworkObject가 아닌 서버 데이터 목록 + 클라이언트 비주얼 프록시 방식을 재사용한다 (§7 XP 오브 처리 방식과 동일 패턴). 드랍 소스는 `DropTableSO`에 골드 확률/수량을 추가하는 방식이며, 픽업 즉시 서버가 세션 내 누적 골드에 더하고 스테이지 종료 시 `PlayerMatchStats`를 거쳐 결과 화면으로 전달한다.
 
-- [ ] `DropTableSO`에 골드 드랍 확률/수량 필드 추가
-- [ ] `GoldOrbVisualProxy` 구현 (`XPOrbVisualProxy` 복사 후 분리 — XP와 책임이 다르므로 유지보수를 위해 별도 클래스로 둔다)
-- [ ] `PlayerMatchStats`에 `GoldEarned` 필드 추가, `MatchResultEntry`에 반영
+- [x] `DropTableSO`에 골드 드랍 확률/수량 필드 추가
+- [x] `GoldOrbVisualProxy` 구현 (`XPOrbVisualProxy` 복사 후 분리 — XP와 책임이 다르므로 유지보수를 위해 별도 클래스로 둔다)
+- [x] `PlayerMatchStats`에 `GoldEarned` 필드 추가, `MatchResultEntry`에 반영
 
 **세션 메모리 저장 (임시 — 영속화는 Phase 9)**
 
-- [ ] `MetaProgressionState` (비-Network 순수 C# 클래스, `GameInstance`가 보유) 구현 — 총 보유 골드, 영구 업그레이드 13종 각 레벨을 앱 실행 중에만 유지
-- [ ] 이 클래스의 필드 구조를 Phase 9 `SaveManager`가 그대로 직렬화할 수 있게 설계 (나중에 저장/로드 코드만 갈아 끼우면 되도록)
-- [ ] 로비 UI에 "이번 세션에만 유지되며 게임 재시작 시 초기화됨" 안내 표시 (Phase 9에서 SaveManager 붙으면 이 문구 제거)
+- [x] `MetaProgressionState` (비-Network 순수 C# 클래스, `GameInstance`가 보유) 구현 — 총 보유 골드, 영구 업그레이드 13종 각 레벨을 앱 실행 중에만 유지
+- [x] 이 클래스의 필드 구조를 Phase 9 `SaveManager`가 그대로 직렬화할 수 있게 설계 (`BuildLevelSnapshot()` — int[] 스냅샷 방식, 나중에 저장/로드 코드만 갈아 끼우면 되도록)
+- [ ] 로비 UI에 "이번 세션에만 유지되며 게임 재시작 시 초기화됨" 안내 표시 (미구현 — Phase 9에서 SaveManager 붙일 때 함께 처리)
+- **정정**: 잠금해제(스킬 누적 사용 횟수 등) 조건은 전부 제외 — Phase 9에서 SaveManager를 실제로 붙일 때 같이 설계한다. `MetaProgressionState.TryPurchase`는 비용/최대레벨/보유골드만 검사한다.
 
 **로비 영구 업그레이드 상점**
 
@@ -1255,13 +1256,13 @@ Done when: 스테이지에서 골드를 드랍/획득하면 세션 동안 누적
 
 이 표는 Phase 7.5의 패시브 스킬(인게임 한정, 레벨업으로 습득) 목록과 이름이 겹치지만 별개 시스템이다 — 패시브는 한 판 안에서만 유효하고, 여기 업그레이드는 골드로 사서 (세션 동안) 모든 판에 영구 적용된다.
 
-- [ ] `PermanentUpgradeTable.csv` + `DataManager` 로딩 추가 (레벨별 비용/효과, §7 DataManager 패턴 재사용)
-- [ ] 로비 상점 UI (View/ViewModel, MVVM 규칙 준수) — 13종 카드/행, 보유 골드 표시, 구매 버튼, 최대 레벨 도달 시 비활성화
-- [ ] 스킬 누적 사용 횟수 카운트 → 스킬 가속 해금 조건 연동 (카운트 위치: `SkillExecutionScheduler` 또는 `SkillManager` 중 확정 필요)
-- [ ] 영구 업그레이드 적용 지점: 스테이지 진입 시 `CharacterDataSO` 베이스 스탯 위에 영구 업그레이드 배율을 곱해 `PlayerNetworkStats` 초기화 (서버 전용 계산 — RULES.md 서버 권한 원칙 준수)
-- [ ] 결과 화면에 이번 판 획득 골드 표시
+- [x] `PermanentUpgradeTable.csv` + `DataManager` 로딩 추가 (레벨별 비용/효과, §7 DataManager 패턴 재사용)
+- [x] 로비 상점 UI — LoL "Swarm" PVE 상점 레퍼런스 기준으로 4열 아이콘 카드 그리드(`UpgradeCard.prefab`, `UpgradeCardUI.cs`) + 우측 상세 패널(현재값→다음값 미리보기) 구조로 구현. 하이어라키는 런타임 생성이 아니라 에디터 스크립트(`Assets/Editor/BuildPermanentUpgradeShopUI.cs`)로 씬에 직접 생성, `PermanentUpgradeShopUI.cs`는 `[SerializeField]` 바인딩만 하는 얇은 스크립트로 유지
+- [ ] ~~스킬 누적 사용 횟수 카운트 → 스킬 가속 해금 조건 연동~~ — 잠금해제 조건 자체를 이 Phase에서 제외 (위 정정 참고)
+- [x] 영구 업그레이드 적용 지점: `PermanentUpgradeHandler`(NetworkBehaviour) — `OnNetworkSpawn` 시 `MetaProgressionState` 스냅샷을 서버로 전송해 `PassiveStatHandler`/`PlayerNetworkStats`에 델타 방식으로 반영 (서버 전용 계산 — RULES.md 서버 권한 원칙 준수)
+- [x] 결과 화면에 이번 판 획득 골드 표시 (`StageResultViewModel.StatsSummary`에 "획득 {N}G" 추가)
 
-예상 기간: 4~6일 (세이브 제외로 기존 5~8일에서 단축)
+예상 기간: 4~6일 (세이브 제외로 기존 5~8일에서 단축) — 실제로는 상점 UI 왕복(런타임 생성 → 에디터 하이어라키 재작업)으로 예상보다 UI 쪽 시간이 더 소요됨
 
 ---
 

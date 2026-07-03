@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Unity.Collections;
 using Unity.Netcode;
-using UnityEngine;
+using Vamsurlike.Core;
 using Vamsurlike.Player;
 using Vamsurlike.UI.Events;
 
@@ -69,6 +69,7 @@ namespace Vamsurlike.Stage
                     SurvivalTime    = statsComp.SurvivalTime,
                     DownCount       = statsComp.DownCount,
                     DeathCount      = statsComp.DeathCount,
+                    GoldEarned      = statsComp.GoldEarned,
                     SkillEntryCount = sortedSkills.Length,
                     Skill0          = MakeSkillEntry(sortedSkills, 0),
                     Skill1          = MakeSkillEntry(sortedSkills, 1),
@@ -101,7 +102,23 @@ namespace Vamsurlike.Stage
         [ClientRpc]
         private void SendMatchResultClientRpc(MatchResultEntry[] entries)
         {
+            ApplyLocalMetaProgression(entries);
             UIEventHub.Instance?.Flow.PublishMatchResult(new MatchResultPayload(entries));
+        }
+
+        // Phase 7.6 — 이번 판 결과에서 "내" 항목을 찾아 골드를 세션 로컬 메타 진행도에 누적.
+        private static void ApplyLocalMetaProgression(MatchResultEntry[] entries)
+        {
+            if (entries == null || NetworkManager.Singleton == null) return;
+            if (GameInstance.I == null) return;
+
+            ulong localId = NetworkManager.Singleton.LocalClientId;
+            foreach (var entry in entries)
+            {
+                if (entry.ClientId != localId) continue;
+                GameInstance.I.MetaProgression.AddGold(entry.GoldEarned);
+                break;
+            }
         }
     }
 }

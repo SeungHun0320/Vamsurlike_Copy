@@ -63,10 +63,11 @@ namespace Vamsurlike.Player
         // 이동/스킬 사용 가능 여부
         public bool CanAct => IsAlive && !IsDowned.Value && !IsDeadWaiting.Value;
 
-        // 이동속도/획득반경 기준치 — 패시브 배율(PassiveStatHandler.MoveSpeedMultiplier 등) 적용 시
-        // 매번 이 값 기준으로 MoveSpeed.Value/PickupRadius.Value를 다시 계산한다 (§7.5 배율 방식 통일).
+        // 이동속도/획득반경/최대체력 기준치 — 배율 적용 시 매번 이 값 기준으로 다시 계산한다
+        // (§7.5 배율 방식 통일, MaxHP는 §7.6 영구 업그레이드 전용 — 인게임 패시브는 여전히 flat 가산).
         private float baseMoveSpeed;
         private float basePickupRadius;
+        private float baseMaxHP;
 
         protected override void OnServerSpawned()
         {
@@ -77,11 +78,11 @@ namespace Vamsurlike.Player
         {
             if (!EnsureServerAuthority(nameof(InitializeFromData))) return;
 
-            float maxHP = data != null ? data.baseHP : fallbackMaxHP;
+            baseMaxHP        = Mathf.Max(1f, data != null ? data.baseHP : fallbackMaxHP);
             baseMoveSpeed    = Mathf.Max(0f, data != null ? data.baseMoveSpeed : fallbackMoveSpeed);
             basePickupRadius = data != null ? data.basePickupRadius : 2f;
 
-            MaxHP.Value        = Mathf.Max(1f, maxHP);
+            MaxHP.Value        = baseMaxHP;
             HP.Value           = MaxHP.Value;
             MoveSpeed.Value    = baseMoveSpeed;
             PickupRadius.Value = basePickupRadius;
@@ -100,6 +101,15 @@ namespace Vamsurlike.Player
         {
             if (!EnsureServerAuthority(nameof(ApplyPickupRadiusMultiplier))) return;
             PickupRadius.Value = Mathf.Max(0f, basePickupRadius * multiplier);
+        }
+
+        // §7.6 영구 업그레이드(MaxHP) 전용 — baseMaxHP 기준으로 배율 재계산, 현재 HP 비율은 유지한다.
+        public void ApplyMaxHPMultiplier(float multiplier)
+        {
+            if (!EnsureServerAuthority(nameof(ApplyMaxHPMultiplier))) return;
+            float ratio = MaxHP.Value > 0f ? HP.Value / MaxHP.Value : 1f;
+            MaxHP.Value = Mathf.Max(1f, baseMaxHP * multiplier);
+            if (IsAlive) HP.Value = Mathf.Max(1f, MaxHP.Value * ratio);
         }
 
         // GAME_PLAN §8 EnemyDefenseRate와 동일한 공식 (defense/(defense+100)) — 플레이어 피격에도 동일 적용
