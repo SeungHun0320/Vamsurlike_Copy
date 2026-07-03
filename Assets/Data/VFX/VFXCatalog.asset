@@ -15,7 +15,7 @@ MonoBehaviour:
   entries:
   - cueId: 1
     label: EnemyDeath
-    prefab: {fileID: 1580661595495182537, guid: 6c26b5f6eda6d6445a7d4b3cf7782806, type: 3}
+    prefab: {fileID: 8142776624367745201, guid: 621eaa409a488d647ab00797aad76f5d, type: 3}
   - cueId: 2
     label: BossDeath
     prefab: {fileID: 1580661595495182537, guid: 006c0f8fcb5681946ab6074d377b1f59, type: 3}
@@ -28,3 +28,6 @@ MonoBehaviour:
   - cueId: 5
     label: BossImpact
     prefab: {fileID: 1580661595495182537, guid: c64d7ce814911414988765ee51d4a9ab, type: 3}
+  - cueId: 6
+    label: GrenadeExplosion
+    prefab: {fileID: 1599315238913598529, guid: 0ed968076c02def4fafda8c02b6af335, type: 3}

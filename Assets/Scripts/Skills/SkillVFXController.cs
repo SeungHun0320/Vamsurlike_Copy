@@ -30,6 +30,7 @@ namespace Vamsurlike.Skills
         [Header("Ultimate VFX")]
         [SerializeField] private VFXSpawnEventSO vfxSpawnEvent;
         [SerializeField] private float ultimateVFXDuration = 0.5f;
+        [SerializeField] private float grenadeExplosionVFXDuration = 0.5f;
 
         private readonly Dictionary<SkillCastType, GameObject> vfxPrefabsByType = new();
         private readonly Dictionary<SkillCastType, AreaCircleVFX> areaCircleVfxByType = new();
@@ -304,6 +305,8 @@ namespace Vamsurlike.Skills
             }
 
             ReturnVisual(prefab, visual);
+            vfxSpawnEvent?.Raise(new VFXCue(
+                VFXCueIds.GrenadeExplosion, to, Vector3.up, 1f, grenadeExplosionVFXDuration, Color.white));
         }
 
         private static GameObject SpawnPooledVisual(GameObject prefab, Vector3 position, Quaternion rotation)
