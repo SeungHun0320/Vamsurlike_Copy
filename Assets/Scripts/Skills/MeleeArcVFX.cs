@@ -1,5 +1,6 @@
 using UnityEngine;
 using Vamsurlike.Network;
+using Vamsurlike.VFX;
 
 namespace Vamsurlike.Skills
 {
@@ -32,6 +33,8 @@ namespace Vamsurlike.Skills
 
             if (lineMaterial != null)
                 lr.sharedMaterial = lineMaterial;
+            else if (lr.sharedMaterial == null)
+                lr.sharedMaterial = LineDefaultMaterial.Get();
             lr.startColor  = ArcColor;
             lr.endColor    = new Color(ArcColor.r, ArcColor.g, ArcColor.b, 0f);
         }

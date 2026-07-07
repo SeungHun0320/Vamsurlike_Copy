@@ -729,11 +729,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Enemy.EnemyNetworkBase
   ShowTopMostFoldoutHeaderGroup: 1
+  critRandomSeed: 9137
   data: {fileID: 0}
   hitFlashColor: {r: 1, g: 1, b: 1, a: 1}
   hitFlashDuration: 0.08
   hitSparkPrefab: {fileID: 1580661595495182537, guid: 06dc630522f084a49b33cc95a4cc35cc, type: 3}
   hitSparkLifetime: 0.25
+  bossTelegraphPrefab: {fileID: 0}
   cameraShakeEvent: {fileID: 11400000, guid: 782f711cf6734360a004c7a01376de0d, type: 2}
   critShakeIntensity: 0.15
   critShakeDuration: 0.12
@@ -744,6 +746,8 @@ MonoBehaviour:
   vfxSpawnEvent: {fileID: 11400000, guid: e74307a1129b4948a03e4dbc39979768, type: 2}
   deathVFXDuration: 0.3
   bossDeathVFXDuration: 0.6
+  bossImpactVFXDuration: 0.4
+  sfxSpawnEvent: {fileID: 11400000, guid: 419db2de910dd3746a785a48b364dc6a, type: 2}
 --- !u!114 &5170033284682644562
 MonoBehaviour:
   m_ObjectHideFlags: 0

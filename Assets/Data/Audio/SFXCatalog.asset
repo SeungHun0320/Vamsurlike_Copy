@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 594a05f20b13e6c40a4158a92ba11cea, type: 3}
+  m_Name: SFXCatalog
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Audio.SFXCatalogSO
+  entries:
+  - cueId: 1
+    label: Hit
+    clip: {fileID: 0}
+    volume: 1
+    pitchVariance: 0.08
+  - cueId: 2
+    label: EnemyDeath
+    clip: {fileID: 0}
+    volume: 1
+    pitchVariance: 0.05
+  - cueId: 3
+    label: BossDeath
+    clip: {fileID: 0}
+    volume: 1
+    pitchVariance: 0
+  - cueId: 4
+    label: SkillCast
+    clip: {fileID: 0}
+    volume: 0.9
+    pitchVariance: 0.05
+  - cueId: 5
+    label: ItemPickup
+    clip: {fileID: 0}
+    volume: 0.8
+    pitchVariance: 0.05
+  - cueId: 6
+    label: XPPickup
+    clip: {fileID: 0}
+    volume: 0.6
+    pitchVariance: 0.1
+  - cueId: 7
+    label: GoldPickup
+    clip: {fileID: 0}
+    volume: 0.6
+    pitchVariance: 0.1
+  - cueId: 8
+    label: ChestOpen
+    clip: {fileID: 0}
+    volume: 1
+    pitchVariance: 0
+  - cueId: 9
+    label: LevelUp
+    clip: {fileID: 0}
+    volume: 1
+    pitchVariance: 0
+  - cueId: 10
+    label: BossTelegraph
+    clip: {fileID: 0}
+    volume: 0.9
+    pitchVariance: 0
+  - cueId: 11
+    label: BossImpact
+    clip: {fileID: 0}
+    volume: 1
+    pitchVariance: 0

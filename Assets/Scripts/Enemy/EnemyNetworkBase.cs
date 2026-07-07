@@ -1,6 +1,7 @@
 using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
+using Vamsurlike.Audio;
 using Vamsurlike.Data;
 using Vamsurlike.Network;
 using Vamsurlike.Player;
@@ -31,6 +32,7 @@ namespace Vamsurlike.Enemy
         [SerializeField] private float hitFlashDuration = 0.08f;
         [SerializeField] private GameObject hitSparkPrefab;
         [SerializeField] private float hitSparkLifetime = 0.25f;
+        [SerializeField] private GameObject bossTelegraphPrefab;
 
         [Header("Camera Shake")]
         [SerializeField] private CameraShakeEventSO cameraShakeEvent;
@@ -46,6 +48,9 @@ namespace Vamsurlike.Enemy
         [SerializeField] private float deathVFXDuration = 0.3f;
         [SerializeField] private float bossDeathVFXDuration = 0.6f;
         [SerializeField] private float bossImpactVFXDuration = 0.4f;
+
+        [Header("SFX")]
+        [SerializeField] private SFXSpawnEventSO sfxSpawnEvent;
 
         public readonly NetworkVariable<float> HP = new(
             100f,
@@ -203,6 +208,7 @@ namespace Vamsurlike.Enemy
         private void PlayBossImpactVFXClientRpc(Vector3 position)
         {
             vfxSpawnEvent?.Raise(new VFXCue(VFXCueIds.BossImpact, position, Vector3.up, 1f, bossImpactVFXDuration, Color.white));
+            sfxSpawnEvent?.Raise(new SFXCue(SFXCueIds.BossImpact, position));
         }
 
         // 모르타르 패턴: 여러 위치에 경고 원을 동시에 표시.
@@ -262,6 +268,8 @@ namespace Vamsurlike.Enemy
         [ClientRpc]
         private void PlayHitSparkClientRpc(Vector3 worldPosition)
         {
+            sfxSpawnEvent?.Raise(new SFXCue(SFXCueIds.Hit, worldPosition));
+
             if (hitSparkPrefab == null) return;
 
             GameObject spark = PoolManager.GetOrInstantiateGO(
@@ -334,11 +342,8 @@ namespace Vamsurlike.Enemy
         [ClientRpc]
         private void ShowSlamTelegraphClientRpc(Vector3 center, float radius, float duration)
         {
-            var visual = new GameObject("BossSlamTelegraph");
-            visual.transform.position = center + Vector3.up * 0.05f;
-
-            AreaCircleVFX circle = visual.AddComponent<AreaCircleVFX>();
-            circle.Initialize(radius, duration, BossTelegraphColor);
+            SpawnTelegraphCircle(center, radius, duration);
+            sfxSpawnEvent?.Raise(new SFXCue(SFXCueIds.BossTelegraph, center));
         }
 
         [ClientRpc]
@@ -346,12 +351,38 @@ namespace Vamsurlike.Enemy
         {
             foreach (var pos in positions)
             {
-                var visual = new GameObject("BossMortarTelegraph");
-                visual.transform.position = pos + Vector3.up * 0.05f;
-
-                AreaCircleVFX circle = visual.AddComponent<AreaCircleVFX>();
-                circle.Initialize(radius, duration, BossTelegraphColor);
+                SpawnTelegraphCircle(pos, radius, duration);
+                sfxSpawnEvent?.Raise(new SFXCue(SFXCueIds.BossTelegraph, pos));
             }
+        }
+
+        // Slam/Mortar 경고 원 — PoolManager를 거쳐 AreaCircleVFX를 재사용한다.
+        // bossTelegraphPrefab 미배선 시 이전과 동일하게 raw Instantiate로 폴백.
+        private void SpawnTelegraphCircle(Vector3 center, float radius, float duration)
+        {
+            Vector3 position = center + Vector3.up * 0.05f;
+
+            if (bossTelegraphPrefab != null)
+            {
+                GameObject visual = PoolManager.GetOrInstantiateGO(
+                    bossTelegraphPrefab, position, Quaternion.identity, nameof(EnemyNetworkBase));
+                if (visual == null) return;
+
+                if (visual.TryGetComponent(out AreaCircleVFX pooledCircle))
+                {
+                    pooledCircle.Initialize(radius, duration, BossTelegraphColor, null, bossTelegraphPrefab);
+                    return;
+                }
+
+                Debug.LogWarning($"[{nameof(EnemyNetworkBase)}] bossTelegraphPrefab에 AreaCircleVFX가 없습니다.", this);
+                PoolManager.ReturnOrDestroyGO(bossTelegraphPrefab, visual, nameof(EnemyNetworkBase));
+                return;
+            }
+
+            var fallback = new GameObject("BossTelegraph");
+            fallback.transform.position = position;
+            AreaCircleVFX circle = fallback.AddComponent<AreaCircleVFX>();
+            circle.Initialize(radius, duration, BossTelegraphColor);
         }
 
         [ClientRpc]
@@ -369,6 +400,7 @@ namespace Vamsurlike.Enemy
             int cueId = isBoss ? VFXCueIds.BossDeath : VFXCueIds.EnemyDeath;
             float duration = isBoss ? bossDeathVFXDuration : deathVFXDuration;
             vfxSpawnEvent?.Raise(new VFXCue(cueId, transform.position, Vector3.up, 1f, duration, Color.white));
+            sfxSpawnEvent?.Raise(new SFXCue(isBoss ? SFXCueIds.BossDeath : SFXCueIds.EnemyDeath, transform.position));
         }
 
     }

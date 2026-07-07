@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
+using Vamsurlike.Audio;
 using Vamsurlike.Data;
 using Vamsurlike.Player;
 using Vamsurlike.Stage;
@@ -42,6 +43,7 @@ namespace Vamsurlike.Skills
         [SerializeField] private Transform projectileSpawnPoint;
         [SerializeField] private float spawnForwardOffset = 0.8f;
         [SerializeField] private float failedCastRetryDelay = 0.1f;
+        [SerializeField] private SFXSpawnEventSO sfxSpawnEvent;
 
 
         private PassiveStatHandler      passiveStatHandler;
@@ -352,7 +354,19 @@ namespace Vamsurlike.Skills
                 bonusProjectileCount,
                 durationMultiplier);
 
-            return executor.TryExecute(context);
+            bool casted = executor.TryExecute(context);
+            // 지속형 스킬(오라/오비탈)은 틱마다 TryCast가 재호출되므로 캐스트 SFX 대상에서 제외 —
+            // 발동 순간 한 번만 울려야 하는 일반 스킬에만 적용한다.
+            if (casted && !executor.IsPersistentExecution)
+                PlaySkillCastSfxClientRpc(transform.position);
+
+            return casted;
+        }
+
+        [ClientRpc]
+        private void PlaySkillCastSfxClientRpc(Vector3 position)
+        {
+            sfxSpawnEvent?.Raise(new SFXCue(SFXCueIds.SkillCast, position));
         }
 
         private void BroadcastSkillsToOwner()

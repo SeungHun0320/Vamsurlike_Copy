@@ -1748,15 +1748,16 @@ Built-in RP에서는 Shader Graph 의존 대신 ShaderLab/HLSL 기반 `.shader` 
 - [X] Built-in RP용 공용 VFX 셰이더 작성 (Additive, Alpha Blend, Telegraph, HitFlash) — HitFlash(MaterialPropertyBlock)와 Telegraph(AreaCircleVFX/MeleeArcVFX 머티리얼 참조)는 이미 완료돼 있었음. Additive/Alpha Blend는 커스텀 HLSL을 새로 작성하는 대신 유니티 내장 `Particles/Standard Unlit` 셰이더(Built-in RP 표준 파티클 셰이더)로 `VFX_Additive_Mat`/`VFX_AlphaBlend_Mat`(`Assets/Resources/Materials/`) 2종을 만들어 이번 세션에서 새로 만든 원샷 VFX 5종(EnemyDeath/BossDeath/Ultimate/PickupAbsorb/BossImpact)에 적용 — 기존에 이미 검증된 HitSpark/XPOrb 머티리얼은 회귀 위험을 피하려 건드리지 않음
 - [X] (후속) 이펙트가 몬스터 메쉬에 가려 안 보이는 문제 — `ZTest Always` 오버레이 셰이더로 전환. `S_VFXOverlay_Additive`/`S_VFXOverlay_AlphaBlend.shader`(`Cull Off, ZWrite Off, ZTest Always`, `Queue=Overlay`) 신규 작성, `VFX_Additive_Mat`/`VFX_AlphaBlend_Mat`을 이 셰이더로 교체(원샷 VFX 5종 전체 적용). 기존에 미사용 상태였던 `S_HitSparkOverlay.shader`를 `M_HitSpark.mat`(피격 스파크)에 실제로 연결해 툰트(`_Color`→`_TintColor`) 보존한 채 적용. 모든 이펙트가 몬스터/지형 깊이값 무시하고 항상 위에 그려짐(단점: 다른 오브젝트 뒤에 있어야 할 상황에서도 항상 앞에 보임 — 탑다운 카메라 특성상 허용 가능하다고 판단)
 - [X] `AreaCircleVFX`, `MeleeArcVFX`의 런타임 `new Material(Shader.Find(...))` 제거 및 Inspector/Prefab Material 참조로 전환
-- [ ] 기존 `SkillVFXController`, `EnemyNetworkBase`의 직접 생성 VFX 경로를 이벤트+풀링 경로로 마이그레이션 — 참고: `VFXEventBridge`(서버 ClientRpc → `VFXSpawnEventSO`/`FloatingTextEventSO` 변환)는 구현은 됐지만 실제로 호출하는 곳이 아직 없다(오브젝트도 씬에 미배치, 카탈로그/이벤트 에셋도 카메라 쉐이크용 1개만 존재). `EnemyNetworkBase`는 현재 자체 ClientRpc(`ShowDamageClientRpc`/`PlayHitFlashClientRpc`/`PlayHitSparkClientRpc`/`PlayCameraShakeClientRpc`)로 직접 처리 중 — 이 마이그레이션 항목에서 VFXEventBridge 경로로 옮길지, 아니면 현재 직접 RPC 패턴을 계속 유지할지 결정 필요
-- [ ] 성능 기준 확인: 런타임 VFX/데미지 텍스트 `Instantiate`/`Destroy` 없음, 동시 one-shot VFX 80개 + 데미지 텍스트 100개에서 60fps 유지 — 실제 호스트 접속 없이는 부하 테스트 불가해 이번 세션에서 미검증. `BossMissile`이 `PoolManager`를 안 거치던 문제는 발견 즉시 수정(`BossMissile.SpawnAt` 팩토리 추가, `NetworkedItemPickup`과 동일한 sourcePrefab/wasPoolSpawned 패턴으로 `OnNetworkDespawn` 시 반납)
+- [X] 기존 `SkillVFXController`, `EnemyNetworkBase`의 직접 생성 VFX 경로를 이벤트+풀링 경로로 마이그레이션 — `VFXEventBridge` 경로로 옮기지 않고 현재의 직접 ClientRpc 패턴을 유지하기로 결정(구조 변경보다 풀링 커버리지가 급선무였음). 대신 실제로 풀을 안 타던 지점을 전부 `PoolManager.GetOrInstantiateGO`/`ReturnOrDestroyGO` 경유로 전환: `Skills/MeleeArcVFX.cs`(근접 스윙마다 raw Instantiate였던 것), `Skills/AreaCircleVFX.cs`(오라/블랙홀/그레네이드 텔레그래프), `Skills/SkillVFXController.cs`(오비탈 비주얼), `Enemy/EnemyNetworkBase.cs`(보스 Slam/Mortar 텔레그래프, `bossTelegraphPrefab` 필드로 `GrenadeImpactCircle.prefab` 재사용). 남은 `VFXEventBridge` 미사용 상태는 의도된 설계 결정으로 재확정 — 필요 시 후속 리팩터링 항목으로 재검토
+- [ ] 성능 기준 확인: 런타임 VFX/데미지 텍스트 `Instantiate`/`Destroy` 없음, 동시 one-shot VFX 80개 + 데미지 텍스트 100개에서 60fps 유지 — **실제 4인 co-op 호스트 세션이 있어야 검증 가능한 항목이라 에이전트 단독으로는 여전히 미검증.** `Instantiate`/`Destroy` 제거 자체는 위 마이그레이션으로 완료됐고, `BossMissile` 누락 건도 이전 세션에 수정 완료(`BossMissile.SpawnAt` 팩토리, `NetworkedItemPickup`과 동일한 sourcePrefab/wasPoolSpawned 패턴). 실측 방법 제안: `DebugEnemyCommands`(화면 내 적 일괄 처치)로 다수 사망 VFX를 동시 발생시키고 Stats/Profiler로 60fps 유지 확인 — 2인 이상 MPM 세션에서 사용자가 직접 진행 필요
 
 #### Phase 8.6 오디오
 
-- [ ] AudioManager 구현 (후순위, 클라이언트 로컬)
-- [ ] SFX 이벤트 채널 정의 (피격, 사망, 스킬, 아이템/XP 획득, 상자 오픈, 보스 패턴)
-- [ ] BGM 전환 구현 (메뉴, 일반 스테이지, 보스 페이즈, 결과 화면)
-- [ ] 설정 UI 음량 슬라이더와 연동
+- [X] AudioManager 구현 (클라이언트 로컬) — `Assets/Scripts/Audio/AudioManager.cs`, `UIEventHub`와 동일하게 Bootstrap DontDestroyOnLoad + `RuntimeInitializeOnLoadMethod` 안전망으로 배치(`Bootstrap.unity`에 실제 GameObject로도 배치). BGM 2개 AudioSource 크로스페이드, SFX는 라운드로빈 AudioSource 풀(기본 12개)로 동시 다중 재생 지원 — 별도 AudioMixer 에셋 없이 `masterVolume × bgmVolume/sfxVolume × 트랙별 volume`로 직접 계산
+- [X] SFXCue 이벤트 채널 정의 — VFX 패턴(`VFXCue`/`VFXSpawnEventSO`/`VFXCatalogSO`) 그대로 미러링해 `Assets/Scripts/Audio/`에 `SFXCue`, `SFXCueIds`, `SFXSpawnEventSO`, `SFXCatalogSO` 신설. cueId 11종(Hit/EnemyDeath/BossDeath/SkillCast/ItemPickup/XPPickup/GoldPickup/ChestOpen/LevelUp/BossTelegraph/BossImpact) 전부 실제 발생 지점에 연결 완료 — `EnemyNetworkBase`(피격/사망/보스텔레그래프/보스임팩트), `SkillManager`(스킬 캐스트, 지속형 스킬은 틱 스팸 방지로 제외), `NetworkedItemPickup`(아이템/상자), `XPOrbManager`/`GoldOrbManager`(획득), `LevelUpManager`(레벨업, 브로드캐스트 이벤트라 각자 로컬 위치에서 재생)
+- [X] BGM 전환 구현 — `SceneManager.sceneLoaded`로 메뉴/스테이지 판별, `UIEventHub.Stage.BossStatusChanged`로 보스 페이즈 전환, `UIEventHub.Flow.GameFlowChanged`(Clear/GameOver)로 결과 화면 전환. 전부 기존 이벤트 허브에 얹어서 구현해 신규 네트워크 동기화 불필요
+- [X] 설정 UI 음량 슬라이더와 연동 — `SettingsUI`→`SettingsManager.SetMasterVolume/SetBgmVolume/SetSfxVolume`→`OnVolumeChanged` 이벤트는 이미 Phase 8.4b에서 구현되어 있었음. `AudioManager.Start()`에서 구독만 추가하면 끝나는 상태였음
+- [ ] **실제 오디오 클립 제작/연결** — 코드/카탈로그/씬 배선은 전부 끝났지만 SFX 11종·BGM 4종 전부 클립이 없는 빈 슬롯 상태. `generate_sfx`/`generate_music` MCP 툴로 생성 시도했으나 이미지 생성 때와 동일하게 `401 Unauthorized`로 막힘(Coplay 생성 서비스 계정 인증 문제로 보임, 세션 내 해결 불가) — 인증 풀리면 `Assets/Data/Audio/SFXCatalog.asset`의 각 entry.clip과 `AudioManager`의 menuBgm/stageBgm/bossBgm/resultBgm 필드만 채우면 바로 재생됨
 
 #### Phase 8.7 최적화/밸런스
 
@@ -1775,16 +1776,16 @@ Built-in RP에서는 Shader Graph 의존 대신 ShaderLab/HLSL 기반 `.shader` 
 
 Done when: Windows Server Build를 별도 실행해 서버 역할만 담당하고, 원격 친구가 Relay 코드로 접속해 4인 게임이 안정적으로 돌아간다.
 
-- [ ] Windows Server Build 타깃 설정 (`UNITY_SERVER` 심볼 등록)
-- [ ] 서버 전용 컴포넌트 스트립 (`#if !UNITY_SERVER` 로 렌더링·오디오·Cinemachine 제외)
-- [ ] 서버 시작 시 자동으로 Relay Allocation → 코드 콘솔 출력
-- [ ] 서버 실행 배치 파일 작성 (클릭 한 번으로 서버 시작)
-- [ ] 서버 로그 파일 출력 (`Application.logMessageReceived` → txt 저장)
 - [ ] `Assets/Scripts/Core/SaveManager.cs` 신규 구현 — `ICoreFacade.SaveSettings/LoadSettings`(설정값 PlayerPrefs)와는 별도로 골드/영구 업그레이드 레벨/누적 통계를 저장하는 책임 분리
   - 저장 포맷: JSON(Newtonsoft Json, §7 필수 패키지에 이미 포함) 로컬 파일, `Application.persistentDataPath` 사용
   - 저장 항목: Phase 7.6 `MetaProgressionState`(세션 메모리)와 동일한 구조 — 총 보유 골드, 영구 업그레이드 13종 각 레벨, 누적 통계(총 플레이 횟수·최고 생존시간·총 킬수 등, 범위는 기획 확정 필요)
   - 로드 실패/파일 없음 시 기본값으로 안전 초기화 (RULES.md 예외 처리 규칙)
   - `UNITY_SERVER` 빌드에서 클라이언트 전용 저장 로직이 서버 프로세스에 끼어들지 않는지 확인 (`#if !UNITY_SERVER` 등)
+- [ ] Windows Server Build 타깃 설정 (`UNITY_SERVER` 심볼 등록)
+- [ ] 서버 전용 컴포넌트 스트립 (`#if !UNITY_SERVER` 로 렌더링·오디오·Cinemachine 제외)
+- [ ] 서버 시작 시 자동으로 Relay Allocation → 코드 콘솔 출력
+- [ ] 서버 실행 배치 파일 작성 (클릭 한 번으로 서버 시작)
+- [ ] 서버 로그 파일 출력 (`Application.logMessageReceived` → txt 저장)
 - [ ] LAN 직접 IP 접속 지원 (같은 네트워크면 Relay 없이 연결)
 - [ ] 4인 원격 플레이 안정성 테스트 (30분 생존 스테이지 기준 크래시 없음)
 - [ ] 서버 치트 방지 기초 (속도 검증, 데미지 서버 내부 계산 재확인)

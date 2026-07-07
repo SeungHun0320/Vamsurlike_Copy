@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using TMPro;
+using TMPro.EditorUtilities;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
@@ -253,22 +254,27 @@ public static class BuildSettingsUI
         lt.text = label; lt.fontSize = 28; lt.color = LabelColor;
         lt.alignment = TextAlignmentOptions.MidlineLeft;
 
-        var ddGO = CreateGO("Dropdown", rowGO.transform);
+        // TMP_DefaultControls로 생성 — Template(Viewport/Content/Item) 전체가 정상 배선된
+        // 완전한 TMP_Dropdown을 만든다. 직접 AddComponent<TMP_Dropdown>()만 하면 template이 없어
+        // 클릭해도 목록이 열리지 않는다(선택 불가 버그의 원인).
+        var ddResources = new TMP_DefaultControls.Resources();
+        GameObject ddGO = TMP_DefaultControls.CreateDropdown(ddResources);
+        ddGO.name = "Dropdown";
+        ddGO.transform.SetParent(rowGO.transform, false);
+
         var ddr = ddGO.GetComponent<RectTransform>();
         ddr.anchorMin = new Vector2(0f, 0f); ddr.anchorMax = Vector2.one;
         ddr.offsetMin = new Vector2(LabelW + 10f, 4f);
         ddr.offsetMax = new Vector2(0f, -4f);
-        AddImage(ddGO, new Color(0.18f, 0.2f, 0.28f, 1f));
 
-        var labelGO = CreateGO("Label", ddGO.transform);
-        SetStretch(labelGO);
-        var labelTMP = labelGO.AddComponent<TextMeshProUGUI>();
-        labelTMP.fontSize = 26; labelTMP.color = Color.white;
-        labelTMP.alignment = TextAlignmentOptions.MidlineLeft;
-        labelTMP.margin = new Vector4(10, 0, 10, 0);
+        if (ddGO.TryGetComponent<Image>(out var ddBg))
+            ddBg.color = new Color(0.18f, 0.2f, 0.28f, 1f);
 
-        var dd = ddGO.AddComponent<TMP_Dropdown>();
-        dd.captionText = labelTMP;
+        var dd = ddGO.GetComponent<TMP_Dropdown>();
+        dd.captionText.fontSize = 26;
+        dd.captionText.color = Color.white;
+        dd.captionText.alignment = TextAlignmentOptions.MidlineLeft;
+        dd.itemText.fontSize = 24;
         dd.options = new List<TMP_Dropdown.OptionData> { new("--") };
 
         return dd;

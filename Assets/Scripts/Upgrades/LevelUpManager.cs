@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using Vamsurlike.Audio;
 using Vamsurlike.Player;
 using Vamsurlike.Skills;
 using Vamsurlike.Stage;
@@ -23,6 +24,7 @@ namespace Vamsurlike.Upgrades
         private readonly Dictionary<ulong, Queue<QueuedLevelUpOptions>> deferredPlayerOptions = new();
         private bool isResolvingDeferredOptions;
         [SerializeField, Min(0f)] private float selectionTimeoutSeconds = 20f;
+        [SerializeField] private SFXSpawnEventSO sfxSpawnEvent;
 
         // 클라이언트 이벤트: 이 클라이언트에 옵션이 도착했을 때 (optionIndices, currentLevels)
         public static event Action<int[], int[]> OnOptionsReceived;
@@ -459,6 +461,13 @@ namespace Vamsurlike.Upgrades
         {
             OnLevelUpCompleted?.Invoke(); // 임시 경유지 (Phase 8 마이그레이션 완료 후 제거)
             UIEventHub.Instance?.Reward.PublishLevelUpCompleted();
+
+            // 전원에게 동시에 브로드캐스트되는 UI성 이벤트라 위치 의미가 없음 — 각자 자기 위치에서 재생해
+            // 3D 감쇠로 안 들리는 상황을 피한다.
+            Vector3 localPos = NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClient.PlayerObject != null
+                ? NetworkManager.Singleton.LocalClient.PlayerObject.transform.position
+                : transform.position;
+            sfxSpawnEvent?.Raise(new SFXCue(SFXCueIds.LevelUp, localPos));
         }
     }
 }

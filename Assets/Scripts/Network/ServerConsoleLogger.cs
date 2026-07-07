@@ -7,7 +7,9 @@ namespace Vamsurlike.Network
     /// <summary>
     /// 데디케이티드 서버 전용 콘솔 로거.
     /// UNITY_SERVER 빌드 또는 -server 인자로 실행 시 자동 활성화.
-    /// Unity 로그를 그대로 stdout으로 중계하고, 서버 이벤트(접속/해제/상태 변화)를 구조화된 형식으로 출력한다.
+    /// Unity의 전체 Debug.Log를 그대로 중계하지 않는다 — 서버 검증/이벤트(접속·해제, 픽업 승인/거부 등
+    /// 명시적으로 Log/LogThrottled를 호출한 것)만 구조화된 형식으로 stdout + 로그 UI에 출력한다.
+    /// (다른 모든 Debug.Log는 각 프로세스의 일반 콘솔에는 여전히 찍히지만, 이 로거의 버퍼/UI에는 안 뜬다.)
     /// </summary>
     public class ServerConsoleLogger : MonoBehaviour
     {
@@ -27,8 +29,6 @@ namespace Vamsurlike.Network
                 return;
             }
 
-            Application.logMessageReceived += ForwardUnityLog;
-
             if (GameNetworkManager.Instance != null)
             {
                 GameNetworkManager.Instance.OnClientConnected    += OnClientConnected;
@@ -40,8 +40,6 @@ namespace Vamsurlike.Network
 
         private void OnDestroy()
         {
-            Application.logMessageReceived -= ForwardUnityLog;
-
             if (GameNetworkManager.Instance != null)
             {
                 GameNetworkManager.Instance.OnClientConnected    -= OnClientConnected;
@@ -61,23 +59,6 @@ namespace Vamsurlike.Network
             int total = GameNetworkManager.Instance != null
                 ? GameNetworkManager.Instance.ConnectedPlayerCount : 0;
             Log($"Client {clientId} 해제. 현재 {total}명");
-        }
-
-        // Unity 로그를 stdout으로 중계 (logType별 색상 없이 순수 텍스트)
-        private static void ForwardUnityLog(string message, string stackTrace, LogType type)
-        {
-            string tag = type switch {
-                LogType.Error     => "[ERROR]",
-                LogType.Exception => "[EXCEPTION]",
-                LogType.Warning   => "[WARN]",
-                _                 => "[LOG]"
-            };
-            string entry = $"{DateTime.Now:HH:mm:ss} {tag} {message}";
-            Console.WriteLine($"{Prefix} {entry}");
-            Publish(entry);
-
-            if (type is LogType.Exception or LogType.Error && !string.IsNullOrEmpty(stackTrace))
-                Console.WriteLine(stackTrace);
         }
 
         public static void Log(string message)

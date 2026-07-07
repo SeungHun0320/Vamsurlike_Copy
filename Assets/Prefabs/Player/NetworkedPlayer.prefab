@@ -653,9 +653,7 @@ MonoBehaviour:
   projectileSpawnPoint: {fileID: 0}
   spawnForwardOffset: 0.8
   failedCastRetryDelay: 0.1
-  gaugeRequired: 100
-  gaugePerDamage: 1
-  gaugePerKill: 25
+  sfxSpawnEvent: {fileID: 11400000, guid: 419db2de910dd3746a785a48b364dc6a, type: 2}
 --- !u!114 &7483216701945328601
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -1,5 +1,6 @@
 using UnityEngine;
 using Vamsurlike.Network;
+using Vamsurlike.VFX;
 
 namespace Vamsurlike.Skills
 {
@@ -30,6 +31,8 @@ namespace Vamsurlike.Skills
 
             if (lineMaterial != null)
                 lineRenderer.sharedMaterial = lineMaterial;
+            else if (lineRenderer.sharedMaterial == null)
+                lineRenderer.sharedMaterial = LineDefaultMaterial.Get();
         }
 
         public void Initialize(float radius, float lifeTime, Color color, Transform target = null, GameObject prefab = null)

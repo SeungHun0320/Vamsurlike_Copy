@@ -1,6 +1,7 @@
 using System;
 using Unity.Netcode;
 using UnityEngine;
+using Vamsurlike.Audio;
 using Vamsurlike.Data;
 using Vamsurlike.Enemy;
 using Vamsurlike.Network;
@@ -18,6 +19,7 @@ namespace Vamsurlike.Items
         [SerializeField] private ItemDataSO itemData;
         [SerializeField] private VFXSpawnEventSO vfxSpawnEvent;
         [SerializeField] private float pickupVFXDuration = 0.15f;
+        [SerializeField] private SFXSpawnEventSO sfxSpawnEvent;
         private GameObject sourcePrefab;
         private bool        wasPoolSpawned;
 
@@ -98,6 +100,7 @@ namespace Vamsurlike.Items
                 // 상자는 카드 선택 화면으로 전환되므로 흡수 이펙트가 거의 안 보임 — 생략
                 if (itemData.itemType != ItemType.Chest)
                     PlayPickupVFXClientRpc();
+                PlayPickupSfxClientRpc();
                 SendAcquisitionLog(clientId);
                 DespawnToPool();
             }
@@ -113,6 +116,15 @@ namespace Vamsurlike.Items
         {
             vfxSpawnEvent?.Raise(new VFXCue(
                 VFXCueIds.PickupAbsorb, transform.position, Vector3.up, 1f, pickupVFXDuration, Color.white));
+        }
+
+        [ClientRpc]
+        private void PlayPickupSfxClientRpc()
+        {
+            int cueId = itemData != null && itemData.itemType == ItemType.Chest
+                ? SFXCueIds.ChestOpen
+                : SFXCueIds.ItemPickup;
+            sfxSpawnEvent?.Raise(new SFXCue(cueId, transform.position));
         }
 
         // 획득 로그는 주운 본인에게만 표시 — 4인 co-op에서 전원에게 브로드캐스트하면 스팸이 됨
