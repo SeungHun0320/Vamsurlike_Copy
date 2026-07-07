@@ -21,23 +21,24 @@ namespace Vamsurlike.Skills
             Vector3 center = target != null
                 ? target.transform.position
                 : context.CasterTransform.position + direction * (data.range * 0.5f);
-            float pullRadius = data.areaRadius > 0f ? data.areaRadius : data.range;
+            // 범위/유지시간 패시브 반영 (Phase 7.5 — 오라/오비탈과 동일 규칙)
+            float pullRadius = (data.areaRadius > 0f ? data.areaRadius : data.range) * context.AreaMultiplier;
+            float duration   = data.duration * context.DurationMultiplier;
 
-            context.VFX?.ShowBlackHole(center, data.duration, pullRadius);
+            context.VFX?.ShowBlackHole(center, duration, pullRadius);
             context.CoroutineRunner.StartSkillCoroutine(
-                RunBlackHole(center, data, context.FinalDamage, context.OwnerClientId, context.Skill.name));
+                RunBlackHole(center, data, context.FinalDamage, context.OwnerClientId, context.Skill.name, pullRadius, duration));
 
             return true;
         }
 
-        private static IEnumerator RunBlackHole(Vector3 center, SkillLevelData d, float damage, ulong ownerClientId, string skillTag)
+        private static IEnumerator RunBlackHole(Vector3 center, SkillLevelData d, float damage, ulong ownerClientId, string skillTag, float pullRadius, float duration)
         {
             var   targets    = new List<EnemyNetworkBase>();
             float elapsed    = 0f;
             float tickTimer  = 0f;
-            float pullRadius = d.areaRadius > 0f ? d.areaRadius : d.range;
 
-            while (elapsed < d.duration)
+            while (elapsed < duration)
             {
                 float dt = Time.deltaTime;
                 elapsed   += dt;

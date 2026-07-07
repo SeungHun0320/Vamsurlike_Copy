@@ -44,9 +44,9 @@ namespace Vamsurlike.Skills
             if (obj == null) return false;
 
             NetworkProjectile proj = null;
-            int orbitalCount = Mathf.Max(1, data.orbitalCount);
-            float orbitalRadius = Mathf.Max(0.1f, data.orbitalRadius);
-            float orbitalHitRadius = Mathf.Max(0.05f, data.orbitalHitRadius);
+            int orbitalCount = Mathf.Max(1, data.orbitalCount + context.BonusProjectileCount);
+            float orbitalRadius = Mathf.Max(0.1f, data.orbitalRadius * context.AreaMultiplier);
+            float orbitalHitRadius = Mathf.Max(0.05f, data.orbitalHitRadius * context.AreaMultiplier);
             float orbitalDamage = context.FinalDamage * Mathf.Max(0f, data.orbitalDamageMultiplier);
 
             if (obj.TryGetComponent(out proj))

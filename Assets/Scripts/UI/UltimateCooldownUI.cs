@@ -51,7 +51,7 @@ namespace Vamsurlike.UI
             {
                 string next = p.IsReady
                     ? keyHint
-                    : Mathf.FloorToInt(p.Duration - p.Remaining).ToString();
+                    : Mathf.CeilToInt(p.Remaining).ToString();
                 if (next != lastText)
                 {
                     lastText = next;

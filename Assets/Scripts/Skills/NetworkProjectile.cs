@@ -101,7 +101,7 @@ namespace Vamsurlike.Skills
             PierceRemaining = Mathf.Max(0, levelData.pierceCount);
             hasInitialized = true;
 
-            transform.localScale = Vector3.one;
+            transform.localScale = projectilePrefab != null ? projectilePrefab.transform.localScale : Vector3.one;
             transform.position = spawnPosition;
             transform.rotation = GetProjectileRotation(Direction);
             SetProjectileRenderersVisible(true);
@@ -180,7 +180,7 @@ namespace Vamsurlike.Skills
             activeMode?.Exit();
 
             hasInitialized = false;
-            transform.localScale = Vector3.one;
+            transform.localScale = sourcePrefab != null ? sourcePrefab.transform.localScale : Vector3.one;
             normalMode?.Reset();
 
             if (NetworkObject != null && NetworkObject.IsSpawned)

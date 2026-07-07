@@ -20,9 +20,8 @@ namespace Vamsurlike.Skills
                 || context.CasterTransform == null || context.CoroutineRunner == null)
                 return false;
 
-            Vector3 dir = ResolveDirection(
-                context.CasterTransform.position, context.LevelData.range,
-                context.CasterForward, out var target);
+            Vector3 dir = AutoTargeting.ResolveDirection(
+                context, context.CasterTransform.position, context.CasterForward, out var target);
             return Execute(context, dir, target);
         }
 
@@ -39,15 +38,5 @@ namespace Vamsurlike.Skills
         // SkillManager 보유 목록에서 제거될 때 호출 — 지속 비주얼 정리용 (기본 no-op)
         public virtual void OnSkillRemoved(SkillCastType castType) { }
 
-        // 가장 가까운 적 방향 반환. 없으면 fallback(CasterForward).
-        private static Vector3 ResolveDirection(
-            Vector3 from, float range, Vector3 fallback, out EnemyNetworkBase target)
-        {
-            target = AutoTargeting.FindNearestEnemy(from, range);
-            if (target == null) return fallback;
-            Vector3 dir = target.transform.position - from;
-            dir.y = 0f;
-            return dir.sqrMagnitude > 0.0001f ? dir.normalized : fallback;
-        }
     }
 }

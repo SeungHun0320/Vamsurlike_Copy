@@ -30,6 +30,8 @@ namespace Vamsurlike.Skills
                 context.OwnerClientId,
                 context.Skill.name,
                 context.CoroutineRunner,
+                context.AreaMultiplier,
+                context.BonusProjectileCount,
                 context.VFX));
             return true;
         }
@@ -41,12 +43,20 @@ namespace Vamsurlike.Skills
             ulong ownerClientId,
             string skillTag,
             ISkillCoroutineRunner coroutineRunner,
+            float areaMultiplier,
+            int bonusProjectileCount,
             ISkillVFXBroadcaster vfx)
         {
-            Vector3 target = PickRandomTarget(origin, levelData.grenadeRange);
+            float grenadeRange = levelData.grenadeRange * areaMultiplier;
+            float splashRadius = levelData.splashRadius * areaMultiplier;
+            float clusterSpread = levelData.clusterSpread * areaMultiplier;
+            float clusterSplashRadius = levelData.clusterSplashRadius * areaMultiplier;
+            int clusterCount = Mathf.Max(0, levelData.clusterCount + bonusProjectileCount);
+
+            Vector3 target = PickRandomTarget(origin, grenadeRange);
 
             Vector3 spawnPos = origin + Vector3.up * SpawnHeightOffset;
-            vfx?.ShowGrenadeImpactCircle(target, levelData.splashRadius, FlightTime);
+            vfx?.ShowGrenadeImpactCircle(target, splashRadius, FlightTime);
             vfx?.ShowGrenade(spawnPos, target, levelData.grenadeArcHeight, FlightTime);
 
             float elapsed = 0f;
@@ -58,21 +68,21 @@ namespace Vamsurlike.Skills
 
             // 중심 스플래시 (메인 데미지의 절반)
             float mainDamage = finalDamage * (1f - levelData.clusterDamageRatio);
-            SkillAreaDamage.ApplySplash(target, levelData.splashRadius, mainDamage, ownerClientId, skillTag);
+            SkillAreaDamage.ApplySplash(target, splashRadius, mainDamage, ownerClientId, skillTag);
 
             // 서브 그레네이드 분열
             float subDamage = finalDamage * levelData.clusterDamageRatio;
-            for (int i = 0; i < levelData.clusterCount; i++)
+            for (int i = 0; i < clusterCount; i++)
             {
-                Vector3 subTarget = PickRandomTarget(target, levelData.clusterSpread);
-                vfx?.ShowGrenadeImpactCircle(subTarget, levelData.clusterSplashRadius, SubFlightTime);
+                Vector3 subTarget = PickRandomTarget(target, clusterSpread);
+                vfx?.ShowGrenadeImpactCircle(subTarget, clusterSplashRadius, SubFlightTime);
                 vfx?.ShowGrenade(
                     target,
                     subTarget,
                     levelData.grenadeArcHeight * 0.4f,
                     SubFlightTime);
                 coroutineRunner.StartSkillCoroutine(
-                    SubGrenadeCoroutine(subTarget, levelData.clusterSplashRadius, subDamage, ownerClientId, skillTag));
+                    SubGrenadeCoroutine(subTarget, clusterSplashRadius, subDamage, ownerClientId, skillTag));
             }
         }
 

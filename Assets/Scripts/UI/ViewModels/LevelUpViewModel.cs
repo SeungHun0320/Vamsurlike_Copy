@@ -73,6 +73,22 @@ namespace Vamsurlike.UI.ViewModels
                     return playerStats != null ? playerStats.PickupRadius.Value : -1f;
                 case UpgradeEffectType.PassiveAttackPower:
                     return statHandler != null ? statHandler.AttackMultiplier.Value : -1f;
+                case UpgradeEffectType.PassiveDefense:
+                    return playerStats != null ? playerStats.Defense.Value : -1f;
+                case UpgradeEffectType.PassiveHealthRegen:
+                    return playerStats != null ? playerStats.HealthRegenPerSecond.Value : -1f;
+                case UpgradeEffectType.PassiveAreaSize:
+                    return statHandler != null ? statHandler.AreaMultiplier.Value : -1f;
+                case UpgradeEffectType.PassiveDuration:
+                    return statHandler != null ? statHandler.DurationMultiplier.Value : -1f;
+                case UpgradeEffectType.PassiveXPGain:
+                    return statHandler != null ? statHandler.XPMultiplier.Value : -1f;
+                case UpgradeEffectType.PassiveCritChance:
+                    return statHandler != null ? statHandler.CritChance.Value : -1f;
+                case UpgradeEffectType.PassiveSkillHaste:
+                    return statHandler != null ? statHandler.SkillHaste.Value : -1f;
+                case UpgradeEffectType.PassiveProjectileCount:
+                    return statHandler != null ? statHandler.BonusProjectileCount : -1f;
                 default:
                     return -1f;
             }

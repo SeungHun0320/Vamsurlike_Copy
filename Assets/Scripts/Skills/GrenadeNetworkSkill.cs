@@ -32,6 +32,7 @@ namespace Vamsurlike.Skills
                 context.FinalDamage,
                 context.OwnerClientId,
                 context.Skill.name,
+                context.AreaMultiplier,
                 context.VFX));
             return true;
         }
@@ -42,6 +43,7 @@ namespace Vamsurlike.Skills
             float finalDamage,
             ulong ownerClientId,
             string skillTag,
+            float areaMultiplier,
             ISkillVFXBroadcaster vfx)
         {
             double rx = rng.NextDouble() * 2.0 - 1.0;
@@ -49,11 +51,12 @@ namespace Vamsurlike.Skills
             double len = System.Math.Sqrt(rx * rx + rz * rz);
             if (len > 0.0001) { rx /= len; rz /= len; }
 
-            float range = (float)(rng.NextDouble() * levelData.grenadeRange);
+            float range = (float)(rng.NextDouble() * levelData.grenadeRange * areaMultiplier);
             Vector3 target = origin + new Vector3((float)rx * range, 0f, (float)rz * range);
+            float splashRadius = levelData.splashRadius * areaMultiplier;
 
             Vector3 spawnPos = origin + Vector3.up * SpawnHeightOffset;
-            vfx?.ShowGrenadeImpactCircle(target, levelData.splashRadius, FlightTime);
+            vfx?.ShowGrenadeImpactCircle(target, splashRadius, FlightTime);
             vfx?.ShowGrenade(spawnPos, target, levelData.grenadeArcHeight, FlightTime);
 
             float elapsed = 0f;
@@ -63,7 +66,7 @@ namespace Vamsurlike.Skills
                 yield return null;
             }
 
-            SkillAreaDamage.ApplySplash(target, levelData.splashRadius, finalDamage, ownerClientId, skillTag);
+            SkillAreaDamage.ApplySplash(target, splashRadius, finalDamage, ownerClientId, skillTag);
         }
     }
 }

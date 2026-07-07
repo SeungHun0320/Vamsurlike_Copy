@@ -20,13 +20,14 @@ namespace Vamsurlike.Skills
                 return false;
 
             Vector3 origin  = context.CasterTransform.position;
-            Vector3 forward = ResolveForward(origin, levelData.meleeRange, context.CasterForward);
+            float   range   = AutoTargeting.ResolveTargetingRange(context);
+            Vector3 forward = AutoTargeting.ResolveDirection(context, origin, context.CasterForward, out _);
 
             float halfArc = levelData.meleeArcAngle * 0.5f;
             float damage = context.FinalDamage;
             int count = 0;
 
-            var cols = Physics.OverlapSphere(origin, levelData.meleeRange);
+            var cols = Physics.OverlapSphere(origin, range);
             foreach (var col in cols)
             {
                 if (!col.TryGetComponent<EnemyNetworkBase>(out var enemy)) continue;
@@ -40,19 +41,9 @@ namespace Vamsurlike.Skills
                 count++;
             }
 
-            context.VFX?.ShowMelee(origin, forward, levelData.meleeRange, levelData.meleeArcAngle);
+            context.VFX?.ShowMelee(origin, forward, range, levelData.meleeArcAngle);
             return true;
         }
 
-        // 범위 내 가장 가까운 적 방향 반환. 없으면 fallback.
-        private static Vector3 ResolveForward(Vector3 origin, float range, Vector3 fallback)
-        {
-            var nearest = AutoTargeting.FindNearestEnemy(origin, range);
-            if (nearest == null) return fallback;
-
-            Vector3 dir = nearest.transform.position - origin;
-            dir.y = 0f;
-            return dir.sqrMagnitude > MinToEnemySqrMagnitude ? dir.normalized : fallback;
-        }
     }
 }

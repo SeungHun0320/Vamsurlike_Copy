@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -13,6 +14,7 @@ namespace Vamsurlike.UI
     // 그리드 카드만 데이터 개수만큼 cardPrefab을 Instantiate한다 (다른 Row 프리팹들과 동일한 패턴).
     public class PermanentUpgradeShopUI : MonoBehaviour
     {
+        public event Action Closed;
         [Header("Debug Hotkeys")]
         [SerializeField] private bool enableDebugHotkeys = true;
         [SerializeField] private Key debugGrantGoldKey = Key.F9;
@@ -52,8 +54,16 @@ namespace Vamsurlike.UI
             if (detailBuyButton != null) detailBuyButton.onClick.AddListener(OnBuyClicked);
         }
 
-        public void OpenPanel() => gameObject.SetActive(true);
-        private void ClosePanel() => gameObject.SetActive(false);
+        public void OpenPanel()
+        {
+            gameObject.SetActive(true);
+            viewModel?.Refresh();
+        }
+        private void ClosePanel()
+        {
+            gameObject.SetActive(false);
+            Closed?.Invoke();
+        }
 
         private void OnEnable()
         {
@@ -96,7 +106,7 @@ namespace Vamsurlike.UI
 
         private void Refresh()
         {
-            if (goldText != null) goldText.text = $"{viewModel.Gold}G";
+            if (goldText != null) goldText.text = $"보유 골드: {viewModel.Gold}G";
 
             IReadOnlyList<PermanentUpgradeShopRow> rows = viewModel.Rows;
             while (cards.Count < rows.Count)

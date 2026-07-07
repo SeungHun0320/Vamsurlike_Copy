@@ -43,10 +43,6 @@ namespace Vamsurlike.Skills
         [SerializeField] private float spawnForwardOffset = 0.8f;
         [SerializeField] private float failedCastRetryDelay = 0.1f;
 
-        [Header("Ultimate Gauge")]
-        [SerializeField] private float gaugeRequired  = 100f;
-        [SerializeField] private float gaugePerDamage = 1f;
-        [SerializeField] private float gaugePerKill   = 25f;
 
         private PassiveStatHandler      passiveStatHandler;
         private PlayerNetworkStats      playerStats;
@@ -60,15 +56,12 @@ namespace Vamsurlike.Skills
 
         private float nextMissingExecutorLogTime;
 
-        // Owner 전용 — 궁극기 게이지 동기화 (UI 표시용, ManualSkillAdapter가 읽음)
+        // Owner 전용 수동 스킬 쿨다운 동기화 (UI 표시용, ManualSkillAdapter가 읽음)
         public readonly NetworkVariable<float> ManualCooldownRemaining = new(
             0f, NetworkVariableReadPermission.Owner, NetworkVariableWritePermission.Server);
         public readonly NetworkVariable<float> ManualCooldownDuration = new(
             DefaultManualCooldown, NetworkVariableReadPermission.Owner, NetworkVariableWritePermission.Server);
 
-        // 서버 → Owner: 현재 게이지 (0 ~ gaugeRequired)
-        public readonly NetworkVariable<float> UltimateGaugeAmount = new(
-            0f, NetworkVariableReadPermission.Owner, NetworkVariableWritePermission.Server);
 
         public static event Action<string[], int[]> OnSkillsSynced;
 
@@ -122,9 +115,7 @@ namespace Vamsurlike.Skills
                 ? passiveStatHandler.DurationMultiplier.Value
                 : 1f;
             // §7.5 스킬 가속 공식: 쿨다운 = 기본 쿨다운 / (1 + 가속/100)
-            float cooldownMultiplier = passiveStatHandler != null
-                ? 1f / (1f + passiveStatHandler.SkillHaste.Value / 100f)
-                : 1f;
+            float cooldownMultiplier = GetCooldownMultiplier();
 
             executionScheduler.Tick(
                 skillInventory.Skills,
@@ -140,49 +131,42 @@ namespace Vamsurlike.Skills
             SyncManualCooldown();
         }
 
+        private float GetCooldownMultiplier()
+        {
+            return passiveStatHandler != null
+                ? 1f / (1f + passiveStatHandler.SkillHaste.Value / 100f)
+                : 1f;
+        }
+
         private void SyncManualCooldown()
         {
             IReadOnlyList<SkillRuntimeState> skills = skillInventory.Skills;
             for (int i = 0; i < skills.Count; i++)
             {
-                if (skills[i].Skill == null || !skills[i].Skill.isManual) continue;
-                ManualCooldownRemaining.Value = Mathf.Max(0f, gaugeRequired - UltimateGaugeAmount.Value);
-                ManualCooldownDuration.Value  = gaugeRequired;
+                SkillRuntimeState owned = skills[i];
+                if (owned.Skill == null || !owned.Skill.isManual) continue;
+
+                SkillLevelData levelData = owned.Skill.GetLevelData(owned.Level);
+                float duration = levelData != null
+                    ? levelData.cooldown * GetCooldownMultiplier()
+                    : DefaultManualCooldown;
+
+                ManualCooldownRemaining.Value = Mathf.Max(0f, owned.CooldownTimer);
+                ManualCooldownDuration.Value = Mathf.Max(0.01f, duration);
                 return;
             }
+
             ManualCooldownRemaining.Value = 0f;
+            ManualCooldownDuration.Value = DefaultManualCooldown;
         }
 
-        // EnemyNetworkBase에서 데미지 발생 시 호출 (서버 전용)
         public void AddUltimateGaugeForDamage(float rawDamage)
         {
-            if (!IsServer) return;
-            AddGaugeInternal(rawDamage * gaugePerDamage);
         }
 
-        // EnemyNetworkBase에서 킬 발생 시 호출 (서버 전용)
         public void AddUltimateGaugeForKill()
         {
-            if (!IsServer) return;
-            AddGaugeInternal(gaugePerKill);
         }
-
-        private void AddGaugeInternal(float amount)
-        {
-            if (!HasManualSkill()) return;
-            float next = Mathf.Clamp(UltimateGaugeAmount.Value + amount, 0f, gaugeRequired);
-            if (Mathf.Approximately(UltimateGaugeAmount.Value, next)) return;
-            UltimateGaugeAmount.Value = next;
-        }
-
-        private bool HasManualSkill()
-        {
-            IReadOnlyList<SkillRuntimeState> skills = skillInventory.Skills;
-            for (int i = 0; i < skills.Count; i++)
-                if (skills[i].Skill != null && skills[i].Skill.isManual) return true;
-            return false;
-        }
-
         public bool LearnSkill(SkillDataSO skill)
         {
             if (!IsServer || skill == null) return false;
@@ -245,13 +229,7 @@ namespace Vamsurlike.Skills
             if (GameFlowCoordinator.Instance == null
                 || !GameFlowCoordinator.Instance.IsGameplayActive)
             {
-                Debug.LogWarning($"[ActivateFirstManualSkillServerRpc] FAIL — 전투 진행 상태가 아님.");
-                return;
-            }
-
-            if (UltimateGaugeAmount.Value < gaugeRequired)
-            {
-                Debug.LogWarning($"[ActivateFirstManualSkillServerRpc] FAIL — 게이지 부족 (current={UltimateGaugeAmount.Value:F1}, required={gaugeRequired:F1}, owner={OwnerClientId})");
+                Debug.LogWarning($"[ActivateFirstManualSkillServerRpc] FAIL - gameplay is not active.");
                 return;
             }
 
@@ -261,11 +239,23 @@ namespace Vamsurlike.Skills
                 SkillRuntimeState owned = skills[i];
                 if (owned.Skill == null || !owned.Skill.isManual) continue;
 
+                if (owned.CooldownTimer > 0f)
+                {
+                    Debug.LogWarning($"[ActivateFirstManualSkillServerRpc] FAIL - cooldown remaining={owned.CooldownTimer:F1}, owner={OwnerClientId}");
+                    return;
+                }
+
                 SkillLevelData levelData = owned.Skill.GetLevelData(owned.Level);
                 if (TryCast(owned, levelData))
-                    UltimateGaugeAmount.Value = 0f;
+                {
+                    owned.CooldownTimer = levelData != null
+                        ? levelData.cooldown * GetCooldownMultiplier()
+                        : DefaultManualCooldown;
+                }
                 else
+                {
                     owned.CooldownTimer = failedCastRetryDelay;
+                }
                 return;
             }
         }
@@ -330,6 +320,9 @@ namespace Vamsurlike.Skills
             int bonusProjectileCount = passiveStatHandler != null
                 ? passiveStatHandler.BonusProjectileCount
                 : 0;
+            float durationMultiplier = passiveStatHandler != null
+                ? passiveStatHandler.DurationMultiplier.Value
+                : 1f;
             float baseSpeed = characterData != null ? characterData.baseMoveSpeed : 1f;
             float currentSpeed = playerStats != null
                 ? playerStats.MoveSpeed.Value
@@ -356,7 +349,8 @@ namespace Vamsurlike.Skills
                 attackMultiplier,
                 speedMultiplier,
                 areaMultiplier,
-                bonusProjectileCount);
+                bonusProjectileCount,
+                durationMultiplier);
 
             return executor.TryExecute(context);
         }

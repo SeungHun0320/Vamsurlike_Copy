@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using Vamsurlike.Data;
 using Vamsurlike.Enemy;
 
 namespace Vamsurlike.Skills
@@ -39,6 +40,55 @@ namespace Vamsurlike.Skills
             return best;
         }
 
+
+        public static float ResolveTargetingRange(in SkillCastContext context)
+        {
+            if (context.LevelData == null) return 0f;
+
+            SkillLevelData data = context.LevelData;
+            float areaMultiplier = Mathf.Max(0f, context.AreaMultiplier);
+
+            return context.Skill != null
+                ? context.Skill.castType switch
+                {
+                    SkillCastType.AreaAura => ResolveAreaRange(data, areaMultiplier),
+                    SkillCastType.Orbital => data.orbitalRadius * areaMultiplier,
+                    SkillCastType.Grenade => data.grenadeRange * areaMultiplier,
+                    SkillCastType.Melee => data.meleeRange * areaMultiplier,
+                    SkillCastType.ClusterGrenade => data.grenadeRange * areaMultiplier,
+                    SkillCastType.BlackHole => ResolveAreaRange(data, areaMultiplier),
+                    _ => data.range,
+                }
+                : data.range;
+        }
+
+        private static float ResolveAreaRange(SkillLevelData data, float areaMultiplier)
+        {
+            float radius = data.areaRadius > 0f ? data.areaRadius : data.range;
+            return radius * areaMultiplier;
+        }
+
+        public static EnemyNetworkBase FindNearestEnemy(
+            in SkillCastContext context,
+            Vector3 origin,
+            HashSet<ulong> ignoredNetworkObjectIds = null)
+        {
+            return FindNearestEnemy(origin, ResolveTargetingRange(context), ignoredNetworkObjectIds);
+        }
+
+        public static Vector3 ResolveDirection(
+            in SkillCastContext context,
+            Vector3 origin,
+            Vector3 fallback,
+            out EnemyNetworkBase target)
+        {
+            target = FindNearestEnemy(context, origin);
+            if (target == null) return fallback;
+
+            Vector3 direction = target.transform.position - origin;
+            direction.y = 0f;
+            return direction.sqrMagnitude > 0.0001f ? direction.normalized : fallback;
+        }
         public static int FindEnemiesInRange(Vector3 origin, float range, List<EnemyNetworkBase> results)
         {
             if (results == null) return 0;

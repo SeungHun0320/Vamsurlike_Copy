@@ -106,7 +106,11 @@ namespace Vamsurlike.UI
             }
 
             if (shopPanel != null)
+            {
+                shopPanel.Closed -= OnShopClosed;
+                shopPanel.Closed += OnShopClosed;
                 shopPanel.gameObject.SetActive(false);
+            }
         }
 
         private static T FindSceneComponent<T>(string objectName) where T : Component
@@ -128,13 +132,22 @@ namespace Vamsurlike.UI
         private void OpenShop()
         {
             if (shopPanel == null) return;
+            if (shopButton != null)
+                shopButton.gameObject.SetActive(false);
             shopPanel.OpenPanel();
+        }
+
+        private void OnShopClosed()
+        {
+            if (isActiveAndEnabled && shopButton != null)
+                shopButton.gameObject.SetActive(true);
         }
 
         private void SetShopVisible(bool visible)
         {
+            bool showButton = visible && (shopPanel == null || !shopPanel.gameObject.activeSelf);
             if (shopButton != null)
-                shopButton.gameObject.SetActive(visible);
+                shopButton.gameObject.SetActive(showButton);
             if (!visible && shopPanel != null && shopPanel.gameObject.activeSelf)
                 shopPanel.gameObject.SetActive(false);
         }

@@ -79,6 +79,15 @@ namespace Vamsurlike.UI
                     return string.Format(attackPowerFormat, currentValue);
                 case UpgradeEffectType.PassivePickupRadius:
                     return string.Format(pickupRadiusFormat, currentValue);
+                case UpgradeEffectType.PassiveDefense:
+                case UpgradeEffectType.PassiveHealthRegen:
+                case UpgradeEffectType.PassiveAreaSize:
+                case UpgradeEffectType.PassiveDuration:
+                case UpgradeEffectType.PassiveXPGain:
+                case UpgradeEffectType.PassiveCritChance:
+                case UpgradeEffectType.PassiveSkillHaste:
+                case UpgradeEffectType.PassiveProjectileCount:
+                    return currentValue.ToString("0.##");
                 default:
                     return string.Empty;
             }
