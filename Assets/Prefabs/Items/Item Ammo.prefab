@@ -109,6 +109,7 @@ GameObject:
   - component: {fileID: 5576427484955112895}
   - component: {fileID: 1246096104984553711}
   - component: {fileID: 3116183710115492793}
+  - component: {fileID: 4078315679644716933}
   m_Layer: 0
   m_Name: Mesh Object
   m_TagString: Untagged
@@ -188,3 +189,19 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &4078315679644716933
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7726404944722560191}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 336ac23c5e01d9d4db6720ad9906f415, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Items.ItemPickupBobber
+  groundOffset: 0.75
+  bobAmplitude: 0.15
+  bobFrequency: 1.5
+  spinDegreesPerSecond: 90
