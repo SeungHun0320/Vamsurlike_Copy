@@ -161,6 +161,10 @@ public void TakeDamage(float amount)
 - **랜덤**: `Random.Range` 대신 시드 기반 `System.Random` 인스턴스 사용 (서버/클라 재현성 보장).
 - **물리 처리**: `CharacterController`, 중력, `Rigidbody` 관련 처리는 모두 `FixedUpdate` + `Time.fixedDeltaTime`. 입력 읽기는 `Update`.
 - **서버 권한 검증**: 데미지·드롭·스폰 등 게임 상태를 바꾸는 모든 메서드는 첫 줄에 `if (!IsServer) return;` 또는 `if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;` 삽입. 클라이언트가 직접 상태를 수정하지 않도록 강제.
+- **RPC payload와 로컬 이벤트 payload 분리**: NGO RPC에는 primitive, NGO 지원 타입, 또는 명시적 `INetworkSerializable` 타입만 싣는다. UI/VFX용 로컬 payload struct는 RPC에 그대로 재사용하지 말고 Adapter/Bridge에서 변환한다.
+- **VFX 풀링**: VFX, 데미지 텍스트, 텔레그래프는 런타임 반복 생성/파괴를 금지하고 Object Pool을 사용한다. One-shot은 재생 종료 후 풀로 반환하고, Loop VFX는 명시적 stop 이벤트 또는 소유자 despawn 시 반환한다.
+- **VFX/Shader 참조**: 런타임 `new Material()`과 반복 `Shader.Find()`를 금지한다. Material/Shader는 Inspector, CatalogSO, prefab에 미리 연결하고, 적 피격 플래시처럼 개별 값만 달라지는 효과는 `MaterialPropertyBlock`을 사용한다.
+- **Built-in RP 셰이더**: 현재 렌더 파이프라인은 Built-in RP 기준으로 작성한다. 공용 VFX 셰이더는 ShaderLab/HLSL `.shader` 파일로 관리하고, URP 전용 Shader Graph 또는 URP include에 의존하지 않는다.
 
 ```csharp
 // ✅ 서버 권한 검증 패턴

@@ -35,6 +35,8 @@ namespace Vamsurlike.UI
                 closeButton.onClick.AddListener(() => gameObject.SetActive(false));
         }
 
+        public void OpenPanel() => gameObject.SetActive(true);
+
         private void OnEnable()
         {
             if (SettingsManager.Instance == null) return;

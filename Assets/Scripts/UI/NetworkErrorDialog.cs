@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 using Vamsurlike.Core;
 using Vamsurlike.Network;
@@ -45,10 +46,16 @@ namespace Vamsurlike.UI
 
         private void Update()
         {
-            if (isSubscribed) return;
-            if (GameNetworkManager.Instance == null) return;
-            GameNetworkManager.Instance.OnUnexpectedDisconnect += OnUnexpectedDisconnect;
-            isSubscribed = true;
+            if (!isSubscribed && GameNetworkManager.Instance != null)
+            {
+                GameNetworkManager.Instance.OnUnexpectedDisconnect += OnUnexpectedDisconnect;
+                isSubscribed = true;
+            }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (Keyboard.current != null && Keyboard.current[Key.F8].wasPressedThisFrame)
+                Show(string.IsNullOrEmpty(defaultMessage) ? "(디버그) 서버 연결이 끊어졌습니다." : $"[F8 DEBUG]\n{defaultMessage}");
+#endif
         }
 
         private void Unsubscribe()

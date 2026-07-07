@@ -111,6 +111,9 @@ namespace Vamsurlike.UI.ViewModels
                 OnStatus?.Invoke(cfg.StartRequestMessage);
         }
 
+        // 씬 재진입 시 이미 연결된 상태를 즉시 반영 (이벤트가 재발생하지 않으므로 직접 호출)
+        public void Refresh() => PublishLobbyState();
+
         private void HandlePlayerCount(ulong _) => PublishLobbyState();
         private void HandleLobbyHost(ulong _)   => PublishLobbyState();
 

@@ -96,8 +96,16 @@ namespace Vamsurlike.UI
 
         private void OnMainMenuClicked()
         {
-            if (GameNetworkManager.Instance != null) GameNetworkManager.Instance.Disconnect();
-            if (SceneLoader.Instance != null)        SceneLoader.Instance.LoadSceneLocal(mainMenuScene);
+            if (GameNetworkManager.Instance != null && GameNetworkManager.Instance.IsListening)
+            {
+                // 서버가 모든 클라이언트를 로비로 복귀시킴 (연결 유지)
+                GameNetworkManager.Instance.RequestReturnToLobby();
+                return;
+            }
+
+            // 미연결 상태(에디터 단독 테스트 등) 폴백
+            if (SceneLoader.Instance != null)
+                SceneLoader.Instance.LoadSceneLocal(mainMenuScene);
         }
 
         private void ApplyStateImmediate(StageResultViewState state)

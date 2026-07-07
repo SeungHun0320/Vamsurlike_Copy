@@ -6,6 +6,7 @@ using Vamsurlike.Enemy;
 using Vamsurlike.Network;
 using Vamsurlike.Player;
 using Vamsurlike.Stage;
+using Vamsurlike.UI.Events;
 using Vamsurlike.VFX;
 
 namespace Vamsurlike.Items
@@ -97,6 +98,7 @@ namespace Vamsurlike.Items
                 // 상자는 카드 선택 화면으로 전환되므로 흡수 이펙트가 거의 안 보임 — 생략
                 if (itemData.itemType != ItemType.Chest)
                     PlayPickupVFXClientRpc();
+                SendAcquisitionLog(clientId);
                 DespawnToPool();
             }
             else
@@ -111,6 +113,32 @@ namespace Vamsurlike.Items
         {
             vfxSpawnEvent?.Raise(new VFXCue(
                 VFXCueIds.PickupAbsorb, transform.position, Vector3.up, 1f, pickupVFXDuration, Color.white));
+        }
+
+        // 획득 로그는 주운 본인에게만 표시 — 4인 co-op에서 전원에게 브로드캐스트하면 스팸이 됨
+        private void SendAcquisitionLog(ulong clientId)
+        {
+            NotifyAcquisitionLogClientRpc(new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { clientId } }
+            });
+        }
+
+        [ClientRpc]
+        private void NotifyAcquisitionLogClientRpc(ClientRpcParams rpcParams = default)
+        {
+            if (UIEventHub.Instance == null || itemData == null) return;
+
+            Color color = itemData.itemType switch
+            {
+                ItemType.HealthOrb => new Color(0.4f, 1f, 0.4f, 1f),
+                ItemType.Missile   => new Color(1f, 0.5f, 0.2f, 1f),
+                ItemType.Chest     => new Color(1f, 0.85f, 0.3f, 1f),
+                _                  => Color.white,
+            };
+
+            UIEventHub.Instance.Stage.PublishAcquisitionLog(new AcquisitionLogPayload(
+                $"{itemData.itemName} 획득", itemData.icon, color, 2.5f));
         }
 
         // 서버 → 요청 클라이언트: 픽업 거절 통보 (pendingPickupRequests 정리 용도)
