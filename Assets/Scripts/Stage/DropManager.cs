@@ -12,7 +12,15 @@ namespace Vamsurlike.Stage
         // 보이지 않도록 모든 드랍 타입에 공통으로 적용하는 스캐터 반경.
         private const float DropScatterRadius = 0.6f;
 
-        private readonly System.Random rng = new();
+        // RULES.md: 랜덤은 시드 기반 System.Random 인스턴스 사용 (서버 재현성 보장)
+        [SerializeField] private int randomSeed = 20240;
+
+        private System.Random rng;
+
+        private void Awake()
+        {
+            rng = new System.Random(randomSeed);
+        }
 
         public void OnEnemyDied(EnemyDataSO data, Vector3 position)
         {

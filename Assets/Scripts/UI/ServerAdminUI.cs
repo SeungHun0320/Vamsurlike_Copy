@@ -56,6 +56,13 @@ namespace Vamsurlike.UI
                 return;
             }
 
+            if (panel == null)
+            {
+                Debug.LogError($"[{nameof(ServerAdminUI)}] panel 참조가 없습니다.", this);
+                enabled = false;
+                return;
+            }
+
             // panel 외 Canvas의 모든 직접 자식 비활성화 (배경/타이틀 등 잔여 요소 제거)
             for (int i = 0; i < transform.childCount; i++)
             {

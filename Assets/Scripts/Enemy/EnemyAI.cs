@@ -29,6 +29,20 @@ namespace Vamsurlike.Enemy
             Agent = GetComponent<NavMeshAgent>();
             Base  = GetComponent<EnemyNetworkBase>();
             Anim  = GetComponentInChildren<Animator>();
+
+            if (Agent == null)
+            {
+                Debug.LogError($"[{nameof(EnemyAI)}] NavMeshAgent 컴포넌트를 찾을 수 없습니다.", this);
+                enabled = false;
+                return;
+            }
+            if (Base == null)
+            {
+                Debug.LogError($"[{nameof(EnemyAI)}] EnemyNetworkBase 컴포넌트를 찾을 수 없습니다.", this);
+                enabled = false;
+                return;
+            }
+
             // 클라이언트에서 NavMeshAgent가 활성화된 채로 남으면 NavMesh 오류 발생.
             // OnServerSpawned()에서 서버에서만 다시 켠다.
             Agent.enabled = false;

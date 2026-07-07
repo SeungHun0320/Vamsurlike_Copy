@@ -1,9 +1,10 @@
 using UnityEngine;
+using Vamsurlike.Network;
 
 namespace Vamsurlike.Skills
 {
     // 근접 공격 범위를 부채꼴(sector)로 바닥에 표시.
-    // SkillVFXController.ShowMeleeClientRpc에서 직접 생성한다.
+    // SkillVFXController.ShowMeleeClientRpc가 PoolManager를 거쳐 생성한다.
     [RequireComponent(typeof(LineRenderer))]
     public sealed class MeleeArcVFX : MonoBehaviour
     {
@@ -18,6 +19,9 @@ namespace Vamsurlike.Skills
         private LineRenderer lr;
         private float        duration;
         private float        elapsed;
+
+        // 풀에서 꺼내졌을 때만 채워짐 — 있으면 만료 시 Destroy 대신 풀로 반환한다.
+        private GameObject sourcePrefab;
 
         private void Awake()
         {
@@ -68,19 +72,46 @@ namespace Vamsurlike.Skills
             lr.endColor   = new Color(c.r, c.g, c.b, 0f);
 
             if (elapsed >= duration)
+                ReturnOrDestroySelf();
+        }
+
+        private void ReturnOrDestroySelf()
+        {
+            if (sourcePrefab != null)
+                PoolManager.ReturnOrDestroyGO(sourcePrefab, gameObject, nameof(MeleeArcVFX));
+            else
                 Destroy(gameObject);
         }
 
-
         // ── 스태틱 팩토리 ──────────────────────────────────────────
-        public static void Spawn(Vector3 origin, Vector3 flatForward, float range, float halfAngleDeg, float lifeTime)
+        // prefab이 있으면 PoolManager를 거쳐 꺼내고, 없으면(미배선 시) 직접 생성해 하위 호환한다.
+        public static void Spawn(GameObject prefab, Vector3 origin, Vector3 flatForward, float range, float halfAngleDeg, float lifeTime)
         {
-            var go = new GameObject("MeleeArcVFX");
-            go.transform.position = origin + Vector3.up * HeightOffset;
-            go.transform.rotation = Quaternion.LookRotation(flatForward, Vector3.up);
+            Vector3 position = origin + Vector3.up * HeightOffset;
+            Quaternion rotation = Quaternion.LookRotation(flatForward, Vector3.up);
 
-            go.AddComponent<LineRenderer>();
-            var vfx = go.AddComponent<MeleeArcVFX>();
+            GameObject go;
+            MeleeArcVFX vfx;
+            if (prefab != null)
+            {
+                go = PoolManager.GetOrInstantiateGO(prefab, position, rotation, nameof(MeleeArcVFX));
+                if (go == null) return;
+                if (!go.TryGetComponent(out vfx))
+                {
+                    Debug.LogWarning($"[{nameof(MeleeArcVFX)}] prefab에 MeleeArcVFX 컴포넌트가 없습니다. prefab={prefab.name}");
+                    PoolManager.ReturnOrDestroyGO(prefab, go, nameof(MeleeArcVFX));
+                    return;
+                }
+            }
+            else
+            {
+                go = new GameObject("MeleeArcVFX");
+                go.transform.SetPositionAndRotation(position, rotation);
+                go.AddComponent<LineRenderer>();
+                vfx = go.AddComponent<MeleeArcVFX>();
+            }
+
+            vfx.sourcePrefab = prefab;
             vfx.Initialize(range, halfAngleDeg, lifeTime);
         }
     }

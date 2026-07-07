@@ -30,27 +30,41 @@ namespace Vamsurlike.UI
 
         private void Awake()
         {
-            segments = segmentsContainer.GetComponentsInChildren<Image>(true);
+            if (segmentsContainer != null)
+                segments = segmentsContainer.GetComponentsInChildren<Image>(true);
         }
 
         public void Bind(PermanentUpgradeShopRow row, bool selected, Action<PermanentUpgradeType> onClick)
         {
-            background.color = selected ? CardSelectedColor : CardColor;
-            iconGlyph.text = PermanentUpgradeDisplay.GetIconGlyph(row.Type);
-            iconGlyph.color = PermanentUpgradeDisplay.GetIconColor(row.Type);
-            titleText.text = row.Name;
-            costText.text = row.IsMaxed ? "MAX" : $"{row.Cost}G";
-            costText.color = row.IsMaxed ? NextValueColor : (row.CanPurchase ? GoldColor : CostLockedColor);
-
-            for (int i = 0; i < segments.Length; i++)
+            if (background != null) background.color = selected ? CardSelectedColor : CardColor;
+            if (iconGlyph != null)
             {
-                bool exists = i < row.MaxLevel;
-                segments[i].gameObject.SetActive(exists);
-                if (exists) segments[i].color = i < row.Level ? SegmentFillColor : SegmentEmptyColor;
+                iconGlyph.text  = PermanentUpgradeDisplay.GetIconGlyph(row.Type);
+                iconGlyph.color = PermanentUpgradeDisplay.GetIconColor(row.Type);
+            }
+            if (titleText != null) titleText.text = row.Name;
+            if (costText != null)
+            {
+                costText.text  = row.IsMaxed ? "MAX" : $"{row.Cost}G";
+                costText.color = row.IsMaxed ? NextValueColor : (row.CanPurchase ? GoldColor : CostLockedColor);
             }
 
-            button.onClick.RemoveAllListeners();
-            button.onClick.AddListener(() => onClick(row.Type));
+            if (segments != null)
+            {
+                for (int i = 0; i < segments.Length; i++)
+                {
+                    if (segments[i] == null) continue;
+                    bool exists = i < row.MaxLevel;
+                    segments[i].gameObject.SetActive(exists);
+                    if (exists) segments[i].color = i < row.Level ? SegmentFillColor : SegmentEmptyColor;
+                }
+            }
+
+            if (button != null)
+            {
+                button.onClick.RemoveAllListeners();
+                button.onClick.AddListener(() => onClick?.Invoke(row.Type));
+            }
         }
     }
 }

@@ -674,8 +674,11 @@ MonoBehaviour:
   orbitalHeightOffset: 1
   meleeVisualForwardOffsetRatio: 0.5
   meleeVisualHeightOffset: 2.2
+  meleeArcPrefab: {fileID: 8239798426078445626, guid: d528e16e72ebd6b42b9212da6bd2430b, type: 3}
+  grenadeImpactCirclePrefab: {fileID: 8679059640687233061, guid: 99dcf1b85d6850c4987731f08188bfef, type: 3}
   vfxSpawnEvent: {fileID: 11400000, guid: e74307a1129b4948a03e4dbc39979768, type: 2}
   ultimateVFXDuration: 0.5
+  grenadeExplosionVFXDuration: 0.5
 --- !u!114 &3868694679171841
 MonoBehaviour:
   m_ObjectHideFlags: 0

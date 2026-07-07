@@ -26,6 +26,8 @@ namespace Vamsurlike.Skills
         [SerializeField] private float orbitalHeightOffset = 0.9f;
         [SerializeField] private float meleeVisualForwardOffsetRatio = 0.5f;
         [SerializeField] private float meleeVisualHeightOffset = 2.2f;
+        [SerializeField] private GameObject meleeArcPrefab;
+        [SerializeField] private GameObject grenadeImpactCirclePrefab;
 
         [Header("Ultimate VFX")]
         [SerializeField] private VFXSpawnEventSO vfxSpawnEvent;
@@ -141,10 +143,8 @@ namespace Vamsurlike.Skills
                     rotationSpeed,
                     i,
                     safeCount);
-                orbitalVisualObjects[i] = Instantiate(
-                    orbitalVisualPrefab,
-                    position,
-                    Quaternion.identity);
+                orbitalVisualObjects[i] = PoolManager.GetOrInstantiateGO(
+                    orbitalVisualPrefab, position, Quaternion.identity, nameof(SkillVFXController));
             }
         }
 
@@ -188,7 +188,7 @@ namespace Vamsurlike.Skills
             flatForward.Normalize();
 
             // 부채꼴 범위 표시
-            MeleeArcVFX.Spawn(position, flatForward, range, arcAngle * 0.5f, MeleeVisualDuration);
+            MeleeArcVFX.Spawn(meleeArcPrefab, position, flatForward, range, arcAngle * 0.5f, MeleeVisualDuration);
 
             // 망치 VFX
             if (!TryGetVFXPrefab(SkillCastType.Melee, out GameObject prefab)) return;
@@ -216,11 +216,27 @@ namespace Vamsurlike.Skills
         [ClientRpc]
         private void ShowGrenadeImpactCircleClientRpc(Vector3 center, float radius, float duration)
         {
-            var visual = new GameObject("GrenadeImpactTelegraph");
-            visual.transform.position = center + Vector3.up * TelegraphHeightOffset;
+            if (grenadeImpactCirclePrefab == null)
+            {
+                Debug.LogWarning($"[{nameof(SkillVFXController)}] grenadeImpactCirclePrefab이 없습니다.", this);
+                return;
+            }
 
-            AreaCircleVFX circle = visual.AddComponent<AreaCircleVFX>();
-            circle.Initialize(radius, duration, GrenadeImpactColor);
+            Vector3 position = center + Vector3.up * TelegraphHeightOffset;
+            GameObject visual = PoolManager.GetOrInstantiateGO(
+                grenadeImpactCirclePrefab, position, Quaternion.identity, nameof(SkillVFXController));
+            if (visual == null) return;
+
+            if (!visual.TryGetComponent(out AreaCircleVFX circle))
+            {
+                Debug.LogWarning(
+                    $"[{nameof(SkillVFXController)}] AreaCircleVFX 컴포넌트가 없습니다. prefab={grenadeImpactCirclePrefab.name}",
+                    this);
+                PoolManager.ReturnOrDestroyGO(grenadeImpactCirclePrefab, visual, nameof(SkillVFXController));
+                return;
+            }
+
+            circle.Initialize(radius, duration, GrenadeImpactColor, null, grenadeImpactCirclePrefab);
         }
 
         [ClientRpc]
@@ -349,17 +365,20 @@ namespace Vamsurlike.Skills
             if (duration <= 0f)
                 DestroyAreaCircleVFX(castType);
 
-            GameObject instance = Instantiate(prefab, position, Quaternion.identity);
+            GameObject instance = PoolManager.GetOrInstantiateGO(
+                prefab, position, Quaternion.identity, nameof(SkillVFXController));
+            if (instance == null) return;
+
             if (!instance.TryGetComponent(out AreaCircleVFX vfx))
             {
                 Debug.LogWarning(
                     $"[{nameof(SkillVFXController)}] AreaCircleVFX 컴포넌트가 없습니다. prefab={prefab.name}",
                     this);
-                Destroy(instance);
+                PoolManager.ReturnOrDestroyGO(prefab, instance, nameof(SkillVFXController));
                 return;
             }
 
-            vfx.Initialize(radius, duration, color, followTarget);
+            vfx.Initialize(radius, duration, color, followTarget, prefab);
             if (duration <= 0f)
                 areaCircleVfxByType[castType] = vfx;
         }
@@ -367,11 +386,8 @@ namespace Vamsurlike.Skills
         private void DestroyAllVisuals()
         {
             DestroyOrbitalVisuals();
-            foreach (KeyValuePair<SkillCastType, AreaCircleVFX> entry in areaCircleVfxByType)
-            {
-                if (entry.Value != null)
-                    Destroy(entry.Value.gameObject);
-            }
+            foreach (SkillCastType castType in new List<SkillCastType>(areaCircleVfxByType.Keys))
+                DestroyAreaCircleVFX(castType);
             areaCircleVfxByType.Clear();
         }
 
@@ -382,7 +398,7 @@ namespace Vamsurlike.Skills
             for (int i = 0; i < orbitalVisualObjects.Length; i++)
             {
                 if (orbitalVisualObjects[i] != null)
-                    Destroy(orbitalVisualObjects[i]);
+                    PoolManager.ReturnOrDestroyGO(orbitalVisualPrefab, orbitalVisualObjects[i], nameof(SkillVFXController));
             }
             orbitalVisualObjects = null;
         }
@@ -390,8 +406,11 @@ namespace Vamsurlike.Skills
         private void DestroyAreaCircleVFX(SkillCastType castType)
         {
             if (!areaCircleVfxByType.TryGetValue(castType, out AreaCircleVFX vfx)) return;
-            if (vfx != null) Destroy(vfx.gameObject);
             areaCircleVfxByType.Remove(castType);
+            if (vfx == null) return;
+
+            GameObject prefab = vfxPrefabsByType.TryGetValue(castType, out GameObject p) ? p : null;
+            PoolManager.ReturnOrDestroyGO(prefab, vfx.gameObject, nameof(SkillVFXController));
         }
     }
 }

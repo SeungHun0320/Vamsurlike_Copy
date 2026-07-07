@@ -44,6 +44,8 @@ namespace Vamsurlike.UI
             if (!slots.TryGetValue(p.ClientId, out var slot))
             {
                 slot = CreateSlot(p.ClientId, p.DisplayName);
+                if (slot == null) return;
+
                 slots[p.ClientId] = slot;
                 RebuildLayout();
             }

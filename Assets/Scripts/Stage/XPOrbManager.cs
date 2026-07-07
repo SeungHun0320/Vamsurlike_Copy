@@ -40,10 +40,7 @@ namespace Vamsurlike.Stage
                 if (go == null) continue;
                 if (go.TryGetComponent<XPOrbVisualProxy>(out var proxy))
                     proxy.Clear();
-                if (PoolManager.Instance != null)
-                    PoolManager.Instance.ReturnGO(orbVisualPrefab, go);
-                else
-                    Destroy(go);
+                PoolManager.ReturnOrDestroyGO(orbVisualPrefab, go, nameof(XPOrbManager));
             }
             orbVisuals.Clear();
         }
@@ -116,9 +113,9 @@ namespace Vamsurlike.Stage
         private void SpawnOrbVisualClientRpc(ulong id, Vector3 position)
         {
             if (orbVisualPrefab == null) return;
-            var go = PoolManager.Instance != null
-                ? PoolManager.Instance.GetGO(orbVisualPrefab, position, Quaternion.identity)
-                : Instantiate(orbVisualPrefab, position, Quaternion.identity);
+            var go = PoolManager.GetOrInstantiateGO(
+                orbVisualPrefab, position, Quaternion.identity, nameof(XPOrbManager));
+            if (go == null) return;
 
             if (!go.TryGetComponent<XPOrbVisualProxy>(out var proxy))
                 proxy = go.AddComponent<XPOrbVisualProxy>();
@@ -140,10 +137,7 @@ namespace Vamsurlike.Stage
             if (go.TryGetComponent<XPOrbVisualProxy>(out var proxy))
                 proxy.Clear();
 
-            if (PoolManager.Instance != null)
-                PoolManager.Instance.ReturnGO(orbVisualPrefab, go);
-            else
-                Destroy(go);
+            PoolManager.ReturnOrDestroyGO(orbVisualPrefab, go, nameof(XPOrbManager));
         }
 
         private readonly struct XPOrbEntry

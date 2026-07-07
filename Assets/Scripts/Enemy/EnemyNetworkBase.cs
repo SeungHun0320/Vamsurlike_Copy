@@ -22,8 +22,9 @@ namespace Vamsurlike.Enemy
         // 치명타 데미지 배율 — 기획 확정 전 기본값 (Phase 7.5)
         private const float CritDamageMultiplier = 1.5f;
 
-        // RULES.md: 랜덤은 시드 기반 System.Random 인스턴스 사용
-        private readonly System.Random critRng = new();
+        // 랜덤은 시드 기반 System.Random 인스턴스 사용
+        [SerializeField] private int critRandomSeed = 9137;
+        private System.Random critRng;
 
         [SerializeField] private EnemyDataSO data;
         [SerializeField] private Color hitFlashColor = Color.white;
@@ -70,6 +71,8 @@ namespace Vamsurlike.Enemy
             if (!IsServer) return;
             MaxHPValue.Value = data != null ? data.hp : 100f;
             HP.Value = MaxHPValue.Value;
+            // 풀에서 재사용되는 인스턴스이므로 스폰마다 재시딩 — NetworkObjectId로 인스턴스별 시퀀스 분리
+            critRng = new System.Random(unchecked(critRandomSeed + (int)NetworkObjectId));
             EnemyRegistry.Register(this);
         }
 
@@ -79,7 +82,7 @@ namespace Vamsurlike.Enemy
             if (!IsServer) return;
             data = enemyData;
             MaxHPValue.Value = Mathf.Max(1f, data.hp * Mathf.Max(1f, hpMultiplier));
-            HP.Value          = MaxHPValue.Value;
+            HP.Value = MaxHPValue.Value;
             ScaledAttackPower = data.attackPower * Mathf.Max(1f, damageMultiplier);
             // OnNetworkSpawn보다 뒤에 호출되므로 EnemyAI에 데이터를 직접 주입
             if (TryGetComponent<EnemyAI>(out var ai))
@@ -120,7 +123,7 @@ namespace Vamsurlike.Enemy
 
             // GAME_PLAN §8 공식: FinalDamage = amount * PlayerDamageMultiplier * (1 - EnemyDefenseRate)
             // PlayerDamageMultiplier는 SkillCastContext.FinalDamage에서 이미 적용된 상태로 amount에 실려 들어온다.
-            float defense     = Mathf.Max(0f, data != null ? data.defense : 0f);
+            float defense = Mathf.Max(0f, data != null ? data.defense : 0f);
             float defenseRate = defense / (defense + 100f);
             float finalDamage = Mathf.Max(1f, amount * (1f - defenseRate));
 
@@ -261,9 +264,8 @@ namespace Vamsurlike.Enemy
         {
             if (hitSparkPrefab == null) return;
 
-            GameObject spark = PoolManager.Instance != null
-                ? PoolManager.Instance.GetGO(hitSparkPrefab, worldPosition, Quaternion.identity)
-                : Instantiate(hitSparkPrefab, worldPosition, Quaternion.identity);
+            GameObject spark = PoolManager.GetOrInstantiateGO(
+                hitSparkPrefab, worldPosition, Quaternion.identity, nameof(EnemyNetworkBase));
 
             if (spark == null) return;
             StartCoroutine(ReturnHitSparkAfterDelay(spark));
@@ -274,13 +276,7 @@ namespace Vamsurlike.Enemy
             yield return new WaitForSeconds(Mathf.Max(0.01f, hitSparkLifetime));
 
             if (spark == null) yield break;
-            if (hitSparkPrefab != null && PoolManager.Instance != null)
-            {
-                PoolManager.Instance.ReturnGO(hitSparkPrefab, spark);
-                yield break;
-            }
-
-            Destroy(spark);
+            PoolManager.ReturnOrDestroyGO(hitSparkPrefab, spark, nameof(EnemyNetworkBase));
         }
         [ClientRpc]
         private void PlayHitFlashClientRpc(bool isCrit)

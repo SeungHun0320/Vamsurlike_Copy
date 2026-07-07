@@ -42,10 +42,7 @@ namespace Vamsurlike.Stage
                 if (go == null) continue;
                 if (go.TryGetComponent<GoldOrbVisualProxy>(out var proxy))
                     proxy.Clear();
-                if (PoolManager.Instance != null)
-                    PoolManager.Instance.ReturnGO(orbVisualPrefab, go);
-                else
-                    Destroy(go);
+                PoolManager.ReturnOrDestroyGO(orbVisualPrefab, go, nameof(GoldOrbManager));
             }
             orbVisuals.Clear();
         }
@@ -127,9 +124,9 @@ namespace Vamsurlike.Stage
         private void SpawnOrbVisualClientRpc(ulong id, Vector3 position)
         {
             if (orbVisualPrefab == null) return;
-            var go = PoolManager.Instance != null
-                ? PoolManager.Instance.GetGO(orbVisualPrefab, position, Quaternion.identity)
-                : Instantiate(orbVisualPrefab, position, Quaternion.identity);
+            var go = PoolManager.GetOrInstantiateGO(
+                orbVisualPrefab, position, Quaternion.identity, nameof(GoldOrbManager));
+            if (go == null) return;
 
             if (!go.TryGetComponent<GoldOrbVisualProxy>(out var proxy))
                 proxy = go.AddComponent<GoldOrbVisualProxy>();
@@ -151,10 +148,7 @@ namespace Vamsurlike.Stage
             if (go.TryGetComponent<GoldOrbVisualProxy>(out var proxy))
                 proxy.Clear();
 
-            if (PoolManager.Instance != null)
-                PoolManager.Instance.ReturnGO(orbVisualPrefab, go);
-            else
-                Destroy(go);
+            PoolManager.ReturnOrDestroyGO(orbVisualPrefab, go, nameof(GoldOrbManager));
         }
 
         private readonly struct GoldOrbEntry

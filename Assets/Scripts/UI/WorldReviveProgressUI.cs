@@ -96,7 +96,10 @@ namespace Vamsurlike.UI
             fillGO.transform.SetParent(go.transform, false);
             progressFill              = fillGO.AddComponent<Image>();
             progressFill.color        = fillColor;
-            progressFill.sprite       = Resources.Load<Sprite>("Sprites/UI/WhiteSquare");
+            var fillSprite = Resources.Load<Sprite>("Sprites/UI/WhiteSquare");
+            if (fillSprite == null)
+                Debug.LogWarning($"[{nameof(WorldReviveProgressUI)}] Sprites/UI/WhiteSquare 를 찾을 수 없습니다. 진행 바가 비어 보일 수 있습니다.", this);
+            progressFill.sprite       = fillSprite;
             progressFill.type         = UnityEngine.UI.Image.Type.Filled;
             progressFill.fillMethod   = UnityEngine.UI.Image.FillMethod.Horizontal;
             progressFill.fillOrigin   = 0;

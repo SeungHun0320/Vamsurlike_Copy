@@ -127,6 +127,9 @@ namespace Vamsurlike.Network
             if (Instance != null && Instance.networkObjectPool != null)
                 return Instance.GetNetworkObject(prefab, position, rotation);
 
+            Debug.LogWarning(
+                $"[{context}] PoolManager.Instance가 준비되지 않아 풀 없이 직접 Instantiate합니다. prefab={prefab.name}");
+
             GameObject instance = Instantiate(prefab, position, rotation);
             if (instance.TryGetComponent(out NetworkObject networkObject))
                 return networkObject;
@@ -139,6 +142,46 @@ namespace Vamsurlike.Network
         public void ReturnNetworkObject(GameObject prefab, NetworkObject instance)
         {
             networkObjectPool?.Return(prefab, instance);
+        }
+
+        // GameObject(비네트워크) 풀 버전 — PoolManager.Instance가 아직 없을 때(초기화 순서 이슈)만
+        // 경고 로그와 함께 직접 Instantiate/Destroy로 폴백한다. 정상 상황에서는 항상 풀을 거친다.
+        public static GameObject GetOrInstantiateGO(
+            GameObject prefab,
+            Vector3 position,
+            Quaternion rotation,
+            string context)
+        {
+            if (prefab == null)
+            {
+                Debug.LogWarning($"[{context}] prefab is null.");
+                return null;
+            }
+
+            if (Instance != null)
+                return Instance.GetGO(prefab, position, rotation);
+
+            Debug.LogWarning(
+                $"[{context}] PoolManager.Instance가 준비되지 않아 풀 없이 직접 Instantiate합니다. prefab={prefab.name}");
+            return Instantiate(prefab, position, rotation);
+        }
+
+        public static void ReturnOrDestroyGO(GameObject prefab, GameObject instance, string context)
+        {
+            if (instance == null) return;
+
+            if (prefab != null && Instance != null)
+            {
+                Instance.ReturnGO(prefab, instance);
+                return;
+            }
+
+            if (prefab == null)
+                Debug.LogWarning($"[{context}] prefab이 없어 풀에 반환하지 못하고 직접 Destroy합니다.");
+            else
+                Debug.LogWarning(
+                    $"[{context}] PoolManager.Instance가 없어 풀에 반환하지 못하고 직접 Destroy합니다. prefab={prefab.name}");
+            Destroy(instance);
         }
 
         private void HandleNetworkStarted()

@@ -1,4 +1,5 @@
 using UnityEngine;
+using Vamsurlike.Network;
 
 namespace Vamsurlike.Skills
 {
@@ -16,6 +17,9 @@ namespace Vamsurlike.Skills
         private float elapsed;
         private bool hasDuration;
 
+        // 풀에서 꺼내졌을 때만 채워짐 — 있으면 만료 시 Destroy 대신 풀로 반환한다.
+        private GameObject sourcePrefab;
+
         private void Awake()
         {
             lineRenderer = GetComponent<LineRenderer>();
@@ -28,12 +32,13 @@ namespace Vamsurlike.Skills
                 lineRenderer.sharedMaterial = lineMaterial;
         }
 
-        public void Initialize(float radius, float lifeTime, Color color, Transform target = null)
+        public void Initialize(float radius, float lifeTime, Color color, Transform target = null, GameObject prefab = null)
         {
             followTarget = target;
             duration = lifeTime;
             elapsed = 0f;
             hasDuration = lifeTime > 0f;
+            sourcePrefab = prefab;
 
             if (lineRenderer == null)
                 lineRenderer = GetComponent<LineRenderer>();
@@ -52,6 +57,14 @@ namespace Vamsurlike.Skills
 
             elapsed += Time.deltaTime;
             if (elapsed >= duration)
+                ReturnOrDestroySelf();
+        }
+
+        private void ReturnOrDestroySelf()
+        {
+            if (sourcePrefab != null)
+                PoolManager.ReturnOrDestroyGO(sourcePrefab, gameObject, nameof(AreaCircleVFX));
+            else
                 Destroy(gameObject);
         }
 
