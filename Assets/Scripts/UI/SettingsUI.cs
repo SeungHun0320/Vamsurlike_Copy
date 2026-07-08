@@ -26,6 +26,7 @@ namespace Vamsurlike.UI
         [SerializeField] private Toggle      fullscreenToggle;
         [SerializeField] private TMP_Dropdown frameCapDropdown;
         [SerializeField] private Button      closeButton;
+        [SerializeField] private Button      openButton;
 
         private bool isInitializing;
 
@@ -33,6 +34,8 @@ namespace Vamsurlike.UI
         {
             if (closeButton != null)
                 closeButton.onClick.AddListener(() => gameObject.SetActive(false));
+            if (openButton != null)
+                openButton.onClick.AddListener(OpenPanel);
         }
 
         public void OpenPanel() => gameObject.SetActive(true);

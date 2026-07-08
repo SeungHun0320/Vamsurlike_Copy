@@ -86,9 +86,11 @@ public static class BuildSettingsUI
         var sbBtn = settingsBtnGO.AddComponent<Button>();
         sbBtn.targetGraphic = settingsBtnGO.GetComponent<Image>();
         CreateTextChild("Text", settingsBtnGO.transform, "설정", 28, Color.white);
-        sbBtn.onClick.AddListener(() => panelGO.SetActive(true));
 
         // ── 레퍼런스 연결 ────────────────────────────────────────────
+        // 버튼 클릭 핸들러는 여기(에디터 스크립트, 에디트 타임 1회 실행)에서 AddListener로
+        // 붙이면 직렬화가 안 돼 씬 재로드/빌드 시 사라진다. SettingsUI.Awake()가 매 실행마다
+        // 다시 붙이도록, 오브젝트 레퍼런스만 연결한다.
         var so = new SerializedObject(settingsUI);
         so.FindProperty("masterSlider").objectReferenceValue      = masterSlider;
         so.FindProperty("bgmSlider").objectReferenceValue         = bgmSlider;
@@ -97,10 +99,8 @@ public static class BuildSettingsUI
         so.FindProperty("fullscreenToggle").objectReferenceValue  = fsToggle;
         so.FindProperty("frameCapDropdown").objectReferenceValue  = fcDropdown;
         so.FindProperty("closeButton").objectReferenceValue       = closeBtn;
+        so.FindProperty("openButton").objectReferenceValue        = sbBtn;
         so.ApplyModifiedProperties();
-
-        // 닫기 버튼 → SetActive(false)
-        closeBtn.onClick.AddListener(() => panelGO.SetActive(false));
 
         // 처음엔 숨김
         panelGO.SetActive(false);
