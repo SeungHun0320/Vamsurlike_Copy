@@ -24,6 +24,9 @@ namespace Vamsurlike.Enemy
         private float targetUpdateTimer;
         private const float TargetUpdateInterval = 0.5f;
 
+        private float stunnedUntil;
+        internal bool IsStunned => Time.time < stunnedUntil;
+
         private void Awake()
         {
             Agent = GetComponent<NavMeshAgent>();
@@ -61,10 +64,41 @@ namespace Vamsurlike.Enemy
             Agent.stoppingDistance = Mathf.Max(0.1f, data.attackRange * 0.8f);
         }
 
+        // 대지분쇄자 등 CC 스킬 전용 — 중복 적용 시 더 긴 쪽으로 갱신(스택 대신 최댓값 유지).
+        internal void ApplyStun(float duration)
+        {
+            if (duration <= 0f) return;
+            stunnedUntil = Mathf.Max(stunnedUntil, Time.time + duration);
+        }
+
+        // 궤도 수류탄 등 넉백 스킬 전용 — NavMeshAgent.Move는 내부적으로 NavMesh 경계에 클램프된다.
+        internal void ApplyKnockback(Vector3 direction, float force)
+        {
+            if (force <= 0f || Agent == null || !Agent.enabled || !Agent.isOnNavMesh) return;
+
+            direction.y = 0f;
+            if (direction.sqrMagnitude < 0.0001f) return;
+
+            Agent.Move(direction.normalized * force);
+        }
+
         private void Update()
         {
             if (!Base.IsAlive) return;
             if (GameFlowCoordinator.Instance == null || !GameFlowCoordinator.Instance.IsGameplayActive) return;
+
+            if (IsStunned)
+            {
+                // ResetPath만으로는 기존 관성 때문에 몇 프레임 더 미끄러지듯 이동할 수 있어
+                // velocity까지 명시적으로 0으로 만들어 즉시 멈춘다.
+                if (Agent.isOnNavMesh)
+                {
+                    Agent.ResetPath();
+                    Agent.velocity = Vector3.zero;
+                }
+                if (Anim != null) Anim.SetFloat(SpeedHash, 0f);
+                return;
+            }
 
             targetUpdateTimer -= Time.deltaTime;
             if (targetUpdateTimer <= 0f)

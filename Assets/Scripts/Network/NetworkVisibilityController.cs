@@ -8,7 +8,11 @@ namespace Vamsurlike.Network
     [DisallowMultipleComponent]
     public class NetworkVisibilityController : ServerBehaviour
     {
-        [SerializeField] private float visibilityRange = 50f;
+        // 카메라 FollowOffset(-18,30,-18)+FOV 40 기준 실측 가로 가시폭 ≈ 50유닛.
+        // range를 그 값과 똑같이 두면 화면 가장자리에서 바로 Show/Hide가 갈려 팝인이 보이므로
+        // 안전 마진(약 30%)을 둔다. updateInterval은 적 이동속도(3.5) 기준 판정 주기당 최대
+        // 1.75유닛 이동이라 range 대비 여유가 충분해 그대로 유지.
+        [SerializeField] private float visibilityRange = 65f;
         [SerializeField] private float updateInterval  = 0.5f;
 
         private readonly HashSet<ulong> visibleClients = new();

@@ -7,6 +7,8 @@ namespace Vamsurlike.Skills
 {
     public sealed class OrbitalSkill : SkillBase
     {
+        private const float HitRadiusPadding = 0.35f;
+
         private readonly List<EnemyNetworkBase> targets = new();
         private readonly HashSet<ulong> hitEnemyIds = new();
 
@@ -37,10 +39,10 @@ namespace Vamsurlike.Skills
             if (skill == null || levelData == null || context.CasterTransform == null)
                 return false;
 
-            int   count    = Mathf.Max(1, levelData.orbitalCount);
-            float radius   = Mathf.Max(0.1f, levelData.orbitalRadius * context.AreaMultiplier);
-            float hitRadius = Mathf.Max(0.05f, levelData.orbitalHitRadius);
-            float rotSpeed = levelData.orbitalRotationSpeed;
+            int   count     = Mathf.Max(1, levelData.orbitalCount);
+            float radius    = Mathf.Max(0.1f, levelData.orbitalRadius * context.AreaMultiplier);
+            float hitRadius = Mathf.Max(0.05f, levelData.orbitalHitRadius * context.AreaMultiplier + HitRadiusPadding);
+            float rotSpeed  = levelData.orbitalRotationSpeed;
 
             if (!serverBroadcastSent
                 || serverCount    != count
@@ -54,26 +56,26 @@ namespace Vamsurlike.Skills
                 context.VFX?.ShowOrbital(count, radius, rotSpeed);
             }
 
-            int damagedCount = 0;
             hitEnemyIds.Clear();
+            float damage = context.FinalDamage;
 
             for (int i = 0; i < count; i++)
             {
                 Vector3 orbPos = OrbitalPositionMath.Calculate(
-                    context.CasterTransform.position, radius, rotSpeed, i, count);
+                    context.CasterTransform.position,
+                    radius,
+                    rotSpeed,
+                    i,
+                    count);
                 int targetCount = AutoTargeting.FindEnemiesInRange(orbPos, hitRadius, targets);
 
-                float damage = context.FinalDamage;
                 for (int j = 0; j < targetCount; j++)
                 {
                     EnemyNetworkBase target = targets[j];
                     if (target == null || !hitEnemyIds.Add(target.NetworkObjectId)) continue;
-                    target.TakeDamage(damage, context.OwnerClientId, context.Skill.name);
-                    damagedCount++;
+                    target.TakeDamage(damage, context.OwnerClientId, skill.name);
                 }
             }
-
-            if (damagedCount == 0) return true;
 
             return true;
         }

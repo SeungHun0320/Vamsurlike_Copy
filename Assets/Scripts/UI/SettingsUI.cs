@@ -27,30 +27,59 @@ namespace Vamsurlike.UI
         [SerializeField] private TMP_Dropdown frameCapDropdown;
         [SerializeField] private Button      closeButton;
         [SerializeField] private Button      openButton;
+        [SerializeField] private CanvasGroup canvasGroup;
 
         private bool isInitializing;
 
+        // 패널 GameObject는 항상 활성 상태로 유지한다. 비활성 상태로 씬에 저장되면
+        // Awake()가 활성화 전까지 실행되지 않아(Unity의 비활성 오브젝트 규칙),
+        // openButton 리스너 배선 자체가 이뤄지지 않아 버튼이 아예 반응하지 않게 된다.
+        // 표시/숨김은 CanvasGroup으로만 제어한다.
         private void Awake()
         {
-            if (closeButton != null)
-                closeButton.onClick.AddListener(() => gameObject.SetActive(false));
-            if (openButton != null)
-                openButton.onClick.AddListener(OpenPanel);
+            if (closeButton != null) closeButton.onClick.AddListener(ClosePanel);
+            if (openButton  != null) openButton.onClick.AddListener(OpenPanel);
+
+            if (SettingsManager.Instance == null)
+            {
+                Debug.LogError($"[{nameof(SettingsUI)}] SettingsManager.Instance가 없습니다. Bootstrap 씬이 먼저 로드되었는지 확인하세요.", this);
+            }
+            else
+            {
+                BuildDropdowns();
+                BindListeners();
+            }
+
+            HidePanel();
         }
 
-        public void OpenPanel() => gameObject.SetActive(true);
-
-        private void OnEnable()
-        {
-            if (SettingsManager.Instance == null) return;
-            BuildDropdowns();
-            LoadCurrentValues();
-            BindListeners();
-        }
-
-        private void OnDisable()
+        private void OnDestroy()
         {
             UnbindListeners();
+        }
+
+        public void OpenPanel()
+        {
+            if (SettingsManager.Instance != null) LoadCurrentValues();
+            ShowPanel();
+        }
+
+        public void ClosePanel() => HidePanel();
+
+        private void ShowPanel()
+        {
+            if (canvasGroup == null) return;
+            canvasGroup.alpha = 1f;
+            canvasGroup.interactable = true;
+            canvasGroup.blocksRaycasts = true;
+        }
+
+        private void HidePanel()
+        {
+            if (canvasGroup == null) return;
+            canvasGroup.alpha = 0f;
+            canvasGroup.interactable = false;
+            canvasGroup.blocksRaycasts = false;
         }
 
         // ─── 초기화 ───────────────────────────────────────────────────

@@ -12,8 +12,8 @@ namespace Vamsurlike.UI
     {
         [FormerlySerializedAs("labelText")]
         [SerializeField] private TextMeshProUGUI skillText;
-        [SerializeField] private Image           iconImage;  // 아이콘 연결 시 활성화 예정
-        [SerializeField] private string          skillLabelFormat = "{0}\nLv.{1}";
+        [SerializeField] private Image iconImage;  // 아이콘 연결 시 활성화 예정
+        [SerializeField] private string skillLabelFormat = "{0}\nLv.{1}";
 
         public void Set(string skillName, int level)
         {
@@ -22,7 +22,12 @@ namespace Vamsurlike.UI
 
         public void Set(SkillHUDSlotViewData slot)
         {
-            if (skillText != null) skillText.text = string.Format(skillLabelFormat, slot.Name, slot.Level);
+            if (skillText != null)
+            {
+                skillText.text = slot.IsMaxLevel
+                    ? $"{slot.Name}\nLv.MAX"
+                    : string.Format(skillLabelFormat, slot.Name, slot.Level);
+            }
             if (iconImage != null) iconImage.gameObject.SetActive(false);
         }
 

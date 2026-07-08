@@ -84,6 +84,9 @@ namespace Vamsurlike.Skills
             float speedMultiplier = 1f,
             string skillTag = null)
         {
+            // NetworkObject.Spawn() 이전(아직 스폰되지 않은 상태)에 호출되므로 this.IsServer(스폰 상태에
+            // 의존) 대신 NetworkManager.Singleton을 직접 확인한다.
+            if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
             if (levelData == null) return;
 
             EnsureModesInitialized();
@@ -166,6 +169,7 @@ namespace Vamsurlike.Skills
 
             hitEnemyIds.Add(target.NetworkObjectId);
             target.TakeDamage(Damage, ProjectileOwnerClientId, SkillTag);
+            LifestealUtility.Apply(currentLevelData, ProjectileOwnerClientId, Damage);
 
             if (PierceRemaining <= 0)
                 return true;

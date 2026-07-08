@@ -20,7 +20,8 @@ namespace Vamsurlike.Skills
             float speedMultiplier  = 1f,
             float areaMultiplier   = 1f,
             int   bonusProjectileCount = 0,
-            float durationMultiplier = 1f)
+            float durationMultiplier = 1f,
+            float skillHasteValue = 0f)
         {
             CoroutineRunner = coroutineRunner;
             VFX = vfx;
@@ -37,6 +38,7 @@ namespace Vamsurlike.Skills
             AreaMultiplier   = Mathf.Max(0f, areaMultiplier);
             BonusProjectileCount = Mathf.Max(0, bonusProjectileCount);
             DurationMultiplier = Mathf.Max(0f, durationMultiplier);
+            SkillHasteValue = Mathf.Max(0f, skillHasteValue);
         }
 
         public ISkillCoroutineRunner CoroutineRunner { get; }
@@ -59,6 +61,8 @@ namespace Vamsurlike.Skills
         // 유지시간 패시브 배율 — 자체 코루틴으로 지속시간을 관리하는 스킬(블랙홀 등)이 곱해서 사용.
         // 지속형(Persistent) 스킬은 SkillExecutionScheduler가 별도로 적용하므로 여기서 중복 적용하지 않는다.
         public float           DurationMultiplier   { get; }
+        // 스킬가속 패시브 원본 수치(%) — 쿨다운 배율과 별개로 자체 효과에 반영하는 스킬(질풍확산탄 등)이 사용.
+        public float           SkillHasteValue      { get; }
 
         // 패시브 공격력 배율이 적용된 최종 데미지
         public float FinalDamage => LevelData != null ? LevelData.damage * AttackMultiplier : 0f;

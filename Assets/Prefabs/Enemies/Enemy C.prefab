@@ -66,7 +66,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 1dcf18599fec3384ab8214aa036c77d6, type: 2}
+  - {fileID: 2100000, guid: ea3a83b2a41c74248890b651cf9a4cde, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -156,7 +156,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 1dcf18599fec3384ab8214aa036c77d6, type: 2}
+  - {fileID: 2100000, guid: ea3a83b2a41c74248890b651cf9a4cde, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -457,8 +457,8 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   critRandomSeed: 9137
   data: {fileID: 0}
-  hitFlashColor: {r: 1, g: 1, b: 1, a: 1}
-  hitFlashDuration: 0.08
+  hitFlashColor: {r: 0.78, g: 0.78, b: 0.78, a: 1}
+  hitFlashDuration: 0.12
   hitSparkPrefab: {fileID: 1580661595495182537, guid: 06dc630522f084a49b33cc95a4cc35cc, type: 3}
   hitSparkLifetime: 0.25
   bossTelegraphPrefab: {fileID: 0}
@@ -622,7 +622,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 1dcf18599fec3384ab8214aa036c77d6, type: 2}
+  - {fileID: 2100000, guid: ea3a83b2a41c74248890b651cf9a4cde, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -743,7 +743,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 1dcf18599fec3384ab8214aa036c77d6, type: 2}
+  - {fileID: 2100000, guid: ea3a83b2a41c74248890b651cf9a4cde, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

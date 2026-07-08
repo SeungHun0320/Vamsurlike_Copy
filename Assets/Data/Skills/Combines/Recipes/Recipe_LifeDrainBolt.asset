@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ce6debee47ff83e4fb707048bf1ace2a, type: 3}
+  m_Name: Recipe_LifeDrainBolt
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Items.CombineRecipeSO
+  sourceSkill: {fileID: 11400000, guid: 9a3d2b8ba7a4d204e9be05cb38e3905c, type: 2}
+  requiredPassiveType: 7
+  evolvedSkill: {fileID: 11400000, guid: 14bb2f0c71272c24290d261ae4a4046a, type: 2}

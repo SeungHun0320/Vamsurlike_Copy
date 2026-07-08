@@ -135,7 +135,8 @@ namespace Vamsurlike.Skills
                 SkillDataSO skill = skills[i].Skill;
                 slots[i] = new SkillSlotSyncData(
                     skill != null ? skill.skillName : "?",
-                    skills[i].Level);
+                    skills[i].Level,
+                    skill != null ? skill.maxLevel : 1);
             }
 
             return slots;

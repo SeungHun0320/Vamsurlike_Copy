@@ -66,6 +66,8 @@ namespace Vamsurlike.Enemy
         // BossPatternController에서 Spawn() 직후 호출 — SpreadShot
         public void InitLinear(Vector3 direction, float missileSpeed, float missileDamage, float lifetime)
         {
+            if (!IsServer) return;
+
             mode          = Mode.Linear;
             moveDirection = direction.normalized;
             speed         = missileSpeed;
@@ -80,6 +82,8 @@ namespace Vamsurlike.Enemy
         // flightTime 동안 포물선으로 target에 도달 후 blastRadius 범위 AOE 피해
         public void InitMortar(Vector3 start, Vector3 target, float flight, float missileDamage, float blastRadius)
         {
+            if (!IsServer) return;
+
             mode         = Mode.Mortar;
             startPos     = start;
             targetPos    = target;

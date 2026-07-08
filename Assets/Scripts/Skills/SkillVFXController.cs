@@ -27,6 +27,7 @@ namespace Vamsurlike.Skills
         [SerializeField] private float meleeVisualForwardOffsetRatio = 0.5f;
         [SerializeField] private float meleeVisualHeightOffset = 2.2f;
         [SerializeField] private GameObject meleeArcPrefab;
+        [SerializeField] private GameObject meleeBoxPrefab;
         [SerializeField] private GameObject grenadeImpactCirclePrefab;
 
         [Header("Ultimate VFX")]
@@ -95,10 +96,10 @@ namespace Vamsurlike.Skills
             ShowUltimateClientRpc(position);
         }
 
-        public void ShowMelee(Vector3 position, Vector3 forward, float range, float arcAngle)
+        public void ShowMelee(SkillCastType castType, Vector3 position, Vector3 forward, float range, float arcAngle)
         {
             if (!IsServer) return;
-            ShowMeleeClientRpc(position, forward, range, arcAngle);
+            ShowMeleeClientRpc(castType, position, forward, range, arcAngle);
         }
 
         public void ShowGrenade(Vector3 from, Vector3 to, float arcHeight, float flightTime)
@@ -111,6 +112,18 @@ namespace Vamsurlike.Skills
         {
             if (!IsServer) return;
             ShowGrenadeImpactCircleClientRpc(center, radius, duration);
+        }
+
+        public void ShowHomingReturn(Vector3 from, float speed)
+        {
+            if (!IsServer) return;
+            ShowHomingReturnClientRpc(from, speed);
+        }
+
+        public void ShowMeleeBox(SkillCastType castType, Vector3 position, Vector3 forward, float range, float width)
+        {
+            if (!IsServer) return;
+            ShowMeleeBoxClientRpc(castType, position, forward, range, width);
         }
 
         public void RemoveSkillVisual(SkillCastType castType)
@@ -179,7 +192,7 @@ namespace Vamsurlike.Skills
         }
 
         [ClientRpc]
-        private void ShowMeleeClientRpc(Vector3 position, Vector3 forward, float range, float arcAngle)
+        private void ShowMeleeClientRpc(SkillCastType castType, Vector3 position, Vector3 forward, float range, float arcAngle)
         {
             Vector3 flatForward = forward;
             flatForward.y = 0f;
@@ -190,8 +203,9 @@ namespace Vamsurlike.Skills
             // 부채꼴 범위 표시
             MeleeArcVFX.Spawn(meleeArcPrefab, position, flatForward, range, arcAngle * 0.5f, MeleeVisualDuration);
 
-            // 망치 VFX
-            if (!TryGetVFXPrefab(SkillCastType.Melee, out GameObject prefab)) return;
+            // 무기 VFX — 호출한 스킬 자신의 castType으로 조회한다 (예전엔 SkillCastType.Melee로
+            // 고정되어 있어 샷건/관통산탄 등 원뿔 즉발 스킬에도 망치 모델이 잘못 표시됐다).
+            if (!TryGetVFXPrefab(castType, out GameObject prefab)) return;
 
             GameObject visual = SpawnPooledVisual(
                 prefab,
@@ -211,6 +225,64 @@ namespace Vamsurlike.Skills
         {
             vfxPrefabsByType.TryGetValue(SkillCastType.Grenade, out GameObject prefab);
             StartCoroutine(GrenadeVisualCoroutine(from, to, arcHeight, flightTime, prefab));
+        }
+
+        [ClientRpc]
+        private void ShowHomingReturnClientRpc(Vector3 from, float speed)
+        {
+            vfxPrefabsByType.TryGetValue(SkillCastType.Grenade, out GameObject prefab);
+            StartCoroutine(HomingReturnVisualCoroutine(from, speed, prefab));
+        }
+
+        // 왕복 관통창 귀환 연출 — 고정 목적지가 아니라 이 컴포넌트의 소유자(시전자) 실시간 위치를
+        // 매 프레임 다시 추적한다. transform은 Netcode로 이미 동기화된 소유자 트랜스폼이라 별도
+        // 위치 갱신 RPC 없이도 모든 클라이언트에서 정확히 같은 지점을 쫓아간다.
+        private IEnumerator HomingReturnVisualCoroutine(Vector3 from, float speed, GameObject prefab)
+        {
+            const float ArriveThreshold = 0.3f;
+
+            GameObject visual = prefab != null
+                ? SpawnPooledVisual(prefab, from, Quaternion.identity)
+                : null;
+
+            Vector3 pos = from;
+            while (true)
+            {
+                Vector3 toTarget = transform.position - pos;
+                float distance = toTarget.magnitude;
+                if (distance <= ArriveThreshold) break;
+
+                float step = Mathf.Min(Mathf.Max(0.1f, speed) * Time.deltaTime, distance);
+                pos += toTarget.normalized * step;
+                if (visual != null) visual.transform.position = pos;
+                yield return null;
+            }
+
+            ReturnVisual(prefab, visual);
+        }
+
+        [ClientRpc]
+        private void ShowMeleeBoxClientRpc(SkillCastType castType, Vector3 position, Vector3 forward, float range, float width)
+        {
+            Vector3 flatForward = forward;
+            flatForward.y = 0f;
+            if (flatForward.sqrMagnitude < 0.0001f)
+                flatForward = transform.forward;
+            flatForward.Normalize();
+
+            // 사각형 범위 표시
+            MeleeBoxVFX.Spawn(meleeBoxPrefab, position, flatForward, range, width, MeleeVisualDuration);
+
+            // 무기 VFX — 호출한 스킬 자신의 castType으로 조회
+            if (!TryGetVFXPrefab(castType, out GameObject prefab)) return;
+
+            GameObject visual = SpawnPooledVisual(
+                prefab,
+                position
+                + flatForward * range * meleeVisualForwardOffsetRatio
+                + Vector3.up * meleeVisualHeightOffset,
+                Quaternion.LookRotation(flatForward, Vector3.up));
+            StartCoroutine(ReturnVisualAfterDelay(prefab, visual, MeleeVisualDuration));
         }
 
         [ClientRpc]

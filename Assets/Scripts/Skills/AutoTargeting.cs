@@ -57,6 +57,9 @@ namespace Vamsurlike.Skills
                     SkillCastType.Melee => data.meleeRange * areaMultiplier,
                     SkillCastType.ClusterGrenade => data.grenadeRange * areaMultiplier,
                     SkillCastType.BlackHole => ResolveAreaRange(data, areaMultiplier),
+                    SkillCastType.PierceShotgun => data.range * areaMultiplier,
+                    SkillCastType.Earthshatter => data.meleeRange * areaMultiplier,
+                    SkillCastType.Shotgun => data.range * areaMultiplier,
                     _ => data.range,
                 }
                 : data.range;

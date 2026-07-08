@@ -26,14 +26,20 @@ namespace Vamsurlike.Skills
                 || context.CoroutineRunner == null)
                 return false;
 
-            context.CoroutineRunner.StartSkillCoroutine(ThrowGrenadeCoroutine(
-                context.CasterTransform.position,
-                levelData,
-                context.FinalDamage,
-                context.OwnerClientId,
-                context.Skill.name,
-                context.AreaMultiplier,
-                context.VFX));
+            // 기본 수류탄은 원래 "개수" 개념이 없는 1회 투척 스킬 — 투사체 개수 보너스 패시브를
+            // 적용하려면 그만큼 독립적인 투척을 추가로 실행한다(각각 전체 스플래시 데미지).
+            int count = Mathf.Max(1, 1 + context.BonusProjectileCount);
+            for (int i = 0; i < count; i++)
+            {
+                context.CoroutineRunner.StartSkillCoroutine(ThrowGrenadeCoroutine(
+                    context.CasterTransform.position,
+                    levelData,
+                    context.FinalDamage,
+                    context.OwnerClientId,
+                    context.Skill.name,
+                    context.AreaMultiplier,
+                    context.VFX));
+            }
             return true;
         }
 

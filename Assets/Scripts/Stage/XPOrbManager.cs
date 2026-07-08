@@ -93,7 +93,8 @@ namespace Vamsurlike.Stage
 
             activeOrbs.Remove(orbId);
             SharedLevelSystem.Instance?.AddXP(orb.Xp, clientId);
-            DestroyOrbVisualClientRpc(orbId);
+            Vector3 collectorPosition = client.PlayerObject != null ? client.PlayerObject.transform.position : orb.Pos;
+            DestroyOrbVisualClientRpc(orbId, clientId, collectorPosition);
             return true;
         }
 
@@ -127,19 +128,36 @@ namespace Vamsurlike.Stage
         }
 
         [ClientRpc]
-        private void DestroyOrbVisualClientRpc(ulong id)
+        private void DestroyOrbVisualClientRpc(ulong id, ulong collectorClientId, Vector3 collectorPosition)
         {
             if (!orbVisuals.TryGetValue(id, out var go)) return;
             orbVisuals.Remove(id);
+            if (go == null) return;
+
+            Transform collectorTransform = NetworkManager.Singleton != null
+                && NetworkManager.Singleton.ConnectedClients.TryGetValue(collectorClientId, out var client)
+                && client.PlayerObject != null
+                    ? client.PlayerObject.transform
+                    : null;
+
+            if (go.TryGetComponent<XPOrbVisualProxy>(out var proxy))
+            {
+                proxy.FlyToAndComplete(collectorTransform, collectorPosition, () => FinishOrbPickup(go, proxy));
+                return;
+            }
+
+            FinishOrbPickup(go, null);
+        }
+
+        private void FinishOrbPickup(GameObject go, XPOrbVisualProxy proxy)
+        {
             if (go == null) return;
 
             vfxSpawnEvent?.Raise(new VFXCue(
                 VFXCueIds.PickupAbsorb, go.transform.position, Vector3.up, 1f, pickupVFXDuration, Color.white));
             sfxSpawnEvent?.Raise(new SFXCue(SFXCueIds.XPPickup, go.transform.position));
 
-            if (go.TryGetComponent<XPOrbVisualProxy>(out var proxy))
-                proxy.Clear();
-
+            proxy?.Clear();
             PoolManager.ReturnOrDestroyGO(orbVisualPrefab, go, nameof(XPOrbManager));
         }
 

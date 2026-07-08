@@ -1,69 +1,77 @@
-using Unity.Netcode;
+using System.Collections.Generic;
 using UnityEngine;
 using Vamsurlike.Data;
 using Vamsurlike.Enemy;
-using Vamsurlike.Network;
 
 namespace Vamsurlike.Skills
 {
-    // 합체 스킬: Orbital + BasicProjectile.
-    // 투사체를 발사하며 orbitalCount개 위성이 주위를 회전하면서 날아감.
-    // 위성은 경로상의 적에게 프레임마다 초당 데미지(damage/s)를 적용.
+    // 충격 궤도: Orbital + ProjectileCount.
+    // 위성은 시각적으로만 공전하고, 데미지는 플레이어 중심 궤도 범위 안의 적에게 틱마다 1회 적용한다.
     public sealed class OrbitalGrenadeSkill : SkillBase
     {
-        private const float DefaultSpawnHeight = 0.8f;
+        private readonly List<EnemyNetworkBase> targets = new();
+        private readonly HashSet<ulong> hitEnemyIds = new();
+
+        // 서버: ClientRpc 중복 전송 방지용 캐시
+        private bool  serverBroadcastSent;
+        private int   serverCount;
+        private float serverRadius;
+        private float serverRotSpeed;
 
         public override SkillCastType SupportedCastType => SkillCastType.OrbitalGrenade;
+        public override bool IsPersistentExecution => true;
 
-        protected override bool Execute(in SkillCastContext context, Vector3 direction, EnemyNetworkBase _)
+        public override void OnSkillRemoved(SkillCastType castType)
         {
-            SkillDataSO    skill = context.Skill;
-            SkillLevelData data  = context.LevelData;
+            if (castType != SupportedCastType) return;
 
-            if (skill.projectilePrefab == null)
-            {
-                Debug.LogWarning($"[{nameof(OrbitalGrenadeSkill)}] projectilePrefab 미할당. skill={skill.name}");
+            serverBroadcastSent = false;
+            serverCount = 0;
+            serverRadius = 0f;
+            serverRotSpeed = 0f;
+        }
+
+        public override bool TryExecute(in SkillCastContext context)
+        {
+            SkillDataSO skill = context.Skill;
+            SkillLevelData levelData = context.LevelData;
+
+            if (skill == null || levelData == null || context.CasterTransform == null)
                 return false;
+
+            int   count          = Mathf.Max(1, levelData.orbitalCount + context.BonusProjectileCount);
+            float radius         = Mathf.Max(0.1f, levelData.orbitalRadius * context.AreaMultiplier);
+            float hitRadius      = Mathf.Max(0.05f, levelData.orbitalHitRadius * context.AreaMultiplier);
+            float rotSpeed       = levelData.orbitalRotationSpeed;
+            float knockbackForce = Mathf.Max(0f, levelData.orbitalKnockbackForce);
+
+            if (!serverBroadcastSent
+                || serverCount    != count
+                || !Mathf.Approximately(serverRadius,   radius)
+                || !Mathf.Approximately(serverRotSpeed, rotSpeed))
+            {
+                serverBroadcastSent = true;
+                serverCount    = count;
+                serverRadius   = radius;
+                serverRotSpeed = rotSpeed;
+                context.VFX?.ShowOrbital(count, radius, rotSpeed);
             }
 
-            Vector3 spawnPos = context.ProjectileSpawnPoint != null
-                ? context.ProjectileSpawnPoint.position
-                : context.CasterTransform.position + Vector3.up * DefaultSpawnHeight;
-            spawnPos += direction * context.SpawnForwardOffset;
+            hitEnemyIds.Clear();
+            Vector3 center = context.CasterTransform.position;
+            float damageRange = radius + hitRadius;
+            float damage = context.FinalDamage;
+            int targetCount = AutoTargeting.FindEnemiesInRange(center, damageRange, targets);
 
-            Quaternion rot = skill.projectilePrefab.TryGetComponent<NetworkProjectile>(out var tmpl)
-                ? tmpl.GetProjectileRotation(direction)
-                : Quaternion.LookRotation(direction, Vector3.up);
-
-            NetworkObject obj = PoolManager.GetOrInstantiateNetworkObject(
-                skill.projectilePrefab,
-                spawnPos,
-                rot,
-                nameof(OrbitalGrenadeSkill));
-
-            if (obj == null) return false;
-
-            NetworkProjectile proj = null;
-            int orbitalCount = Mathf.Max(1, data.orbitalCount + context.BonusProjectileCount);
-            float orbitalRadius = Mathf.Max(0.1f, data.orbitalRadius * context.AreaMultiplier);
-            float orbitalHitRadius = Mathf.Max(0.05f, data.orbitalHitRadius * context.AreaMultiplier);
-            float orbitalDamage = context.FinalDamage * Mathf.Max(0f, data.orbitalDamageMultiplier);
-
-            if (obj.TryGetComponent(out proj))
-                proj.Initialize(skill.projectilePrefab, context.OwnerClientId, spawnPos, direction, data, context.FinalDamage, context.SpeedMultiplier, skill.name);
-            else
-                Debug.LogWarning($"[{nameof(OrbitalGrenadeSkill)}] NetworkProjectile 없음. prefab={skill.projectilePrefab.name}");
-
-            obj.Spawn(true);
-            if (proj != null)
+            for (int i = 0; i < targetCount; i++)
             {
-                proj.SpawnOrbitingProjectiles(
-                    skill.projectilePrefab,
-                    orbitalCount,
-                    orbitalRadius,
-                    data.orbitalRotationSpeed,
-                    orbitalHitRadius,
-                    orbitalDamage);
+                EnemyNetworkBase target = targets[i];
+                if (target == null || !hitEnemyIds.Add(target.NetworkObjectId)) continue;
+
+                target.TakeDamage(damage, context.OwnerClientId, skill.name);
+
+                if (knockbackForce > 0f)
+                    target.ApplyKnockback(center, knockbackForce);
             }
 
             return true;

@@ -28,8 +28,8 @@ namespace Vamsurlike.Enemy
         private System.Random critRng;
 
         [SerializeField] private EnemyDataSO data;
-        [SerializeField] private Color hitFlashColor = Color.white;
-        [SerializeField] private float hitFlashDuration = 0.08f;
+        [SerializeField] private Color hitFlashColor = new(0.48f, 0.48f, 0.48f, 1f);
+        [SerializeField] private float hitFlashDuration = 0.15f;
         [SerializeField] private GameObject hitSparkPrefab;
         [SerializeField] private float hitSparkLifetime = 0.25f;
         [SerializeField] private GameObject bossTelegraphPrefab;
@@ -70,6 +70,8 @@ namespace Vamsurlike.Enemy
         private const ulong NoAttacker = ulong.MaxValue;
         private ulong lastAttackerClientId = NoAttacker;
         private Coroutine hitFlashCoroutine;
+        private Renderer[] hitFlashRenderers;
+        private MaterialPropertyBlock[] hitFlashOriginalBlocks;
 
         public override void OnNetworkSpawn()
         {
@@ -150,7 +152,6 @@ namespace Vamsurlike.Enemy
             {
                 lastAttackerClientId = attackerClientId;
                 GetPlayerMatchStats(attackerClientId)?.AddDamage(finalDamage, skillTag);
-                GetSkillManager(attackerClientId)?.AddUltimateGaugeForDamage(finalDamage);
             }
 
             float offset = data != null ? data.floatingTextHeightOffset : 2f;
@@ -173,20 +174,29 @@ namespace Vamsurlike.Enemy
             return client.PlayerObject?.GetComponent<PlayerMatchStats>();
         }
 
-        private SkillManager GetSkillManager(ulong clientId)
-        {
-            if (NetworkManager.Singleton == null) return null;
-            if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client)) return null;
-            if (client.PlayerObject == null) return null;
-            return client.PlayerObject.GetComponent<SkillManager>();
-        }
-
         private PassiveStatHandler GetPassiveStatHandler(ulong clientId)
         {
             if (NetworkManager.Singleton == null) return null;
             if (!NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out var client)) return null;
             if (client.PlayerObject == null) return null;
             return client.PlayerObject.GetComponent<PassiveStatHandler>();
+        }
+
+        // 대지분쇄자(Earthshatter) 등 CC 스킬 전용 — 서버 전용.
+        public void ApplyStun(float duration)
+        {
+            if (!IsServer) return;
+            if (TryGetComponent<EnemyAI>(out var ai)) ai.ApplyStun(duration);
+        }
+
+        // 궤도 수류탄(OrbitalGrenade) 등 넉백 스킬 전용 — sourcePosition 반대 방향으로 밀어낸다. 서버 전용.
+        public void ApplyKnockback(Vector3 sourcePosition, float force)
+        {
+            if (!IsServer) return;
+            if (!TryGetComponent<EnemyAI>(out var ai)) return;
+
+            Vector3 direction = transform.position - sourcePosition;
+            ai.ApplyKnockback(direction, force);
         }
 
         // 서버가 지정한 보스 광역기 범위를 Damage Aura와 같은 원형 VFX로 전 클라이언트에 표시.
@@ -226,9 +236,6 @@ namespace Vamsurlike.Enemy
             {
                 PlayerMatchStats matchStats = GetPlayerMatchStats(lastAttackerClientId);
                 if (matchStats != null) matchStats.AddKill();
-
-                SkillManager skillManager = GetSkillManager(lastAttackerClientId);
-                if (skillManager != null) skillManager.AddUltimateGaugeForKill();
             }
 
             TriggerDeathAnimClientRpc();
@@ -252,6 +259,13 @@ namespace Vamsurlike.Enemy
 
         public override void OnNetworkDespawn()
         {
+            if (hitFlashCoroutine != null)
+            {
+                StopCoroutine(hitFlashCoroutine);
+                hitFlashCoroutine = null;
+            }
+            RestoreHitFlashBlocks();
+
             base.OnNetworkDespawn();
             if (!IsServer) return;
             EnemyRegistry.Unregister(this);
@@ -290,30 +304,36 @@ namespace Vamsurlike.Enemy
         private void PlayHitFlashClientRpc(bool isCrit)
         {
             if (!gameObject.activeInHierarchy) return;
+
             if (hitFlashCoroutine != null)
+            {
                 StopCoroutine(hitFlashCoroutine);
+                RestoreHitFlashBlocks();
+            }
+
             hitFlashCoroutine = StartCoroutine(HitFlashCoroutine(isCrit));
         }
 
         private IEnumerator HitFlashCoroutine(bool isCrit)
         {
-            Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
-            if (renderers == null || renderers.Length == 0)
+            hitFlashRenderers = GetComponentsInChildren<Renderer>(true);
+            if (hitFlashRenderers == null || hitFlashRenderers.Length == 0)
             {
                 hitFlashCoroutine = null;
                 yield break;
             }
 
-            MaterialPropertyBlock[] originalBlocks = new MaterialPropertyBlock[renderers.Length];
-            Color flashColor = isCrit ? Color.Lerp(hitFlashColor, Color.yellow, 0.35f) : hitFlashColor;
-
-            for (int i = 0; i < renderers.Length; i++)
+            hitFlashOriginalBlocks = new MaterialPropertyBlock[hitFlashRenderers.Length];
+            for (int i = 0; i < hitFlashRenderers.Length; i++)
             {
-                Renderer r = renderers[i];
+                Renderer r = hitFlashRenderers[i];
                 if (r == null) continue;
 
-                originalBlocks[i] = new MaterialPropertyBlock();
-                r.GetPropertyBlock(originalBlocks[i]);
+                hitFlashOriginalBlocks[i] = new MaterialPropertyBlock();
+                r.GetPropertyBlock(hitFlashOriginalBlocks[i]);
+
+                Color baseColor = ResolveRendererColor(r, hitFlashOriginalBlocks[i]);
+                Color flashColor = ApplyHitFlashTint(baseColor, isCrit);
 
                 var block = new MaterialPropertyBlock();
                 r.GetPropertyBlock(block);
@@ -325,13 +345,56 @@ namespace Vamsurlike.Enemy
 
             yield return new WaitForSeconds(Mathf.Max(0.01f, hitFlashDuration));
 
-            for (int i = 0; i < renderers.Length; i++)
+            RestoreHitFlashBlocks();
+            hitFlashCoroutine = null;
+        }
+
+        private Color ApplyHitFlashTint(Color baseColor, bool isCrit)
+        {
+            Color flashColor = new(
+                Mathf.Clamp01(baseColor.r * hitFlashColor.r),
+                Mathf.Clamp01(baseColor.g * hitFlashColor.g),
+                Mathf.Clamp01(baseColor.b * hitFlashColor.b),
+                baseColor.a);
+
+            return isCrit ? Color.Lerp(flashColor, Color.yellow, 0.25f) : flashColor;
+        }
+
+        private static Color ResolveRendererColor(Renderer renderer, MaterialPropertyBlock block)
+        {
+            Color color = Color.white;
+            Material material = renderer != null ? renderer.sharedMaterial : null;
+
+            if (material != null)
             {
-                if (renderers[i] != null)
-                    renderers[i].SetPropertyBlock(originalBlocks[i]);
+                if (material.HasProperty(BaseColorProperty))
+                    color = material.GetColor(BaseColorProperty);
+                else if (material.HasProperty(ColorProperty))
+                    color = material.GetColor(ColorProperty);
             }
 
-            hitFlashCoroutine = null;
+            if (block == null) return color;
+
+            Color blockColor = block.GetColor(BaseColorProperty);
+            if (blockColor != default) return blockColor;
+
+            blockColor = block.GetColor(ColorProperty);
+            return blockColor != default ? blockColor : color;
+        }
+
+        private void RestoreHitFlashBlocks()
+        {
+            if (hitFlashRenderers == null || hitFlashOriginalBlocks == null) return;
+
+            int count = Mathf.Min(hitFlashRenderers.Length, hitFlashOriginalBlocks.Length);
+            for (int i = 0; i < count; i++)
+            {
+                if (hitFlashRenderers[i] != null && hitFlashOriginalBlocks[i] != null)
+                    hitFlashRenderers[i].SetPropertyBlock(hitFlashOriginalBlocks[i]);
+            }
+
+            hitFlashRenderers = null;
+            hitFlashOriginalBlocks = null;
         }
         [ClientRpc]
         private void PlayCameraShakeClientRpc(float intensity, float duration)

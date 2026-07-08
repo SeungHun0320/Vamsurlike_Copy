@@ -27,8 +27,14 @@ namespace Vamsurlike.UI.Events
     {
         public readonly string[] Names;
         public readonly int[]    Levels;
+        public readonly int[]    MaxLevels;
 
-        public SkillSlotsPayload(string[] names, int[] levels) { Names = names; Levels = levels; }
+        public SkillSlotsPayload(string[] names, int[] levels, int[] maxLevels = null)
+        {
+            Names     = names;
+            Levels    = levels;
+            MaxLevels = maxLevels;
+        }
     }
 
     public readonly struct GameFlowPayload

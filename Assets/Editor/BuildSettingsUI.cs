@@ -36,6 +36,7 @@ public static class BuildSettingsUI
         var panelGO = CreateGO("SettingsPanel", canvas.transform);
         SetStretch(panelGO);
         AddImage(panelGO, PanelBg);
+        var canvasGroup = panelGO.AddComponent<CanvasGroup>();
         var settingsUI = panelGO.AddComponent<SettingsUI>();
 
         // ── Dialog (중앙 다이얼로그 박스) ────────────────────────────
@@ -100,11 +101,12 @@ public static class BuildSettingsUI
         so.FindProperty("frameCapDropdown").objectReferenceValue  = fcDropdown;
         so.FindProperty("closeButton").objectReferenceValue       = closeBtn;
         so.FindProperty("openButton").objectReferenceValue        = sbBtn;
+        so.FindProperty("canvasGroup").objectReferenceValue       = canvasGroup;
         so.ApplyModifiedProperties();
 
-        // 처음엔 숨김
-        panelGO.SetActive(false);
-
+        // panelGO는 항상 활성 상태로 둔다 (SettingsUI.Awake()가 CanvasGroup으로 숨김 처리).
+        // 여기서 SetActive(false)로 저장하면 씬 로드 시 Awake()가 실행되지 않아
+        // openButton 리스너가 배선되지 않는 문제가 재발한다.
         EditorUtility.SetDirty(canvas);
         Debug.Log("[BuildSettingsUI] 완료 — SettingsPanel + SettingsButton 생성.");
     }

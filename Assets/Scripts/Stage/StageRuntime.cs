@@ -82,6 +82,8 @@ namespace Vamsurlike.Stage
         // ─── Stage Loading ──────────────────────────────────────────────
         public void LoadStage(int stageId)
         {
+            if (!IsServer) return;
+
             if (!DataManager.Stages.TryGetValue(stageId, out activeStage))
             {
                 Debug.LogError($"[{nameof(StageRuntime)}] stageId={stageId}를 DataManager에서 찾을 수 없습니다.");

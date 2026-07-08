@@ -124,6 +124,7 @@ namespace Vamsurlike.Skills
 
                 hitCooldownUntil[enemy.NetworkObjectId] = Time.time + Projectile.OrbitHitCooldown;
                 enemy.TakeDamage(Projectile.Damage, Projectile.ProjectileOwnerClientId, Projectile.SkillTag);
+                LifestealUtility.Apply(Projectile.CurrentLevelData, Projectile.ProjectileOwnerClientId, Projectile.Damage);
             }
         }
 

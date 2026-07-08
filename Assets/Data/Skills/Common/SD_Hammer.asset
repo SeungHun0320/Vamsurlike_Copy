@@ -20,9 +20,9 @@ MonoBehaviour:
   vfxPrefab: {fileID: 1348174882345252545, guid: beb5e03bcc0b69d4993fba9359467e97, type: 3}
   maxLevel: 3
   levels:
-  - cooldown: 2
-    damage: 60
-    range: 10
+  - cooldown: 3.2
+    damage: 25
+    range: 0
     projectileSpeed: 12
     projectileLifetime: 2
     projectileHitRadius: 0.5
@@ -37,6 +37,8 @@ MonoBehaviour:
     orbitalRotationSpeed: 180
     orbitalHitRadius: 0.65
     orbitalDamageMultiplier: 1
+    orbitalSplashRadius: 0
+    orbitalKnockbackForce: 0
     orbitalHitCooldown: 0.2
     orbitalProjectileScale: 0.75
     detachedOrbitalLifetimeMultiplier: 0.8
@@ -52,16 +54,23 @@ MonoBehaviour:
     scatterBulletCount: 8
     scatterAngle: 60
     burstDuration: 2
-    meleeArcAngle: 60
-    meleeRange: 10
+    meleeRange: 7
+    meleeWidth: 5
     clusterCount: 4
     clusterSpread: 3
     clusterSplashRadius: 1.5
     clusterDamageRatio: 0.5
     pullSpeed: 3
-  - cooldown: 1.8
-    damage: 90
-    range: 10
+    stunDuration: 1.5
+    aftershockCount: 3
+    aftershockRadius: 2
+    aftershockDamageRatio: 0.5
+    aftershockDelay: 0.4
+    lifestealRatio: 0
+    boomerangDamageAmplifyPerStack: 0.15
+  - cooldown: 2.88
+    damage: 38
+    range: 0
     projectileSpeed: 12
     projectileLifetime: 2
     projectileHitRadius: 0.5
@@ -76,6 +85,8 @@ MonoBehaviour:
     orbitalRotationSpeed: 180
     orbitalHitRadius: 0.65
     orbitalDamageMultiplier: 1
+    orbitalSplashRadius: 0
+    orbitalKnockbackForce: 0
     orbitalHitCooldown: 0.2
     orbitalProjectileScale: 0.75
     detachedOrbitalLifetimeMultiplier: 0.8
@@ -91,16 +102,23 @@ MonoBehaviour:
     scatterBulletCount: 8
     scatterAngle: 60
     burstDuration: 2
-    meleeArcAngle: 90
-    meleeRange: 15
+    meleeRange: 8
+    meleeWidth: 6
     clusterCount: 4
     clusterSpread: 3
     clusterSplashRadius: 1.5
     clusterDamageRatio: 0.5
     pullSpeed: 3
-  - cooldown: 1.5
-    damage: 120
-    range: 10
+    stunDuration: 1.5
+    aftershockCount: 3
+    aftershockRadius: 2
+    aftershockDamageRatio: 0.5
+    aftershockDelay: 0.4
+    lifestealRatio: 0
+    boomerangDamageAmplifyPerStack: 0.15
+  - cooldown: 2.4
+    damage: 50
+    range: 0
     projectileSpeed: 12
     projectileLifetime: 2
     projectileHitRadius: 0.5
@@ -115,6 +133,8 @@ MonoBehaviour:
     orbitalRotationSpeed: 180
     orbitalHitRadius: 0.65
     orbitalDamageMultiplier: 1
+    orbitalSplashRadius: 0
+    orbitalKnockbackForce: 0
     orbitalHitCooldown: 0.2
     orbitalProjectileScale: 0.75
     detachedOrbitalLifetimeMultiplier: 0.8
@@ -130,10 +150,17 @@ MonoBehaviour:
     scatterBulletCount: 8
     scatterAngle: 60
     burstDuration: 2
-    meleeArcAngle: 120
-    meleeRange: 20
+    meleeRange: 9
+    meleeWidth: 7
     clusterCount: 4
     clusterSpread: 3
     clusterSplashRadius: 1.5
     clusterDamageRatio: 0.5
     pullSpeed: 3
+    stunDuration: 1.5
+    aftershockCount: 3
+    aftershockRadius: 2
+    aftershockDamageRatio: 0.5
+    aftershockDelay: 0.4
+    lifestealRatio: 0
+    boomerangDamageAmplifyPerStack: 0.15

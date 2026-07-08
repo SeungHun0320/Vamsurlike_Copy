@@ -1761,13 +1761,24 @@ Built-in RP에서는 Shader Graph 의존 대신 ShaderLab/HLSL 기반 `.shader` 
 
 #### Phase 8.7 최적화/밸런스
 
-- [ ] GPU Instancing 적용 (Enemy 대량 렌더링)
+- [X] GPU Instancing 적용 — 적 머티리얼 4종(Enemy A/B/C/D)을 `Assets/Materials/Enemies/`에 복제(BE5 원본 폴더는 보존) 후 `enableInstancing = true` 설정, 4개 적 프리팹 렌더러를 복제본으로 재배선. 같은 타입끼리는 SRP 배칭 조건 충족(동일 메시+동일 머티리얼 인스턴스), 타입 간 배칭은 비주얼 차이가 의도된 것이라 미적용
 - [ ] Network Profiler + CPU Profiler로 병목 확인
-- [ ] Object Visibility 튜닝 (Phase 3 구현 기반, 가시 범위 수치 조정)
-- [ ] XP, 스폰, 스킬 수치 Co-op 밸런싱
-- [ ] 조합 스킬 4종 더 추가
-- [ ] (Phase 7.5에서 이월) 조합 스킬 액티브 수치 강화 — "조합 스킬은 엄청 강하다" 요구사항 반영
-- [ ] (Phase 7.5에서 이월) 조합 레시피 4종의 요구 패시브 재검토 — 현재는 placeholder(클러스터 수류탄←범위크기 / 궤도 수류탄←투사체 / 블랙홀←유지시간 / 관통샷건←치명타확률), 실제 플레이 느낌 보고 조정
+- [X] Object Visibility 튜닝 — `NetworkVisibilityController.cs`의 `visibilityRange`를 50f→65f로 상향. 카메라 실측 가시폭(FollowOffset -18,30,-18 / FOV 40 기준 ≈50유닛)과 기존 값이 거의 겹쳐 화면 가장자리에서 팝인 발생 가능성이 있어 30% 마진 확보. `updateInterval`(0.5s)은 적 이동속도 대비 여유 충분해 유지
+- [ ] XP, 스폰, 스킬 수치 Co-op 밸런싱 — **1차 조정 적용, 미완료**. 만렙 기준 DPS 표로 비교해보니 망치가 압도적으로 튀고(단일 히트 DPS 80, 2위 대비 2배 이상) 진화형(대지분쇄자)이 오히려 기본형보다 약한 역전 현상 확인. 우선 전체 스킬 쿨다운 ×1.6, 데미지 ×0.6 일괄 적용 + 망치는 추가로 더 크게 하향(데미지 60/90/120→25/38/50, 쿨다운 2/1.8/1.5→3.2/2.88/2.4) + 대지분쇄자는 오히려 상향(데미지 50→65, 쿨다운 1.4→2.24)해서 진화 역전 현상 수정. 업그레이드로 추후 보완 가능하다는 전제로 전반적으로 낮춘 것이라 실제 플레이 느낌 보고 추가 조정 필요
+- [X] 조합 스킬 4종 추가(대지분쇄자/질풍확산탄/생명흡수탄/왕복 관통창) — 궁극기(불릿스톰) 기반 조합은 향후 플레이어 종류 확장 시 별도 진행 예정이라 이번엔 제외
+  - **대지분쇄자**(망치 만렙 + 공격력 패시브): 근접 범위 확대 + 기절 추가. `EnemyAI`/`EnemyNetworkBase`에 `ApplyStun` 신규 유틸리티 구현
+  - **질풍확산탄**(SpreadProjectile→"샷건" 만렙 + 스킬가속 패시브): 스킬가속 수치가 쿨다운뿐 아니라 탄속에도 그대로 반영(`SkillCastContext.SkillHasteValue` 신규 필드)
+  - **생명흡수탄**(기본투사체 만렙 + 체력재생 패시브): 투사체 + 그 주위를 도는 위성들(구 OrbitalGrenade 방식 재활용 — 충격궤도는 오빗 소스 그대로 유지, 이쪽은 별도 `SkillCastType.LifeDrainBolt` 신설)이 함께 날아가며, 본체·위성 타격 모두 데미지 비율만큼 흡혈(`SkillLevelData.lifestealRatio` 신규 필드 + `LifestealUtility` 공용 헬퍼, 0이면 기존 스킬 전부 영향 없음)
+  - **왕복 관통창**(PierceProjectile 만렙 + 이동속도 패시브): 전진하며 관통한 적마다 스택 누적 → 최대 사거리에서 반전해 귀환, 스택 수만큼 증폭된 데미지로 재타격. NetworkProjectile을 스폰하지 않고 Grenade류처럼 서버 코루틴이 가상 이동 지점을 직접 시뮬레이션(`SkillLevelData.boomerangDamageAmplifyPerStack` 신규 필드)
+- [X] (Phase 7.5에서 이월) 조합 스킬 액티브 수치 강화 및 메커니즘 개편
+  - **명칭 정정**: "샷건"은 SpreadProjectile(부채꼴 다발 발사)을 가리키는 이름이고 ScatterShot은 원래 이름대로 "기관총"(연속 점사) 유지 — 최초 작업 때 이름을 반대로 붙였던 것을 바로잡음
+  - 샷건(SpreadProjectile, 신규 `SkillCastType.Shotgun`)/관통샷건(PierceShotgun): "쭉 나가는 투사체" → "원뿔 범위 즉발 판정" 방식으로 전면 개편. 샷건은 원뿔 내 최근접 1명만, 관통샷건(진화)은 원뿔 내 전체 적 타격. 기관총(ScatterShot)은 기존 연속 점사 방식 그대로 유지
+  - 궤도 수류탄: "투사체를 던져 그 주위로 위성 회전" → 기존 오빗처럼 "플레이어 중심 정적 공전"으로 변경 + 스플래시 데미지·넉백 추가(`SkillLevelData.orbitalSplashRadius`/`orbitalKnockbackForce` 신규 필드, `EnemyAI.ApplyKnockback` 신규 유틸리티)
+  - 스킬 표시명 정리: "오비탈 샷" → "충격 궤도" (변경된 메커니즘에 맞게)
+- [ ] (Phase 7.5에서 이월) 조합 레시피 4종(클러스터 수류탄←범위크기 / 궤도 수류탄←투사체 / 블랙홀←유지시간 / 관통샷건←치명타확률)의 요구 패시브 재검토 — 실제 플레이 느낌 보고 조정
+- [ ] **(별도 세션으로 분리) `SkillLevelData` 구조 리팩터링** — 현재 하나의 거대 플랫 클래스(약 50개 필드)를 스킬 타입 16종이 전부 공유해서, 타입마다 안 쓰는 필드가 항상 0으로 남는 구조(예: 망치의 공용 `range`가 실제로는 `meleeRange`와 중복이라 죽은 값). `Assets/Editor/SkillDataSOEditor.cs`의 switch문도 타입 늘어날 때마다 계속 커짐(RULES.md 인터페이스 분리 원칙과 어긋남)
+  - 방향: `SkillLevelData`를 추상 베이스 + 타입별 서브클래스로 분리, `[SerializeReference]` 기반 다형성 직렬화로 전환
+  - 이번 세션에 이 정확히 같은 에셋들(SkillDataSO)을 스크립트로 일괄 조작하다 레벨 데이터 유실 사고가 2번 있었음 — `[SerializeReference]`는 타입명 변경 시 참조가 깨지는 등 더 다루기 까다로워서, 급하게 이어서 하지 않고 **커밋 체크포인트 잡고 타입 하나씩 검증하며 별도 세션에서 진행**하기로 함
 
 예상 기간: 1~2주
 

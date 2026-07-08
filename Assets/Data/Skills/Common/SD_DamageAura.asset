@@ -20,8 +20,8 @@ MonoBehaviour:
   vfxPrefab: {fileID: 100000, guid: 42d8e21b1cd94e829d54bf8352726ca8, type: 3}
   maxLevel: 2
   levels:
-  - cooldown: 0.8
-    damage: 6
+  - cooldown: 1.28
+    damage: 3.6
     range: 6
     projectileSpeed: 1
     projectileLifetime: 1
@@ -36,11 +36,40 @@ MonoBehaviour:
     orbitalRadius: 2
     orbitalRotationSpeed: 180
     orbitalHitRadius: 0.65
+    orbitalDamageMultiplier: 1
+    orbitalSplashRadius: 0
+    orbitalKnockbackForce: 0
+    orbitalHitCooldown: 0.2
+    orbitalProjectileScale: 0.75
+    detachedOrbitalLifetimeMultiplier: 0.8
+    detachedOrbitalHomingDelay: 0.2
+    detachedOrbitalHomingRange: 18
+    detachedOrbitalHomingTurnSpeed: 540
     waveCount: 1
     waveDelay: 0.15
     rotationPerWave: 30
-  - cooldown: 0.65
-    damage: 9
+    grenadeRange: 6
+    grenadeArcHeight: 3
+    splashRadius: 2.5
+    scatterBulletCount: 8
+    scatterAngle: 60
+    burstDuration: 2
+    meleeRange: 2.5
+    meleeWidth: 3
+    clusterCount: 4
+    clusterSpread: 3
+    clusterSplashRadius: 1.5
+    clusterDamageRatio: 0.5
+    pullSpeed: 3
+    stunDuration: 1.5
+    aftershockCount: 3
+    aftershockRadius: 2
+    aftershockDamageRatio: 0.5
+    aftershockDelay: 0.4
+    lifestealRatio: 0
+    boomerangDamageAmplifyPerStack: 0.15
+  - cooldown: 1.04
+    damage: 5.4
     range: 7
     projectileSpeed: 1
     projectileLifetime: 1
@@ -55,6 +84,35 @@ MonoBehaviour:
     orbitalRadius: 2
     orbitalRotationSpeed: 180
     orbitalHitRadius: 0.65
+    orbitalDamageMultiplier: 1
+    orbitalSplashRadius: 0
+    orbitalKnockbackForce: 0
+    orbitalHitCooldown: 0.2
+    orbitalProjectileScale: 0.75
+    detachedOrbitalLifetimeMultiplier: 0.8
+    detachedOrbitalHomingDelay: 0.2
+    detachedOrbitalHomingRange: 18
+    detachedOrbitalHomingTurnSpeed: 540
     waveCount: 1
     waveDelay: 0.15
     rotationPerWave: 30
+    grenadeRange: 6
+    grenadeArcHeight: 3
+    splashRadius: 2.5
+    scatterBulletCount: 8
+    scatterAngle: 60
+    burstDuration: 2
+    meleeRange: 2.5
+    meleeWidth: 3
+    clusterCount: 4
+    clusterSpread: 3
+    clusterSplashRadius: 1.5
+    clusterDamageRatio: 0.5
+    pullSpeed: 3
+    stunDuration: 1.5
+    aftershockCount: 3
+    aftershockRadius: 2
+    aftershockDamageRatio: 0.5
+    aftershockDelay: 0.4
+    lifestealRatio: 0
+    boomerangDamageAmplifyPerStack: 0.15

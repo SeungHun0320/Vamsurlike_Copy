@@ -48,6 +48,16 @@ namespace Vamsurlike.Editor
 
             EditorGUILayout.Space(6f);
             EditorGUILayout.PropertyField(maxLevel);
+
+            // levels 배열 크기는 항상 maxLevel과 동기화한다. 예전엔 별도의 수동 "Levels Size" IntField로
+            // levels.arraySize를 직접 편집할 수 있었는데, 어셈블리 리로드 직후 등 GUI 값이 일시적으로
+            // 어긋나는 상황에서 실수로 더 작은 값이 커밋되면 기존 레벨 데이터가 확인 없이 조용히
+            // 삭제되는 사고가 있었다(대지분쇄자 3레벨 → 1레벨로 유실). maxLevel 하나만 신뢰 가능한
+            // 소스로 두고 배열 크기를 거기서만 파생시킨다.
+            int targetSize = Mathf.Max(1, maxLevel.intValue);
+            if (levels.arraySize != targetSize)
+                levels.arraySize = targetSize;
+
             DrawLevels(type);
 
             serializedObject.ApplyModifiedProperties();
@@ -55,10 +65,6 @@ namespace Vamsurlike.Editor
 
         private void DrawLevels(SkillCastType type)
         {
-            int size = Mathf.Max(0, EditorGUILayout.IntField("Levels Size", levels.arraySize));
-            if (size != levels.arraySize)
-                levels.arraySize = size;
-
             EditorGUI.indentLevel++;
             for (int i = 0; i < levels.arraySize; i++)
             {
@@ -90,6 +96,8 @@ namespace Vamsurlike.Editor
             {
                 case SkillCastType.Projectile:
                     DrawProjectileSection(level, includeCountAndSpread: true, includePierce: true);
+                    DrawSection("Lifesteal");
+                    DrawField(level, "lifestealRatio");
                     break;
 
                 case SkillCastType.AreaAura:
@@ -104,8 +112,17 @@ namespace Vamsurlike.Editor
                     break;
 
                 case SkillCastType.OrbitalGrenade:
-                    DrawProjectileSection(level, includeCountAndSpread: false, includePierce: true);
-                    DrawOrbitalSection(level, includeProjectileDetach: true);
+                    DrawOrbitalSection(level, includeProjectileDetach: false);
+                    DrawSection("Orbital Grenade (충격 궤도)");
+                    DrawField(level, "orbitalKnockbackForce");
+                    break;
+
+                case SkillCastType.BlackHole:
+                    DrawPersistentSection(level);
+                    DrawSection("Area");
+                    DrawField(level, "areaRadius");
+                    DrawSection("BlackHole");
+                    DrawField(level, "pullSpeed");
                     break;
 
                 case SkillCastType.Ultimate:
@@ -123,18 +140,70 @@ namespace Vamsurlike.Editor
                     DrawField(level, "splashRadius");
                     break;
 
+                case SkillCastType.ClusterGrenade:
+                    DrawSection("Grenade");
+                    DrawField(level, "grenadeRange");
+                    DrawField(level, "grenadeArcHeight");
+                    DrawField(level, "splashRadius");
+                    DrawSection("Cluster Grenade");
+                    DrawField(level, "clusterCount");
+                    DrawField(level, "clusterSpread");
+                    DrawField(level, "clusterSplashRadius");
+                    DrawField(level, "clusterDamageRatio");
+                    break;
+
                 case SkillCastType.ScatterShot:
                     DrawProjectileSection(level, includeCountAndSpread: false, includePierce: true);
-                    DrawSection("Scatter Shot");
+                    DrawSection("Scatter Shot (기관총)");
                     DrawField(level, "scatterBulletCount");
                     DrawField(level, "scatterAngle");
                     DrawField(level, "burstDuration");
                     break;
 
                 case SkillCastType.Melee:
-                    DrawSection("Melee");
-                    DrawField(level, "meleeArcAngle");
+                    DrawSection("Melee (사각형 판정)");
                     DrawField(level, "meleeRange");
+                    DrawField(level, "meleeWidth");
+                    break;
+
+                case SkillCastType.PierceShotgun:
+                case SkillCastType.Shotgun:
+                    DrawSection("Shotgun (원뿔 즉발)");
+                    DrawField(level, "scatterAngle");
+                    break;
+
+                case SkillCastType.Earthshatter:
+                    DrawSection("Melee (사각형 판정)");
+                    DrawField(level, "meleeRange");
+                    DrawField(level, "meleeWidth");
+                    DrawSection("Earthshatter (대지분쇄자)");
+                    DrawField(level, "stunDuration");
+                    DrawField(level, "aftershockCount");
+                    DrawField(level, "aftershockRadius");
+                    DrawField(level, "aftershockDamageRatio");
+                    DrawField(level, "aftershockDelay");
+                    break;
+
+                case SkillCastType.GaleSpread:
+                    DrawProjectileSection(level, includeCountAndSpread: false, includePierce: false);
+                    DrawSection("Scatter Shot (기관총 재사용)");
+                    DrawField(level, "scatterBulletCount");
+                    DrawField(level, "scatterAngle");
+                    DrawField(level, "burstDuration");
+                    break;
+
+                case SkillCastType.PiercingBoomerang:
+                    DrawSection("Projectile");
+                    DrawField(level, "projectileSpeed");
+                    DrawField(level, "projectileHitRadius");
+                    DrawSection("Piercing Boomerang (왕복 관통창)");
+                    DrawField(level, "boomerangDamageAmplifyPerStack");
+                    break;
+
+                case SkillCastType.LifeDrainBolt:
+                    DrawOrbitalSection(level, includeProjectileDetach: true);
+                    DrawSection("Lifesteal");
+                    DrawField(level, "lifestealRatio");
                     break;
             }
         }
@@ -199,16 +268,23 @@ namespace Vamsurlike.Editor
             type == SkillCastType.Projectile ||
             type == SkillCastType.ScatterShot ||
             type == SkillCastType.Ultimate ||
-            type == SkillCastType.OrbitalGrenade;
+            type == SkillCastType.GaleSpread ||
+            type == SkillCastType.LifeDrainBolt;
 
         private static bool UsesVFXPrefab(SkillCastType type) =>
             type == SkillCastType.Grenade ||
-            type == SkillCastType.Melee;
+            type == SkillCastType.ClusterGrenade ||
+            type == SkillCastType.Melee ||
+            type == SkillCastType.Earthshatter;
 
         private static bool UsesRange(SkillCastType type) =>
             type == SkillCastType.Projectile ||
             type == SkillCastType.AreaAura ||
             type == SkillCastType.ScatterShot ||
-            type == SkillCastType.OrbitalGrenade;
+            type == SkillCastType.BlackHole ||
+            type == SkillCastType.PierceShotgun ||
+            type == SkillCastType.Shotgun ||
+            type == SkillCastType.PiercingBoomerang ||
+            type == SkillCastType.LifeDrainBolt;
     }
 }

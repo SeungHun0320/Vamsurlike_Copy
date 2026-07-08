@@ -17,18 +17,21 @@ namespace Vamsurlike.Skills
     {
         public FixedString64Bytes skillName;
         public int                level;
+        public int                maxLevel;
 
-        public SkillSlotSyncData(string skillName, int level)
+        public SkillSlotSyncData(string skillName, int level, int maxLevel)
         {
             this.skillName = default;
             this.skillName.CopyFromTruncated(string.IsNullOrWhiteSpace(skillName) ? "?" : skillName);
-            this.level = level;
+            this.level    = level;
+            this.maxLevel = Mathf.Max(1, maxLevel);
         }
 
         public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
         {
             serializer.SerializeValue(ref skillName);
             serializer.SerializeValue(ref level);
+            serializer.SerializeValue(ref maxLevel);
         }
     }
 
@@ -162,13 +165,6 @@ namespace Vamsurlike.Skills
             ManualCooldownDuration.Value = DefaultManualCooldown;
         }
 
-        public void AddUltimateGaugeForDamage(float rawDamage)
-        {
-        }
-
-        public void AddUltimateGaugeForKill()
-        {
-        }
         public bool LearnSkill(SkillDataSO skill)
         {
             if (!IsServer || skill == null) return false;
@@ -325,6 +321,9 @@ namespace Vamsurlike.Skills
             float durationMultiplier = passiveStatHandler != null
                 ? passiveStatHandler.DurationMultiplier.Value
                 : 1f;
+            float skillHasteValue = passiveStatHandler != null
+                ? passiveStatHandler.SkillHaste.Value
+                : 0f;
             float baseSpeed = characterData != null ? characterData.baseMoveSpeed : 1f;
             float currentSpeed = playerStats != null
                 ? playerStats.MoveSpeed.Value
@@ -352,7 +351,8 @@ namespace Vamsurlike.Skills
                 speedMultiplier,
                 areaMultiplier,
                 bonusProjectileCount,
-                durationMultiplier);
+                durationMultiplier,
+                skillHasteValue);
 
             bool casted = executor.TryExecute(context);
             // 지속형 스킬(오라/오비탈)은 틱마다 TryCast가 재호출되므로 캐스트 SFX 대상에서 제외 —
@@ -394,17 +394,19 @@ namespace Vamsurlike.Skills
             ClientRpcParams rpcParams = default)
         {
             int count = slots != null ? slots.Length : 0;
-            string[] names  = count > 0 ? new string[count] : Array.Empty<string>();
-            int[]    levels = count > 0 ? new int[count]    : Array.Empty<int>();
+            string[] names     = count > 0 ? new string[count] : Array.Empty<string>();
+            int[]    levels    = count > 0 ? new int[count]    : Array.Empty<int>();
+            int[]    maxLevels = count > 0 ? new int[count]    : Array.Empty<int>();
 
             for (int i = 0; i < count; i++)
             {
-                names[i]  = slots[i].skillName.ToString();
-                levels[i] = slots[i].level;
+                names[i]     = slots[i].skillName.ToString();
+                levels[i]    = slots[i].level;
+                maxLevels[i] = slots[i].maxLevel;
             }
 
             OnSkillsSynced?.Invoke(names, levels); // 임시 경유지 (Phase 8 마이그레이션 완료 후 제거)
-            UIEventHub.Instance?.Skill.PublishSkillSlotsChanged(new SkillSlotsPayload(names, levels));
+            UIEventHub.Instance?.Skill.PublishSkillSlotsChanged(new SkillSlotsPayload(names, levels, maxLevels));
         }
 
         private void BuildExecutorRegistry()
@@ -423,6 +425,11 @@ namespace Vamsurlike.Skills
             Register(new OrbitalGrenadeSkill());
             Register(new BlackHoleSkill());
             Register(new PierceShotgunSkill());
+            Register(new EarthshatterSkill());
+            Register(new GaleSpreadSkill());
+            Register(new ShotgunSkill());
+            Register(new PiercingBoomerangSkill());
+            Register(new LifeDrainBoltSkill());
         }
 
         private void Register(SkillBase executor)

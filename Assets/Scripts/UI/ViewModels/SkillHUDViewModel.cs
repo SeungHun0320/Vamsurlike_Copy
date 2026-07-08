@@ -8,11 +8,14 @@ namespace Vamsurlike.UI.ViewModels
     {
         public readonly string Name;
         public readonly int Level;
+        public readonly int MaxLevel;
+        public bool IsMaxLevel => MaxLevel > 0 && Level >= MaxLevel;
 
-        public SkillHUDSlotViewData(string name, int level)
+        public SkillHUDSlotViewData(string name, int level, int maxLevel = 0)
         {
             Name = string.IsNullOrWhiteSpace(name) ? "-" : name;
             Level = Math.Max(1, level);
+            MaxLevel = Math.Max(0, maxLevel);
         }
     }
 
@@ -50,7 +53,10 @@ namespace Vamsurlike.UI.ViewModels
                 int level = payload.Levels != null && i < payload.Levels.Length
                     ? payload.Levels[i]
                     : 1;
-                slots.Add(new SkillHUDSlotViewData(payload.Names[i], level));
+                int maxLevel = payload.MaxLevels != null && i < payload.MaxLevels.Length
+                    ? payload.MaxLevels[i]
+                    : 0;
+                slots.Add(new SkillHUDSlotViewData(payload.Names[i], level, maxLevel));
             }
 
             OnSkillsChanged?.Invoke(slots);

@@ -12,94 +12,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6b4a51447856db045ae04069e1460781, type: 3}
   m_Name: SD_OrbitalGrenade
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Data.SkillDataSO
-  skillName: "\uC624\uBE44\uD0C8 \uC0F7"
+  skillName: "\uCDA9\uACA9 \uADA4\uB3C4"
   icon: {fileID: 0}
   castType: 8
   isManual: 0
   projectilePrefab: {fileID: 4756532345730749531, guid: d2ea673924e42cb43b7bdd7a34a25601, type: 3}
   vfxPrefab: {fileID: 0}
-  maxLevel: 3
+  maxLevel: 1
   levels:
-  - cooldown: 3
-    damage: 25
-    range: 25
-    projectileSpeed: 12
-    projectileLifetime: 2
-    projectileHitRadius: 0.5
-    projectileCount: 1
-    spreadAngle: 0
-    pierceCount: 0
-    duration: 0
-    tickInterval: 1
-    areaRadius: 0
-    orbitalCount: 2
-    orbitalRadius: 4
-    orbitalRotationSpeed: 150
-    orbitalHitRadius: 0.5
-    orbitalDamageMultiplier: 1
-    orbitalHitCooldown: 0.2
-    orbitalProjectileScale: 0.75
-    detachedOrbitalLifetimeMultiplier: 0.8
-    detachedOrbitalHomingDelay: 0.2
-    detachedOrbitalHomingRange: 18
-    detachedOrbitalHomingTurnSpeed: 540
-    waveCount: 0
-    waveDelay: 0
-    rotationPerWave: 0
-    grenadeRange: 0
-    grenadeArcHeight: 0
-    splashRadius: 0
-    scatterBulletCount: 0
-    scatterAngle: 0
-    burstDuration: 0
-    meleeArcAngle: 0
-    meleeRange: 0
-    clusterCount: 0
-    clusterSpread: 0
-    clusterSplashRadius: 0
-    clusterDamageRatio: 0
-    pullSpeed: 0
-  - cooldown: 2.5
-    damage: 32
-    range: 25
-    projectileSpeed: 12
-    projectileLifetime: 2
-    projectileHitRadius: 0.5
-    projectileCount: 1
-    spreadAngle: 0
-    pierceCount: 0
-    duration: 0
-    tickInterval: 1
-    areaRadius: 0
-    orbitalCount: 3
-    orbitalRadius: 4
-    orbitalRotationSpeed: 170
-    orbitalHitRadius: 0.5
-    orbitalDamageMultiplier: 1
-    orbitalHitCooldown: 0.2
-    orbitalProjectileScale: 0.75
-    detachedOrbitalLifetimeMultiplier: 0.8
-    detachedOrbitalHomingDelay: 0.2
-    detachedOrbitalHomingRange: 18
-    detachedOrbitalHomingTurnSpeed: 540
-    waveCount: 0
-    waveDelay: 0
-    rotationPerWave: 0
-    grenadeRange: 0
-    grenadeArcHeight: 0
-    splashRadius: 0
-    scatterBulletCount: 0
-    scatterAngle: 0
-    burstDuration: 0
-    meleeArcAngle: 0
-    meleeRange: 0
-    clusterCount: 0
-    clusterSpread: 0
-    clusterSplashRadius: 0
-    clusterDamageRatio: 0
-    pullSpeed: 0
-  - cooldown: 2
-    damage: 42
+  - cooldown: 3.2
+    damage: 25.2
     range: 25
     projectileSpeed: 12
     projectileLifetime: 2.5
@@ -115,25 +37,34 @@ MonoBehaviour:
     orbitalRotationSpeed: 200
     orbitalHitRadius: 0.5
     orbitalDamageMultiplier: 1
+    orbitalSplashRadius: 0
+    orbitalKnockbackForce: 4
     orbitalHitCooldown: 0.2
     orbitalProjectileScale: 0.75
     detachedOrbitalLifetimeMultiplier: 0.8
     detachedOrbitalHomingDelay: 0.2
     detachedOrbitalHomingRange: 18
     detachedOrbitalHomingTurnSpeed: 540
-    waveCount: 0
-    waveDelay: 0
-    rotationPerWave: 0
-    grenadeRange: 0
-    grenadeArcHeight: 0
-    splashRadius: 0
-    scatterBulletCount: 0
-    scatterAngle: 0
-    burstDuration: 0
-    meleeArcAngle: 0
-    meleeRange: 0
-    clusterCount: 0
-    clusterSpread: 0
-    clusterSplashRadius: 0
-    clusterDamageRatio: 0
-    pullSpeed: 0
+    waveCount: 1
+    waveDelay: 0.15
+    rotationPerWave: 30
+    grenadeRange: 6
+    grenadeArcHeight: 3
+    splashRadius: 2.5
+    scatterBulletCount: 8
+    scatterAngle: 60
+    burstDuration: 2
+    meleeRange: 2.5
+    meleeWidth: 3
+    clusterCount: 4
+    clusterSpread: 3
+    clusterSplashRadius: 1.5
+    clusterDamageRatio: 0.5
+    pullSpeed: 3
+    stunDuration: 1.5
+    aftershockCount: 3
+    aftershockRadius: 2
+    aftershockDamageRatio: 0.5
+    aftershockDelay: 0.4
+    lifestealRatio: 0
+    boomerangDamageAmplifyPerStack: 0.15
