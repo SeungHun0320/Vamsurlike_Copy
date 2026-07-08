@@ -8,7 +8,7 @@ namespace Vamsurlike.Items
     public sealed class ItemPickupBobber : MonoBehaviour
     {
         [SerializeField] private float groundOffset = 0.5f;
-        [SerializeField] private float bobAmplitude = 0.15f;
+        [SerializeField] private float bobAmplitude = 0.3f;
         [SerializeField] private float bobFrequency = 1.5f;
         [SerializeField] private float spinDegreesPerSecond = 90f;
 

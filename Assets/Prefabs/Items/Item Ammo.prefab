@@ -202,6 +202,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Items.ItemPickupBobber
   groundOffset: 0.75
-  bobAmplitude: 0.15
+  bobAmplitude: 0.3
   bobFrequency: 1.5
   spinDegreesPerSecond: 90

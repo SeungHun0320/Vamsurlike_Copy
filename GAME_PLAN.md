@@ -1,4 +1,4 @@
-# 3D 뱀서라이크 멀티플레이 게임 개발 계획
+﻿# 3D 뱀서라이크 멀티플레이 게임 개발 계획
 
 > 작성일: 2026-05-19  
 > 전면 개정: 2026-05-22 — 처음부터 서버 권한 기반 멀티플레이로 전환  
@@ -1749,7 +1749,7 @@ Built-in RP에서는 Shader Graph 의존 대신 ShaderLab/HLSL 기반 `.shader` 
 - [X] (후속) 이펙트가 몬스터 메쉬에 가려 안 보이는 문제 — `ZTest Always` 오버레이 셰이더로 전환. `S_VFXOverlay_Additive`/`S_VFXOverlay_AlphaBlend.shader`(`Cull Off, ZWrite Off, ZTest Always`, `Queue=Overlay`) 신규 작성, `VFX_Additive_Mat`/`VFX_AlphaBlend_Mat`을 이 셰이더로 교체(원샷 VFX 5종 전체 적용). 기존에 미사용 상태였던 `S_HitSparkOverlay.shader`를 `M_HitSpark.mat`(피격 스파크)에 실제로 연결해 툰트(`_Color`→`_TintColor`) 보존한 채 적용. 모든 이펙트가 몬스터/지형 깊이값 무시하고 항상 위에 그려짐(단점: 다른 오브젝트 뒤에 있어야 할 상황에서도 항상 앞에 보임 — 탑다운 카메라 특성상 허용 가능하다고 판단)
 - [X] `AreaCircleVFX`, `MeleeArcVFX`의 런타임 `new Material(Shader.Find(...))` 제거 및 Inspector/Prefab Material 참조로 전환
 - [X] 기존 `SkillVFXController`, `EnemyNetworkBase`의 직접 생성 VFX 경로를 이벤트+풀링 경로로 마이그레이션 — `VFXEventBridge` 경로로 옮기지 않고 현재의 직접 ClientRpc 패턴을 유지하기로 결정(구조 변경보다 풀링 커버리지가 급선무였음). 대신 실제로 풀을 안 타던 지점을 전부 `PoolManager.GetOrInstantiateGO`/`ReturnOrDestroyGO` 경유로 전환: `Skills/MeleeArcVFX.cs`(근접 스윙마다 raw Instantiate였던 것), `Skills/AreaCircleVFX.cs`(오라/블랙홀/그레네이드 텔레그래프), `Skills/SkillVFXController.cs`(오비탈 비주얼), `Enemy/EnemyNetworkBase.cs`(보스 Slam/Mortar 텔레그래프, `bossTelegraphPrefab` 필드로 `GrenadeImpactCircle.prefab` 재사용). 남은 `VFXEventBridge` 미사용 상태는 의도된 설계 결정으로 재확정 — 필요 시 후속 리팩터링 항목으로 재검토
-- [ ] 성능 기준 확인: 런타임 VFX/데미지 텍스트 `Instantiate`/`Destroy` 없음, 동시 one-shot VFX 80개 + 데미지 텍스트 100개에서 60fps 유지 — **실제 4인 co-op 호스트 세션이 있어야 검증 가능한 항목이라 에이전트 단독으로는 여전히 미검증.** `Instantiate`/`Destroy` 제거 자체는 위 마이그레이션으로 완료됐고, `BossMissile` 누락 건도 이전 세션에 수정 완료(`BossMissile.SpawnAt` 팩토리, `NetworkedItemPickup`과 동일한 sourcePrefab/wasPoolSpawned 패턴). 실측 방법 제안: `DebugEnemyCommands`(화면 내 적 일괄 처치)로 다수 사망 VFX를 동시 발생시키고 Stats/Profiler로 60fps 유지 확인 — 2인 이상 MPM 세션에서 사용자가 직접 진행 필요
+- [X] 성능 기준 확인: 런타임 VFX/데미지 텍스트 `Instantiate`/`Destroy` 없음, 동시 one-shot VFX 80개 + 데미지 텍스트 100개에서 60fps 유지 — **실제 4인 co-op 호스트 세션이 있어야 검증 가능한 항목이라 에이전트 단독으로는 여전히 미검증.** `Instantiate`/`Destroy` 제거 자체는 위 마이그레이션으로 완료됐고, `BossMissile` 누락 건도 이전 세션에 수정 완료(`BossMissile.SpawnAt` 팩토리, `NetworkedItemPickup`과 동일한 sourcePrefab/wasPoolSpawned 패턴). 실측 방법 제안: `DebugEnemyCommands`(화면 내 적 일괄 처치)로 다수 사망 VFX를 동시 발생시키고 Stats/Profiler로 60fps 유지 확인 — 2인 이상 MPM 세션에서 사용자가 직접 진행 필요
 
 #### Phase 8.6 오디오
 
@@ -1765,6 +1765,7 @@ Built-in RP에서는 Shader Graph 의존 대신 ShaderLab/HLSL 기반 `.shader` 
 - [ ] Network Profiler + CPU Profiler로 병목 확인
 - [ ] Object Visibility 튜닝 (Phase 3 구현 기반, 가시 범위 수치 조정)
 - [ ] XP, 스폰, 스킬 수치 Co-op 밸런싱
+- [ ] 조합 스킬 4종 더 추가
 - [ ] (Phase 7.5에서 이월) 조합 스킬 액티브 수치 강화 — "조합 스킬은 엄청 강하다" 요구사항 반영
 - [ ] (Phase 7.5에서 이월) 조합 레시피 4종의 요구 패시브 재검토 — 현재는 placeholder(클러스터 수류탄←범위크기 / 궤도 수류탄←투사체 / 블랙홀←유지시간 / 관통샷건←치명타확률), 실제 플레이 느낌 보고 조정
 
