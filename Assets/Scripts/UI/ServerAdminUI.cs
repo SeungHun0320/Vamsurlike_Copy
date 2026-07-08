@@ -12,6 +12,8 @@ namespace Vamsurlike.UI
     {
         [SerializeField] private GameObject panel;
         [SerializeField] private TextMeshProUGUI playerCountText;
+        // 서버 모드 정리 시에도 꺼지면 안 되는 형제 오브젝트(설정 버튼/패널 등) — 이름으로 매칭.
+        [SerializeField] private string[] preserveSiblingNames = { "SettingsButton", "SettingsPanel" };
         [SerializeField, Min(10)] private int maxVisibleLogLines = 500;
         [Header("Layout")]
         [SerializeField] private Vector2 panelSize = new(1520f, 1040f);
@@ -64,11 +66,14 @@ namespace Vamsurlike.UI
             }
 
             // panel 외 Canvas의 모든 직접 자식 비활성화 (배경/타이틀 등 잔여 요소 제거)
+            // 단, preserveSiblingNames에 등록된 것(설정 버튼/패널 등)은 서버 모드에서도 그대로 둔다.
             for (int i = 0; i < transform.childCount; i++)
             {
                 var child = transform.GetChild(i).gameObject;
-                if (child != panel)
-                    child.SetActive(false);
+                if (child == panel) continue;
+                if (System.Array.IndexOf(preserveSiblingNames, child.name) >= 0) continue;
+
+                child.SetActive(false);
             }
 
             s_persistent = this;
