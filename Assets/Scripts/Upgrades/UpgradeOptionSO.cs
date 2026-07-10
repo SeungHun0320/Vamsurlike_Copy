@@ -40,5 +40,16 @@ namespace Vamsurlike.Upgrades
 
         // SkillLevelUp / NewSkill: 대상 스킬 SO 직접 참조
         public SkillDataSO skillData;
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            bool requiresSkillData = effectType is UpgradeEffectType.SkillLevelUp or UpgradeEffectType.NewSkill;
+            if (requiresSkillData && skillData == null)
+                Debug.LogWarning($"[{nameof(UpgradeOptionSO)}] \"{name}\": effectType={effectType}인데 skillData가 비어 있습니다.", this);
+            else if (!requiresSkillData && skillData != null)
+                Debug.LogWarning($"[{nameof(UpgradeOptionSO)}] \"{name}\": effectType={effectType}(패시브)인데 skillData(\"{skillData.name}\")가 설정되어 있습니다 — 사용되지 않는 참조입니다.", this);
+        }
+#endif
     }
 }

@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.AI;
 using Vamsurlike.Data.Runtime;
 using Vamsurlike.Network;
 using SysRandom = System.Random;
@@ -11,8 +12,18 @@ namespace Vamsurlike.Stage
 {
     public class WaveController : MonoBehaviour
     {
-        [SerializeField] private float spawnRadius = 15f;
+        [SerializeField] private float spawnRadius = 15f; // SpawnEliteRing 전용 — 플레이어 그룹을 포위하는 반경
         [SerializeField] private int   randomSeed  = 42;
+
+        // 스테이지 Ground에 부착된 MapSpawnBounds가 있으면 그쪽이 우선한다 — 스테이지마다 크기가
+        // 다를 수 있으므로 여기 값은 MapSpawnBounds가 없을 때만 쓰이는 폴백(Stage_01 기준)이다.
+        [SerializeField] private MapSpawnBounds spawnBounds;
+        [SerializeField] private float mapSpawnHalfExtent   = 220f;
+        [SerializeField] private float navMeshSampleRadius  = 10f;
+        private const int MaxMapSpawnAttempts = 5;
+
+        private float EffectiveHalfExtent   => spawnBounds != null ? spawnBounds.halfExtent          : mapSpawnHalfExtent;
+        private float EffectiveSampleRadius => spawnBounds != null ? spawnBounds.navMeshSampleRadius : navMeshSampleRadius;
 
         private SysRandom         rng;
         private EnemySpawnManager spawnManager;
@@ -128,7 +139,7 @@ namespace Vamsurlike.Stage
 
                 for (int i = 0; i < count; i++)
                 {
-                    SpawnNearRandomPlayer(entry.EnemyName, hpMul, dmgMul);
+                    SpawnAnywhereOnMap(entry.EnemyName, hpMul, dmgMul);
                     yield return new WaitForSeconds(interval);
                 }
             }
@@ -166,23 +177,33 @@ namespace Vamsurlike.Stage
         }
 
         // ─── Spawn Helpers ──────────────────────────────────────────────
-        private void SpawnNearRandomPlayer(string enemyName, float hpMul = 1f, float dmgMul = 1f)
+        // 기본 웨이브 스폰 — 플레이어 근처로만 몰리지 않도록 맵 전체 범위에서 무작위 지점을 고른다.
+        private void SpawnAnywhereOnMap(string enemyName, float hpMul = 1f, float dmgMul = 1f)
         {
             if (spawnManager == null) return;
 
-            var clients = NetworkManager.Singleton.ConnectedClientsList;
-            if (clients.Count == 0) return;
-
-            var     target = clients[rng.Next(clients.Count)];
-            Vector3 center = target.PlayerObject != null
-                ? target.PlayerObject.transform.position
-                : Vector3.zero;
-
-            double  angle = rng.NextDouble() * System.Math.PI * 2.0;
-            var     dir   = new Vector2((float)System.Math.Cos(angle), (float)System.Math.Sin(angle));
-            Vector3 pos   = center + new Vector3(dir.x, 0f, dir.y) * spawnRadius;
-
+            Vector3 pos = FindValidMapPosition();
             spawnManager.SpawnEnemyByName(enemyName, pos, hpMul, dmgMul);
+        }
+
+        // 맵 범위 내 무작위 좌표를 몇 번 시도해 NavMesh 위 유효한 지점을 찾는다.
+        // 전부 실패하면(맵 가장자리 등 NavMesh 없는 지점만 뽑힌 경우) 원점 근처로 안전하게 폴백한다.
+        private Vector3 FindValidMapPosition()
+        {
+            float halfExtent   = EffectiveHalfExtent;
+            float sampleRadius = EffectiveSampleRadius;
+
+            for (int attempt = 0; attempt < MaxMapSpawnAttempts; attempt++)
+            {
+                float x = (float)(rng.NextDouble() * 2.0 - 1.0) * halfExtent;
+                float z = (float)(rng.NextDouble() * 2.0 - 1.0) * halfExtent;
+
+                if (NavMesh.SamplePosition(new Vector3(x, 0f, z), out NavMeshHit hit, sampleRadius, NavMesh.AllAreas))
+                    return hit.position;
+            }
+
+            Debug.LogWarning($"[{nameof(WaveController)}] 맵 전체 스폰 위치를 {MaxMapSpawnAttempts}회 시도했지만 NavMesh를 찾지 못해 원점 근처로 폴백합니다.");
+            return Vector3.zero;
         }
 
         private Vector3 GetCenterPosition()

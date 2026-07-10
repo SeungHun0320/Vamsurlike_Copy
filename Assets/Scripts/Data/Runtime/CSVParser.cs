@@ -53,20 +53,39 @@ namespace Vamsurlike.Data.Runtime
             throw new FormatException($"[CSV] {lineNum}번 줄 '{field}': '{s}' → {typeof(T).Name} 변환 실패");
         }
 
-        // "EnemyData_A:5:0.6|EnemyData_B:3:0.8" 형식 파싱
-        public static IReadOnlyList<(string name, int count, float interval)> ParseEntries(string raw)
+        // "EnemyData_A:5:0.6|EnemyData_B:3:0.8" 형식 파싱.
+        // 잘못된 항목은 조용히 버리지 않고 경고를 남긴다 — 웨이브 데이터 오타가 에러 없이
+        // 사라지면(예: 간격 누락) 웨이브가 통째로 비어 스폰이 안 되는 걸 눈치채기 어렵다.
+        public static IReadOnlyList<(string name, int count, float interval)> ParseEntries(string raw, int lineNumber = -1)
         {
             var result = new List<(string, int, float)>();
             if (string.IsNullOrWhiteSpace(raw)) return result;
 
             foreach (string part in raw.Split('|'))
             {
-                string[] seg = part.Trim().Split(':');
-                if (seg.Length < 3) continue;
-                string name     = seg[0].Trim();
-                if (!int.TryParse(seg[1].Trim(), out int count))    continue;
+                string trimmedPart = part.Trim();
+                string[] seg = trimmedPart.Split(':');
+                if (seg.Length < 3)
+                {
+                    UnityEngine.Debug.LogWarning(
+                        $"[CSV] {lineNumber}번 줄 entries 항목 '{trimmedPart}' 형식 오류(name:count:interval 필요) — 무시됨");
+                    continue;
+                }
+
+                string name = seg[0].Trim();
+                if (!int.TryParse(seg[1].Trim(), out int count))
+                {
+                    UnityEngine.Debug.LogWarning(
+                        $"[CSV] {lineNumber}번 줄 entries 항목 '{trimmedPart}': count '{seg[1].Trim()}' → int 변환 실패 — 무시됨");
+                    continue;
+                }
                 if (!float.TryParse(seg[2].Trim(), NumberStyles.Float,
-                        CultureInfo.InvariantCulture, out float ivl)) continue;
+                        CultureInfo.InvariantCulture, out float ivl))
+                {
+                    UnityEngine.Debug.LogWarning(
+                        $"[CSV] {lineNumber}번 줄 entries 항목 '{trimmedPart}': interval '{seg[2].Trim()}' → float 변환 실패 — 무시됨");
+                    continue;
+                }
                 result.Add((name, count, ivl));
             }
             return result;

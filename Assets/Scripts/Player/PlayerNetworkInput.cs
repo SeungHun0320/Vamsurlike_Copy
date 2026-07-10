@@ -8,10 +8,16 @@ namespace Vamsurlike.Player
     [RequireComponent(typeof(Skills.SkillManager))]
     public class PlayerNetworkInput : OwnerBehaviour
     {
+        // 카메라(Cinemachine Follow)가 매 프레임 미세하게 계속 움직이면 worldDir이 실수 오차만큼
+        // 계속 달라져서, 정확히 같은 방향으로 계속 이동 중이어도 "값이 바뀌었다"고 오판해
+        // 매 FixedUpdate마다 RPC를 보내게 된다 — 의미 있는 변화만 재전송하도록 임계값 비교로 교체.
+        private const float DirectionChangeThresholdSqr = 0.0004f; // 0.02 단위 변화
+
         private PlayerNetworkController controller;
         private Skills.SkillManager     skillManager;
         private PlayerNetworkStats      playerStats;
         private Vector2                 lastSentDir;
+        private bool                    forceNextSend;
 
         protected override void OnOwnerSpawned()
         {
@@ -53,7 +59,8 @@ namespace Vamsurlike.Player
             Vector2 raw      = ReadMoveInput();
             Vector2 worldDir = ToCameraRelative(raw);
 
-            if (worldDir == lastSentDir) return;
+            if (!forceNextSend && (worldDir - lastSentDir).sqrMagnitude < DirectionChangeThresholdSqr) return;
+            forceNextSend = false;
             lastSentDir = worldDir;
             controller.SubmitMoveInputServerRpc(worldDir);
         }
@@ -70,7 +77,7 @@ namespace Vamsurlike.Player
 
         private void ForceNextMoveInputSend()
         {
-            lastSentDir = new Vector2(float.NaN, float.NaN);
+            forceNextSend = true;
         }
 
         private static Vector2 ReadMoveInput()

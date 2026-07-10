@@ -11,7 +11,8 @@ namespace Vamsurlike.Core
         private void Start()
         {
             StartupValidator.ValidateBootstrap(PoolManager.Instance);
-            SceneManager.LoadScene(mainMenuSceneName);
+            string sceneName = SceneConfigSO.Instance != null ? SceneConfigSO.Instance.mainMenuSceneName : mainMenuSceneName;
+            SceneManager.LoadScene(sceneName);
         }
     }
 }

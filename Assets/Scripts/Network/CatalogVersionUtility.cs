@@ -1,5 +1,6 @@
 using System.Text;
 using UnityEngine;
+using Vamsurlike.Data;
 using Vamsurlike.Items;
 using Vamsurlike.Upgrades;
 
@@ -42,7 +43,9 @@ namespace Vamsurlike.Network
                 if (opt == null) { sb.Append("null|"); continue; }
                 sb.Append(opt.name).Append('|')
                   .Append((int)opt.effectType).Append('|')
-                  .Append(opt.value).Append('|');
+                  .Append(opt.value).Append('|')
+                  .Append(opt.maxLevel).Append('|');
+                AppendSkillData(sb, opt.skillData);
             }
         }
 
@@ -58,10 +61,29 @@ namespace Vamsurlike.Network
             foreach (var recipe in catalog.recipes)
             {
                 if (recipe == null) { sb.Append("null|"); continue; }
-                sb.Append(recipe.sourceSkill  != null ? recipe.sourceSkill.name  : "null").Append('|')
-                  .Append((int)recipe.requiredPassiveType).Append('|')
-                  .Append(recipe.evolvedSkill != null ? recipe.evolvedSkill.name : "null").Append('|');
+                AppendSkillData(sb, recipe.sourceSkill);
+                sb.Append((int)recipe.requiredPassiveType).Append('|');
+                AppendSkillData(sb, recipe.evolvedSkill);
             }
+        }
+
+        // 이름만 비교하면 SkillDataSO 내부 스탯(maxLevel, 레벨별 수치)이 바뀌어도 해시가
+        // 그대로라 클라/서버 밸런스 불일치를 못 잡는다 — maxLevel과 레벨 배열 전체를 JSON으로
+        // 직렬화해 포함시켜 필드가 늘어나도 자동으로 해시에 반영되게 한다.
+        private static void AppendSkillData(StringBuilder sb, SkillDataSO skill)
+        {
+            if (skill == null) { sb.Append("null|"); return; }
+
+            sb.Append(skill.name).Append('|')
+              .Append((int)skill.castType).Append('|')
+              .Append(skill.maxLevel).Append('|');
+
+            if (skill.levels != null)
+            {
+                foreach (var level in skill.levels)
+                    sb.Append(JsonUtility.ToJson(level)).Append(';');
+            }
+            sb.Append('|');
         }
 
         private static void AppendItemCatalog(StringBuilder sb)

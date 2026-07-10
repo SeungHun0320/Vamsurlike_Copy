@@ -54,8 +54,9 @@ namespace Vamsurlike.Network
 
         private void StartDedicatedServer()
         {
-            string ip   = GetArgValue("-ip",   "0.0.0.0");
-            ushort port = GetArgPort("-port", 7777);
+            NetworkConfigSO config = NetworkConfigSO.Instance;
+            string ip   = GetArgValue("-ip",   config != null ? config.defaultServerIp : "0.0.0.0");
+            ushort port = GetArgPort("-port", config != null ? config.defaultPort : (ushort)7777);
             bool ok = GameNetworkManager.Instance?.StartAsServer(ip, port) ?? false;
             ServerConsoleLogger.Log($"서버 시작 — {ip}:{port} (ok={ok})");
         }

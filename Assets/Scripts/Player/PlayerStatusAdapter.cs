@@ -22,11 +22,34 @@ namespace Vamsurlike.Player
             stats         = GetComponent<PlayerNetworkStats>();
             reviveHandler = GetComponent<PlayerReviveHandler>();
             matchStats    = GetComponent<PlayerMatchStats>();
+
+            // [RequireComponent]로 프리팹 구조는 보장되지만, 방어적 null 체크는 RULES.md 규칙.
+            if (stats == null)
+            {
+                Debug.LogError($"[{nameof(PlayerStatusAdapter)}] PlayerNetworkStats 컴포넌트를 찾을 수 없습니다.", this);
+                enabled = false;
+                return;
+            }
+            if (reviveHandler == null)
+            {
+                Debug.LogError($"[{nameof(PlayerStatusAdapter)}] PlayerReviveHandler 컴포넌트를 찾을 수 없습니다.", this);
+                enabled = false;
+                return;
+            }
+            if (matchStats == null)
+            {
+                Debug.LogError($"[{nameof(PlayerStatusAdapter)}] PlayerMatchStats 컴포넌트를 찾을 수 없습니다.", this);
+                enabled = false;
+                return;
+            }
         }
 
         public override void OnNetworkSpawn()
         {
             if (!IsClient) return; // 데디케이티드 서버에서는 UI 이벤트 불필요
+            // OnNetworkSpawn은 MonoBehaviour.enabled와 무관하게 호출되므로 Awake 실패 시(위 null
+            // 체크로 enabled=false 처리된 경우) 여기서도 다시 막아야 한다.
+            if (stats == null || reviveHandler == null || matchStats == null) return;
 
             stats.HP.OnValueChanged                          += OnStatF;
             stats.MaxHP.OnValueChanged                       += OnStatF;
@@ -42,6 +65,7 @@ namespace Vamsurlike.Player
         public override void OnNetworkDespawn()
         {
             if (!IsClient) return;
+            if (stats == null || reviveHandler == null || matchStats == null) return;
 
             stats.HP.OnValueChanged                          -= OnStatF;
             stats.MaxHP.OnValueChanged                       -= OnStatF;

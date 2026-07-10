@@ -47,6 +47,14 @@ namespace Vamsurlike.UI
                 return;
             }
 
+            // 공유 NetworkConfig가 있으면 그쪽을 우선시켜, GameNetworkManager 등 다른 곳과
+            // 기본 IP/포트가 어긋나지 않게 한다. 없으면 위 [SerializeField] 기본값을 그대로 사용.
+            if (NetworkConfigSO.Instance != null)
+            {
+                defaultServerPort = NetworkConfigSO.Instance.defaultPort;
+                fallbackLocalIp   = NetworkConfigSO.Instance.defaultClientIp;
+            }
+
             viewModel = new LobbyViewModel(new LobbyViewModelConfig
             {
                 DefaultServerPort        = defaultServerPort,

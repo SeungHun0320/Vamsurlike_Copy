@@ -10,7 +10,7 @@ namespace Vamsurlike.Player
 {
     public class LocalPlayerCameraBinder : NetworkBehaviour
     {
-        [SerializeField] private string cameraName = "CM_FollowCam";
+        [SerializeField] private string cameraTag = "PlayerFollowCamera";
         [SerializeField] private int activePriority = 20;
 
         private bool isBound;
@@ -48,7 +48,7 @@ namespace Vamsurlike.Player
             return;
 #else
             CinemachineCamera camera = null;
-            GameObject cameraObject = GameObject.Find(cameraName);
+            GameObject cameraObject = GameObject.FindGameObjectWithTag(cameraTag);
             if (cameraObject != null)
                 camera = cameraObject.GetComponent<CinemachineCamera>();
 

@@ -19,6 +19,7 @@ namespace Vamsurlike.Enemy
         private static readonly int BaseColorProperty = Shader.PropertyToID("_BaseColor");
         private static readonly int ColorProperty = Shader.PropertyToID("_Color");
         private static readonly int EmissionColorProperty = Shader.PropertyToID("_EmissionColor");
+        private static readonly int SaturationProperty = Shader.PropertyToID("_Saturation");
 
         // 치명타 데미지 배율 — 기획 확정 전 기본값 (Phase 7.5)
         private const float CritDamageMultiplier = 1.5f;
@@ -62,6 +63,19 @@ namespace Vamsurlike.Enemy
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
 
+        // 같은 프리팹을 재사용하는 색상 변형(팔레트 스왑) 지원 — EnemyDataSO.tintColor를 모든 클라에 동기화.
+        public readonly NetworkVariable<Color> TintColor = new(
+            Color.white,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
+
+        // _Color는 곱하기 틴트라 원본 텍스처가 다색이면 무채색을 만들 수 없다 — 셰이더의 _Saturation으로
+        // 별도 채도 조절(0=회색조, 1=원본)을 동기화한다.
+        public readonly NetworkVariable<float> Saturation = new(
+            1f,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
+
         public bool IsAlive => HP.Value > 0f;
         public EnemyDataSO Data => data;
         public float MaxHP => MaxHPValue.Value;
@@ -75,12 +89,38 @@ namespace Vamsurlike.Enemy
 
         public override void OnNetworkSpawn()
         {
+            TintColor.OnValueChanged += OnTintColorChanged;
+            Saturation.OnValueChanged += OnSaturationChanged;
+            ApplyTint(TintColor.Value, Saturation.Value);
+
             if (!IsServer) return;
             MaxHPValue.Value = data != null ? data.hp : 100f;
             HP.Value = MaxHPValue.Value;
             // 풀에서 재사용되는 인스턴스이므로 스폰마다 재시딩 — NetworkObjectId로 인스턴스별 시퀀스 분리
             critRng = new System.Random(unchecked(critRandomSeed + (int)NetworkObjectId));
             EnemyRegistry.Register(this);
+        }
+
+        private void OnTintColorChanged(Color _, Color next) => ApplyTint(next, Saturation.Value);
+        private void OnSaturationChanged(float _, float next) => ApplyTint(TintColor.Value, next);
+
+        // 풀에서 재사용되는 프리팹에 팔레트 스왑을 적용 — MaterialPropertyBlock을 사용해 GPU 인스턴싱/배칭이
+        // 깨지지 않도록 한다(renderer.material 직접 접근은 인스턴스마다 머티리얼을 복제해 배칭을 깬다).
+        // _Color는 곱하기라 원본이 다색이면 무채색을 만들 수 없어, TintableDesaturate 셰이더의 _Saturation을
+        // 함께 적용해 실제 회색조 변형도 지원한다.
+        private void ApplyTint(Color color, float saturation)
+        {
+            var renderers = GetComponentsInChildren<Renderer>(true);
+            foreach (var r in renderers)
+            {
+                if (r == null) continue;
+                var block = new MaterialPropertyBlock();
+                r.GetPropertyBlock(block);
+                block.SetColor(BaseColorProperty, color);
+                block.SetColor(ColorProperty, color);
+                block.SetFloat(SaturationProperty, saturation);
+                r.SetPropertyBlock(block);
+            }
         }
 
         // EnemySpawnManager.SpawnEnemy에서 Spawn() 직후 호출
@@ -90,6 +130,10 @@ namespace Vamsurlike.Enemy
             data = enemyData;
             MaxHPValue.Value = Mathf.Max(1f, data.hp * Mathf.Max(1f, hpMultiplier));
             HP.Value = MaxHPValue.Value;
+            TintColor.Value = data.tintColor;
+            Saturation.Value = data.saturation;
+            // NetworkTransform이 SyncScale=true라 서버에서 설정하면 모든 클라이언트에 그대로 복제된다.
+            transform.localScale = Vector3.one * Mathf.Max(0.05f, data.visualScale);
             ScaledAttackPower = data.attackPower * Mathf.Max(1f, damageMultiplier);
             // OnNetworkSpawn보다 뒤에 호출되므로 EnemyAI에 데이터를 직접 주입
             if (TryGetComponent<EnemyAI>(out var ai))
@@ -259,6 +303,9 @@ namespace Vamsurlike.Enemy
 
         public override void OnNetworkDespawn()
         {
+            TintColor.OnValueChanged -= OnTintColorChanged;
+            Saturation.OnValueChanged -= OnSaturationChanged;
+
             if (hitFlashCoroutine != null)
             {
                 StopCoroutine(hitFlashCoroutine);

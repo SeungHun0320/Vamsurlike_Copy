@@ -1,4 +1,3 @@
-using System;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
@@ -34,10 +33,6 @@ namespace Vamsurlike.Player
             0f,
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
-
-        // 클라이언트 이벤트 (progress: 0~1 진행도, -1 취소)
-        public static event Action<float> OnReviveProgressUpdated;
-        public static event Action        OnRevived;
 
         // ReviveRangeVisualizer에서 반경 참조용
         public static readonly List<PlayerReviveHandler> All = new();
@@ -258,21 +253,18 @@ namespace Vamsurlike.Player
         [ClientRpc]
         private void SendReviveProgressClientRpc(float progress, ulong downedClientId)
         {
-            OnReviveProgressUpdated?.Invoke(progress); // 임시 경유지 (Phase 8 마이그레이션 완료 후 제거)
             UIEventHub.Instance?.Player.PublishReviveProgress(new ReviveProgressPayload(progress, downedClientId));
         }
 
         [ClientRpc]
         private void CancelReviveProgressClientRpc(ulong downedClientId)
         {
-            OnReviveProgressUpdated?.Invoke(-1f); // 임시 경유지 (Phase 8 마이그레이션 완료 후 제거)
             UIEventHub.Instance?.Player.PublishReviveProgress(new ReviveProgressPayload(-1f, downedClientId));
         }
 
         [ClientRpc]
         private void NotifyRevivedClientRpc()
         {
-            OnRevived?.Invoke(); // 임시 경유지 (Phase 8 마이그레이션 완료 후 제거)
             UIEventHub.Instance?.Player.PublishPlayerRevived();
         }
     }

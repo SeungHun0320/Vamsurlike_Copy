@@ -101,6 +101,10 @@ namespace Vamsurlike.Data
 
         [Header("PiercingBoomerang")]
         [Min(0f)] public float boomerangDamageAmplifyPerStack = 0.15f; // 귀환 데미지 = 기본데미지 * (1 + 스택수 * 이 값)
+
+        [Header("Shotgun")]
+        [Min(0.1f)] public float shotgunSoloDamageMultiplier   = 1.5f; // 원뿔 안에 적이 1명뿐일 때 집중 데미지 배율
+        [Min(0.1f)] public float shotgunSharedDamageMultiplier = 0.6f; // 2명 이상 동시에 맞을 때 분산 데미지 배율
     }
 
     [CreateAssetMenu(fileName = "SkillData", menuName = "Vamsurlike/Data/Skill")]
@@ -127,5 +131,15 @@ namespace Vamsurlike.Data
             if (levels == null || levels.Length == 0) return null;
             return levels[Mathf.Clamp(level - 1, 0, levels.Length - 1)];
         }
+
+#if UNITY_EDITOR
+        // 커스텀 인스펙터(SkillDataSOEditor)를 거치지 않고 levels 배열을 직접 편집했을 때
+        // maxLevel과 어긋난 상태로 저장되는 것을 잡기 위한 최후 방어선.
+        private void OnValidate()
+        {
+            if (levels != null && levels.Length != maxLevel)
+                Debug.LogWarning($"[{nameof(SkillDataSO)}] \"{name}\": maxLevel({maxLevel})과 levels 배열 길이({levels.Length})가 일치하지 않습니다.", this);
+        }
+#endif
     }
 }

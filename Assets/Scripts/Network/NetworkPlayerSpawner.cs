@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Vamsurlike.Core;
 using Vamsurlike.Player;
 
 namespace Vamsurlike.Network
@@ -9,6 +10,8 @@ namespace Vamsurlike.Network
     public class NetworkPlayerSpawner : MonoBehaviour
     {
         [SerializeField] private string gameplaySceneName = "Stage_01";
+
+        private string GameplaySceneName => SceneConfigSO.Instance != null ? SceneConfigSO.Instance.stageSceneName : gameplaySceneName;
         [SerializeField] private Vector3[] spawnPositions =
         {
             new(-2f, 1f, -2f),
@@ -155,7 +158,7 @@ namespace Vamsurlike.Network
         {
             return NetworkManager.Singleton != null
                 && NetworkManager.Singleton.IsServer
-                && sceneName == gameplaySceneName;
+                && sceneName == GameplaySceneName;
         }
 
         private Vector3 GetSpawnPosition(ulong clientId)

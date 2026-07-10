@@ -67,9 +67,6 @@ namespace Vamsurlike.Skills
         public readonly NetworkVariable<float> ManualCooldownDuration = new(
             DefaultManualCooldown, NetworkVariableReadPermission.Owner, NetworkVariableWritePermission.Server);
 
-
-        public static event Action<string[], int[]> OnSkillsSynced;
-
         private void Awake()
         {
             passiveStatHandler = GetComponent<PassiveStatHandler>();
@@ -405,7 +402,6 @@ namespace Vamsurlike.Skills
                 maxLevels[i] = slots[i].maxLevel;
             }
 
-            OnSkillsSynced?.Invoke(names, levels); // 임시 경유지 (Phase 8 마이그레이션 완료 후 제거)
             UIEventHub.Instance?.Skill.PublishSkillSlotsChanged(new SkillSlotsPayload(names, levels, maxLevels));
         }
 

@@ -48,9 +48,9 @@ MonoBehaviour:
     waveCount: 1
     waveDelay: 0.15
     rotationPerWave: 30
-    grenadeRange: 9
-    grenadeArcHeight: 4
-    splashRadius: 1.8
+    grenadeRange: 13
+    grenadeArcHeight: 6
+    splashRadius: 2
     scatterBulletCount: 8
     scatterAngle: 60
     burstDuration: 2
@@ -58,7 +58,7 @@ MonoBehaviour:
     meleeWidth: 3
     clusterCount: 5
     clusterSpread: 4.5
-    clusterSplashRadius: 2.2
+    clusterSplashRadius: 2.5
     clusterDamageRatio: 0.5
     pullSpeed: 3
     stunDuration: 1.5

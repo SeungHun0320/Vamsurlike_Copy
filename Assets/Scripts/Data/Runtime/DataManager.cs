@@ -50,7 +50,7 @@ namespace Vamsurlike.Data.Runtime
                 result = row;
             }
 
-            return result ?? new EnemyScalingData(0, 0f, 1f, 1f, 1f);
+            return result ?? new EnemyScalingData(0, 0f, 1f, 1f, 1f, 1f);
         }
 
         // ─── Permanent Upgrade Lookup ─────────────────────────────────────
@@ -113,8 +113,9 @@ namespace Vamsurlike.Data.Runtime
             float hp    = CSVParser.Float(cols, h["hpMultiplier"],        "hpMultiplier",        line);
             float dmg   = CSVParser.Float(cols, h["damageMultiplier"],    "damageMultiplier",    line);
             float spawn = CSVParser.Float(cols, h["spawnRateMultiplier"], "spawnRateMultiplier", line);
+            float xp    = CSVParser.Float(cols, h["xpMultiplier"],        "xpMultiplier",        line);
             return new EnemyScalingData(id, t,
-                Mathf.Max(0.1f, hp), Mathf.Max(0.1f, dmg), Mathf.Max(0.1f, spawn));
+                Mathf.Max(0.1f, hp), Mathf.Max(0.1f, dmg), Mathf.Max(0.1f, spawn), Mathf.Max(0.1f, xp));
         }
 
         private static StageData MakeStage(string[] cols, Dictionary<string, int> h, int line)
@@ -139,7 +140,7 @@ namespace Vamsurlike.Data.Runtime
             string action  = CSVParser.Str  (cols, h["spawnActionName"]);
             string raw     = CSVParser.Str  (cols, h["entries"]);
 
-            var rawList = CSVParser.ParseEntries(raw);
+            var rawList = CSVParser.ParseEntries(raw, line);
             var entries = new List<WaveEntry>(rawList.Count);
             foreach (var (eName, cnt, ivl) in rawList)
                 entries.Add(new WaveEntry(eName, Mathf.Max(1, cnt), Mathf.Max(0f, ivl)));

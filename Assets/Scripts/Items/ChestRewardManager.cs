@@ -20,9 +20,6 @@ namespace Vamsurlike.Items
         private readonly HashSet<ulong>                      pendingChoices = new();
         private readonly Dictionary<ulong, double> playerOptionDeadlines = new();
 
-        public static event Action<ChestChoiceData[]> OnOptionsReceived;
-        public static event Action        OnChestRewardCompleted;
-
         [SerializeField] private int fallbackXP = 30;
         [SerializeField, Min(0f)] private float selectionTimeoutSeconds = 20f;
 
@@ -116,8 +113,8 @@ namespace Vamsurlike.Items
                 GameFlowCoordinator.Instance?.ReturnToGameplay();
         }
 
-        [ServerRpc(RequireOwnership = false)]
-        public void SubmitChoiceServerRpc(int choiceIndex, ServerRpcParams rpcParams = default)
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+        public void SubmitChoiceServerRpc(int choiceIndex, RpcParams rpcParams = default)
         {
             ulong clientId = rpcParams.Receive.SenderClientId;
 
@@ -275,14 +272,12 @@ namespace Vamsurlike.Items
         [ClientRpc]
         private void ShowOptionsClientRpc(ChestChoiceData[] choices, ClientRpcParams rpcParams = default)
         {
-            OnOptionsReceived?.Invoke(choices); // 임시 경유지 (Phase 8 마이그레이션 완료 후 제거)
             UIEventHub.Instance?.Reward.PublishChestOptions(new ChestOptionsPayload(choices));
         }
 
         [ClientRpc]
         private void NotifyCompletedClientRpc()
         {
-            OnChestRewardCompleted?.Invoke(); // 임시 경유지 (Phase 8 마이그레이션 완료 후 제거)
             UIEventHub.Instance?.Reward.PublishChestRewardCompleted();
         }
     }

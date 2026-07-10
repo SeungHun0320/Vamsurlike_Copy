@@ -12,8 +12,12 @@ namespace Vamsurlike.Audio
     // 클라이언트 로컬 전용 — 서버 권한/네트워크 동기화와 무관하다.
     public sealed class AudioManager : MonoBehaviour
     {
-        private const string MenuSceneName  = "MainMenu";
-        private const string StageSceneName = "Stage_01";
+        // 폴백 리터럴 — SceneConfigSO(Resources/Configs/SceneConfig.asset)가 있으면 그쪽이 우선한다.
+        private const string DefaultMenuSceneName  = "MainMenu";
+        private const string DefaultStageSceneName = "Stage_01";
+
+        private static string MenuSceneName  => SceneConfigSO.Instance != null ? SceneConfigSO.Instance.mainMenuSceneName : DefaultMenuSceneName;
+        private static string StageSceneName => SceneConfigSO.Instance != null ? SceneConfigSO.Instance.stageSceneName    : DefaultStageSceneName;
 
         public static AudioManager Instance { get; private set; }
 
@@ -46,6 +50,7 @@ namespace Vamsurlike.Audio
         private float sfxVolumeScale = 1f;
 
         private bool isBossPhase;
+        private bool settingsSubscribed;
 
         // Bootstrap 씬에 컴포넌트가 없는 경우 자동 생성 (안전망)
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -73,12 +78,7 @@ namespace Vamsurlike.Audio
 
         private void Start()
         {
-            if (SettingsManager.Instance != null)
-            {
-                SettingsManager.Instance.OnVolumeChanged += HandleVolumeChanged;
-                var s = SettingsManager.Instance.Current;
-                HandleVolumeChanged(s.masterVolume, s.bgmVolume, s.sfxVolume);
-            }
+            TrySubscribeToSettings();
 
             if (UIEventHub.Instance != null)
             {
@@ -88,6 +88,23 @@ namespace Vamsurlike.Audio
 
             SceneManager.sceneLoaded += HandleSceneLoaded;
             HandleSceneLoaded(SceneManager.GetActiveScene(), LoadSceneMode.Single);
+        }
+
+        private void Update()
+        {
+            // SettingsManager도 별도의 DontDestroyOnLoad 싱글턴이라 Start() 시점에 아직 준비되지
+            // 않았을 수 있다(씬 내 컴포넌트 간 Start 순서는 보장되지 않음) — 준비될 때까지 재시도.
+            if (!settingsSubscribed) TrySubscribeToSettings();
+        }
+
+        private void TrySubscribeToSettings()
+        {
+            if (settingsSubscribed || SettingsManager.Instance == null) return;
+
+            SettingsManager.Instance.OnVolumeChanged += HandleVolumeChanged;
+            var s = SettingsManager.Instance.Current;
+            HandleVolumeChanged(s.masterVolume, s.bgmVolume, s.sfxVolume);
+            settingsSubscribed = true;
         }
 
         private void OnEnable()

@@ -74,7 +74,7 @@ MonoBehaviour:
     projectileSpeed: 14.5
     projectileLifetime: 2.6
     projectileHitRadius: 0.7
-    projectileCount: 2
+    projectileCount: 1
     spreadAngle: 18
     pierceCount: 0
     duration: 0
@@ -122,7 +122,7 @@ MonoBehaviour:
     projectileSpeed: 15
     projectileLifetime: 2.7
     projectileHitRadius: 0.72
-    projectileCount: 3
+    projectileCount: 1
     spreadAngle: 30
     pierceCount: 0
     duration: 0
@@ -170,7 +170,7 @@ MonoBehaviour:
     projectileSpeed: 15.5
     projectileLifetime: 2.9
     projectileHitRadius: 0.75
-    projectileCount: 4
+    projectileCount: 1
     spreadAngle: 42
     pierceCount: 1
     duration: 0
@@ -218,7 +218,7 @@ MonoBehaviour:
     projectileSpeed: 16
     projectileLifetime: 3.1
     projectileHitRadius: 0.8
-    projectileCount: 5
+    projectileCount: 1
     spreadAngle: 55
     pierceCount: 2
     duration: 0

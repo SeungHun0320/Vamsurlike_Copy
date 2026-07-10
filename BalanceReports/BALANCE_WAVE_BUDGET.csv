@@ -1,0 +1,7 @@
+"Wave","Duration","Loop","Action","EnemyId","Count","SpawnInterval","SpawnRatePerSec","TotalBaseHP","TotalHP@6m","XPTotal"
+"0","20","FALSE","","EnemyData_A","12","0.35","2.86","600.0","1050.0","120"
+"1","25","FALSE","","EnemyData_A","14","0.25","4.00","700.0","1225.0","140"
+"1","25","FALSE","","EnemyData_B","10","0.25","4.00","300.0","525.0","80"
+"2","22","TRUE","","EnemyData_B","16","0.2","5.00","480.0","840.0","128"
+"2","22","TRUE","","EnemyData_C","10","0.35","2.86","1500.0","2625.0","250"
+"3","35","FALSE","SpawnEliteRing","EnemyData_C","16","0","instant","2400.0","4200.0","400"

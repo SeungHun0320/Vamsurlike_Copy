@@ -2,6 +2,7 @@ using System;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine;
+using Vamsurlike.Core;
 
 namespace Vamsurlike.Network
 {
@@ -10,6 +11,8 @@ namespace Vamsurlike.Network
     {
         public const ulong NoLobbyHost = LobbyHostService.NoLobbyHost;
 
+        // C# 기본 매개변수 값은 컴파일 타임 상수여야 하므로 리터럴을 유지한다.
+        // 실제 런타임 기본값은 NetworkConfigSO/SceneConfigSO(있는 경우)를 우선 사용 — 아래 Awake() 참고.
         private const string DefaultClientIp = "127.0.0.1";
         private const string DefaultServerIp = "0.0.0.0";
         private const ushort DefaultPort = 7777;
@@ -34,8 +37,12 @@ namespace Vamsurlike.Network
 
         private bool isIntentionalDisconnect;
 
-        public string CurrentIp => sessionService?.CurrentIp ?? DefaultClientIp;
-        public ushort CurrentPort => sessionService?.CurrentPort ?? DefaultPort;
+        public string CurrentIp => sessionService?.CurrentIp ?? ResolvedClientIp;
+        public ushort CurrentPort => sessionService?.CurrentPort ?? ResolvedPort;
+
+        private static string ResolvedClientIp => NetworkConfigSO.Instance != null ? NetworkConfigSO.Instance.defaultClientIp : DefaultClientIp;
+        private static string ResolvedServerIp => NetworkConfigSO.Instance != null ? NetworkConfigSO.Instance.defaultServerIp : DefaultServerIp;
+        private static ushort ResolvedPort     => NetworkConfigSO.Instance != null ? NetworkConfigSO.Instance.defaultPort     : DefaultPort;
         public ulong LobbyHostClientId => lobbyHostService?.LobbyHostClientId ?? NoLobbyHost;
         public bool IsLocalLobbyHost => lobbyHostService?.IsLocalLobbyHost ?? false;
         public int ConnectedPlayerCount => networkManager?.ConnectedClients?.Count ?? 0;
@@ -67,7 +74,7 @@ namespace Vamsurlike.Network
             }
 
             ValidateSceneNames();
-            sessionService = new NetworkSessionService(networkManager, transport, DefaultClientIp, DefaultPort);
+            sessionService = new NetworkSessionService(networkManager, transport, ResolvedClientIp, ResolvedPort);
             lobbyHostService = new LobbyHostService(networkManager);
             gameStartService = new GameStartService(
                 networkManager,
@@ -221,13 +228,13 @@ namespace Vamsurlike.Network
             if (string.IsNullOrWhiteSpace(lobbySceneName))
             {
                 Debug.LogWarning($"[{nameof(GameNetworkManager)}] 로비 씬 이름이 비어 있어 기본값을 사용합니다.", this);
-                lobbySceneName = DefaultLobbySceneName;
+                lobbySceneName = SceneConfigSO.Instance != null ? SceneConfigSO.Instance.mainMenuSceneName : DefaultLobbySceneName;
             }
 
             if (string.IsNullOrWhiteSpace(stageSceneName))
             {
                 Debug.LogWarning($"[{nameof(GameNetworkManager)}] 스테이지 씬 이름이 비어 있어 기본값을 사용합니다.", this);
-                stageSceneName = DefaultStageSceneName;
+                stageSceneName = SceneConfigSO.Instance != null ? SceneConfigSO.Instance.stageSceneName : DefaultStageSceneName;
             }
         }
     }

@@ -34,14 +34,18 @@ namespace Vamsurlike.Player
 
         public override void OnNetworkSpawn()
         {
-            ColorIndex.OnValueChanged += (_, next) => ApplyColor(next);
+            // 람다를 매번 새로 만들면 -=가 다른 인스턴스라 실제로 구독 해제가 안 된다 —
+            // 반드시 같은 델리게이트(이름 있는 메서드)로 구독/해제해야 한다.
+            ColorIndex.OnValueChanged += OnColorIndexChanged;
             ApplyColor(ColorIndex.Value);
         }
 
         public override void OnNetworkDespawn()
         {
-            ColorIndex.OnValueChanged -= (_, next) => ApplyColor(next);
+            ColorIndex.OnValueChanged -= OnColorIndexChanged;
         }
+
+        private void OnColorIndexChanged(int _, int next) => ApplyColor(next);
 
         // 서버 전용: 색상 인덱스 설정
         public void SetColorIndex(int index)

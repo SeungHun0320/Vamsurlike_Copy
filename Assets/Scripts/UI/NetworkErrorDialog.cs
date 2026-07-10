@@ -30,7 +30,10 @@ namespace Vamsurlike.UI
         {
             if (Instance != null) { Destroy(gameObject); return; }
             Instance = this;
-            DontDestroyOnLoad(gameObject);
+            // Bootstrap Canvas의 자식이라 gameObject 자신은 루트가 아님 — ServerAdminUI와 동일하게
+            // transform.root를 영속화한다(그렇지 않으면 "DontDestroyOnLoad only works for root
+            // GameObjects" 에러가 나고 다음 씬 로드 때 조용히 파괴된다).
+            DontDestroyOnLoad(transform.root.gameObject);
 
             if (confirmButton != null)
                 confirmButton.onClick.AddListener(OnConfirmClicked);

@@ -74,7 +74,7 @@ MonoBehaviour:
     projectileSpeed: 14
     projectileLifetime: 2.7
     projectileHitRadius: 0.7
-    projectileCount: 5
+    projectileCount: 3
     spreadAngle: 45
     pierceCount: 0
     duration: 0

@@ -26,11 +26,6 @@ namespace Vamsurlike.Upgrades
         [SerializeField, Min(0f)] private float selectionTimeoutSeconds = 20f;
         [SerializeField] private SFXSpawnEventSO sfxSpawnEvent;
 
-        // 클라이언트 이벤트: 이 클라이언트에 옵션이 도착했을 때 (optionIndices, currentLevels)
-        public static event Action<int[], int[]> OnOptionsReceived;
-        // 클라이언트 이벤트: 레벨업이 완전히 완료(모두 선택)됐을 때
-        public static event Action OnLevelUpCompleted;
-
         // RULES.md: 시드 기반 System.Random 사용
         private readonly System.Random rng = new();
         private LevelUpOptionPicker optionPicker;
@@ -146,8 +141,8 @@ namespace Vamsurlike.Upgrades
         }
 
         // 클라이언트 → 서버: 플레이어가 카드를 선택했을 때
-        [ServerRpc(RequireOwnership = false)]
-        public void SubmitChoiceServerRpc(int choiceIndex, ServerRpcParams rpcParams = default)
+        [Rpc(SendTo.Server, InvokePermission = RpcInvokePermission.Everyone)]
+        public void SubmitChoiceServerRpc(int choiceIndex, RpcParams rpcParams = default)
         {
             ulong clientId = rpcParams.Receive.SenderClientId;
 
@@ -451,7 +446,6 @@ namespace Vamsurlike.Upgrades
         [ClientRpc]
         private void ShowLevelUpOptionsClientRpc(int[] optionIndices, int[] currentLevels, ClientRpcParams rpcParams = default)
         {
-            OnOptionsReceived?.Invoke(optionIndices, currentLevels); // 임시 경유지 (Phase 8 마이그레이션 완료 후 제거)
             UIEventHub.Instance?.Reward.PublishLevelUpOptions(new LevelUpOptionsPayload(optionIndices, currentLevels));
         }
 
@@ -459,7 +453,6 @@ namespace Vamsurlike.Upgrades
         [ClientRpc]
         private void NotifyLevelUpCompletedClientRpc()
         {
-            OnLevelUpCompleted?.Invoke(); // 임시 경유지 (Phase 8 마이그레이션 완료 후 제거)
             UIEventHub.Instance?.Reward.PublishLevelUpCompleted();
 
             // 전원에게 동시에 브로드캐스트되는 UI성 이벤트라 위치 의미가 없음 — 각자 자기 위치에서 재생해

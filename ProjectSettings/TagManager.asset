@@ -11,6 +11,7 @@ TagManager:
   - XPOrb
   - Item
   - Ground
+  - PlayerFollowCamera
   layers:
   - Default
   - TransparentFX

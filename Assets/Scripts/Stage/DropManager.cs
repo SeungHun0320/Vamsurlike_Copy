@@ -1,6 +1,7 @@
 using Unity.Netcode;
 using UnityEngine;
 using Vamsurlike.Data;
+using Vamsurlike.Data.Runtime;
 using Vamsurlike.Items;
 
 namespace Vamsurlike.Stage
@@ -28,7 +29,12 @@ namespace Vamsurlike.Stage
             if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
 
             if (data.xpDrop > 0 && XPOrbManager.Instance != null)
-                XPOrbManager.Instance.SpawnOrb(ScatterPosition(position, DropScatterRadius), data.xpDrop);
+            {
+                float elapsed      = StageRuntime.Instance != null ? StageRuntime.Instance.ElapsedTime.Value : 0f;
+                float xpMultiplier = DataManager.GetScaling(elapsed).XpMultiplier;
+                int   scaledXp     = Mathf.Max(1, Mathf.RoundToInt(data.xpDrop * xpMultiplier));
+                XPOrbManager.Instance.SpawnOrb(ScatterPosition(position, DropScatterRadius), scaledXp);
+            }
 
             if (data.dropTable != null)
             {
