@@ -9,6 +9,7 @@ namespace Vamsurlike.Skills
     public sealed class PierceShotgunSkill : SkillBase
     {
         private const float MinToEnemySqrMagnitude = 0.0001f;
+        private static readonly Collider[] OverlapBuffer = new Collider[256];
 
         public override SkillCastType SupportedCastType => SkillCastType.PierceShotgun;
 
@@ -26,17 +27,22 @@ namespace Vamsurlike.Skills
             float   halfArc = levelData.scatterAngle * 0.5f;
             float   damage  = context.FinalDamage;
 
-            var cols = Physics.OverlapSphere(origin, range);
-            foreach (var col in cols)
+            int overlapCount = Physics.OverlapSphereNonAlloc(origin, range, OverlapBuffer);
+            for (int i = 0; i < overlapCount; i++)
             {
-                if (!col.TryGetComponent<EnemyNetworkBase>(out var enemy)) continue;
+                Collider col = OverlapBuffer[i];
+                if (col == null || !col.TryGetComponent<EnemyNetworkBase>(out var enemy))
+                {
+                    OverlapBuffer[i] = null;
+                    continue;
+                }
 
                 Vector3 toEnemy = col.transform.position - origin;
                 toEnemy.y = 0f;
-                if (toEnemy.sqrMagnitude < MinToEnemySqrMagnitude) continue;
-                if (Vector3.Angle(forward, toEnemy.normalized) > halfArc) continue;
+                if (toEnemy.sqrMagnitude >= MinToEnemySqrMagnitude && Vector3.Angle(forward, toEnemy.normalized) <= halfArc)
+                    enemy.TakeDamage(damage, context.OwnerClientId, skill.name);
 
-                enemy.TakeDamage(damage, context.OwnerClientId, skill.name);
+                OverlapBuffer[i] = null;
             }
 
             context.VFX?.ShowMelee(SupportedCastType, origin, forward, range, levelData.scatterAngle);

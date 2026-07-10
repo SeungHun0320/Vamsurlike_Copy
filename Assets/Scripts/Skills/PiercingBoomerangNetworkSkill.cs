@@ -13,6 +13,7 @@ namespace Vamsurlike.Skills
     public sealed class PiercingBoomerangSkill : SkillBase
     {
         private const float SpawnHeightOffset = 0.8f;
+        private static readonly Collider[] OverlapBuffer = new Collider[128];
 
         public override SkillCastType SupportedCastType => SkillCastType.PiercingBoomerang;
 
@@ -104,14 +105,23 @@ namespace Vamsurlike.Skills
             Vector3 position, float radius, float damage, ulong ownerClientId, string skillTag, HashSet<ulong> hitIds)
         {
             int newHits = 0;
-            var cols = Physics.OverlapSphere(position, radius);
-            foreach (var col in cols)
+            int overlapCount = Physics.OverlapSphereNonAlloc(position, radius, OverlapBuffer);
+            for (int i = 0; i < overlapCount; i++)
             {
-                if (!col.TryGetComponent<EnemyNetworkBase>(out var enemy)) continue;
-                if (!hitIds.Add(enemy.NetworkObjectId)) continue;
+                Collider col = OverlapBuffer[i];
+                if (col == null || !col.TryGetComponent<EnemyNetworkBase>(out var enemy))
+                {
+                    OverlapBuffer[i] = null;
+                    continue;
+                }
 
-                enemy.TakeDamage(damage, ownerClientId, skillTag);
-                newHits++;
+                if (hitIds.Add(enemy.NetworkObjectId))
+                {
+                    enemy.TakeDamage(damage, ownerClientId, skillTag);
+                    newHits++;
+                }
+
+                OverlapBuffer[i] = null;
             }
             return newHits;
         }

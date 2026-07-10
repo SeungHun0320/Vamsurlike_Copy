@@ -24,10 +24,14 @@ namespace Vamsurlike.Enemy
         private float targetUpdateTimer;
         private float nextRepathTime;
         private Vector3 lastDestination;
+        private float animUpdateTimer;
+        private float lastAnimSpeed = -1f;
 
         private const float TargetUpdateInterval = 0.5f;
         private const float RepathInterval = 0.2f;
         private const float RepathTargetMoveThresholdSqr = 0.25f;
+        private const float AnimUpdateInterval = 0.1f;
+        private const float AnimSpeedChangeThreshold = 0.05f;
 
         internal float AttackCooldown { get; set; }
 
@@ -66,6 +70,8 @@ namespace Vamsurlike.Enemy
             nextRepathTime = Time.time + Random.Range(0f, RepathInterval);
             lastDestination = transform.position;
             AttackCooldown = 0f;
+            animUpdateTimer = Random.Range(0f, AnimUpdateInterval);
+            lastAnimSpeed = -1f;
             ChangeState(EnemyStates.Idle);
         }
 
@@ -108,7 +114,7 @@ namespace Vamsurlike.Enemy
                     Agent.ResetPath();
                     Agent.velocity = Vector3.zero;
                 }
-                if (Anim != null) Anim.SetFloat(SpeedHash, 0f);
+                SetAnimatorSpeed(0f, force: true);
                 return;
             }
 
@@ -121,13 +127,30 @@ namespace Vamsurlike.Enemy
 
             currentState?.Update(this);
 
-            if (Anim != null)
-                Anim.SetFloat(SpeedHash, Agent.velocity.magnitude);
+            UpdateAnimatorSpeed();
         }
 
         internal void TriggerAttackAnim()
         {
             if (Anim != null) Anim.SetTrigger(AttackHash);
+        }
+
+        private void UpdateAnimatorSpeed()
+        {
+            animUpdateTimer -= Time.deltaTime;
+            if (animUpdateTimer > 0f) return;
+
+            animUpdateTimer = AnimUpdateInterval;
+            SetAnimatorSpeed(Agent.velocity.magnitude);
+        }
+
+        private void SetAnimatorSpeed(float speed, bool force = false)
+        {
+            if (Anim == null) return;
+            if (!force && Mathf.Abs(speed - lastAnimSpeed) < AnimSpeedChangeThreshold) return;
+
+            lastAnimSpeed = speed;
+            Anim.SetFloat(SpeedHash, speed);
         }
 
         internal void ChangeState(IEnemyState next)

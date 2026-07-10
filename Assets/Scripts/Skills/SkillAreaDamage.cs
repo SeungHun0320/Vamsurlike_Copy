@@ -6,6 +6,7 @@ namespace Vamsurlike.Skills
     // 스킬 공통 광역 데미지 유틸. OverlapSphere 기반 스플래시를 중복 없이 공유.
     internal static class SkillAreaDamage
     {
+        private static readonly Collider[] OverlapBuffer = new Collider[256];
         internal static void ApplySplash(
             Vector3 center,
             float radius,
@@ -13,11 +14,13 @@ namespace Vamsurlike.Skills
             ulong ownerClientId,
             string skillTag)
         {
-            var cols = Physics.OverlapSphere(center, radius);
-            foreach (var col in cols)
+            int hitCount = Physics.OverlapSphereNonAlloc(center, radius, OverlapBuffer);
+            for (int i = 0; i < hitCount; i++)
             {
-                if (col.TryGetComponent<EnemyNetworkBase>(out var enemy))
+                Collider col = OverlapBuffer[i];
+                if (col != null && col.TryGetComponent<EnemyNetworkBase>(out var enemy))
                     enemy.TakeDamage(damage, ownerClientId, skillTag);
+                OverlapBuffer[i] = null;
             }
         }
     }

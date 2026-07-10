@@ -23,6 +23,7 @@ namespace Vamsurlike.Enemy
 
         // 치명타 데미지 배율 — 기획 확정 전 기본값 (Phase 7.5)
         private const float CritDamageMultiplier = 1.5f;
+        private const float HitFeedbackMinInterval = 0.08f;
 
         // 랜덤은 시드 기반 System.Random 인스턴스 사용
         [SerializeField] private int critRandomSeed = 9137;
@@ -86,12 +87,16 @@ namespace Vamsurlike.Enemy
         private Coroutine hitFlashCoroutine;
         private Renderer[] hitFlashRenderers;
         private MaterialPropertyBlock[] hitFlashOriginalBlocks;
+        private Renderer[] cachedHitFlashRenderers;
+        private float nextHitFeedbackTime;
 
         public override void OnNetworkSpawn()
         {
             TintColor.OnValueChanged += OnTintColorChanged;
             Saturation.OnValueChanged += OnSaturationChanged;
             ApplyTint(TintColor.Value, Saturation.Value);
+
+            nextHitFeedbackTime = 0f;
 
             if (!IsServer) return;
             MaxHPValue.Value = data != null ? data.hp : 100f;
@@ -197,18 +202,35 @@ namespace Vamsurlike.Enemy
                 lastAttackerClientId = attackerClientId;
                 GetPlayerMatchStats(attackerClientId)?.AddDamage(finalDamage, skillTag);
             }
-
+            bool died = HP.Value <= 0f;
             float offset = data != null ? data.floatingTextHeightOffset : 2f;
-            ShowDamageClientRpc(finalDamage, isCrit, transform.position + Vector3.up * offset);
-            PlayHitFlashClientRpc(isCrit);
-            PlayHitSparkClientRpc(transform.position + Vector3.up * (offset * 0.5f));
+            if (ShouldSendHitFeedback(isCrit, died))
+            {
+                Vector3 basePosition = transform.position;
+                PlayDamageFeedbackClientRpc(
+                    finalDamage,
+                    isCrit,
+                    basePosition + Vector3.up * offset,
+                    basePosition + Vector3.up * (offset * 0.5f),
+                    isCrit);
+            }
 
-            // 치명타만 흔들림을 준다 — 잡몹 다단히트까지 매번 흔들면 대규모 물량전에서 화면이 계속 떨려 거슬린다.
-            if (isCrit)
-                PlayCameraShakeClientRpc(critShakeIntensity, critShakeDuration);
-
-            if (HP.Value <= 0f)
+            if (died)
                 HandleDeath();
+        }
+
+        private bool ShouldSendHitFeedback(bool isCrit, bool died)
+        {
+            if (isCrit || died)
+            {
+                nextHitFeedbackTime = Time.time + HitFeedbackMinInterval;
+                return true;
+            }
+
+            if (Time.time < nextHitFeedbackTime) return false;
+
+            nextHitFeedbackTime = Time.time + HitFeedbackMinInterval;
+            return true;
         }
 
         private PlayerMatchStats GetPlayerMatchStats(ulong clientId)
@@ -319,15 +341,23 @@ namespace Vamsurlike.Enemy
             if (data != null && data.prefab != null && PoolManager.Instance != null)
                 PoolManager.Instance.ReturnNetworkObject(data.prefab, NetworkObject);
         }
-
         [ClientRpc]
-        private void ShowDamageClientRpc(float damage, bool isCrit, Vector3 worldPosition)
+        private void PlayDamageFeedbackClientRpc(
+            float damage,
+            bool isCrit,
+            Vector3 damageWorldPosition,
+            Vector3 sparkWorldPosition,
+            bool playCritShake)
         {
-            FloatingTextManager.Instance?.ShowDamage(damage, worldPosition, isCrit);
+            FloatingTextManager.Instance?.ShowDamage(damage, damageWorldPosition, isCrit);
+            PlayHitSpark(sparkWorldPosition);
+            PlayHitFlash(isCrit);
+
+            if (playCritShake)
+                cameraShakeEvent?.Raise(new CameraShakeCue(transform.position, critShakeIntensity, critShakeDuration, shakeRadius));
         }
 
-        [ClientRpc]
-        private void PlayHitSparkClientRpc(Vector3 worldPosition)
+        private void PlayHitSpark(Vector3 worldPosition)
         {
             sfxSpawnEvent?.Raise(new SFXCue(SFXCueIds.Hit, worldPosition));
 
@@ -347,8 +377,7 @@ namespace Vamsurlike.Enemy
             if (spark == null) yield break;
             PoolManager.ReturnOrDestroyGO(hitSparkPrefab, spark, nameof(EnemyNetworkBase));
         }
-        [ClientRpc]
-        private void PlayHitFlashClientRpc(bool isCrit)
+        private void PlayHitFlash(bool isCrit)
         {
             if (!gameObject.activeInHierarchy) return;
 
@@ -363,7 +392,7 @@ namespace Vamsurlike.Enemy
 
         private IEnumerator HitFlashCoroutine(bool isCrit)
         {
-            hitFlashRenderers = GetComponentsInChildren<Renderer>(true);
+            hitFlashRenderers = GetHitFlashRenderers();
             if (hitFlashRenderers == null || hitFlashRenderers.Length == 0)
             {
                 hitFlashCoroutine = null;
@@ -394,6 +423,13 @@ namespace Vamsurlike.Enemy
 
             RestoreHitFlashBlocks();
             hitFlashCoroutine = null;
+        }
+
+        private Renderer[] GetHitFlashRenderers()
+        {
+            if (cachedHitFlashRenderers == null || cachedHitFlashRenderers.Length == 0)
+                cachedHitFlashRenderers = GetComponentsInChildren<Renderer>(true);
+            return cachedHitFlashRenderers;
         }
 
         private Color ApplyHitFlashTint(Color baseColor, bool isCrit)
