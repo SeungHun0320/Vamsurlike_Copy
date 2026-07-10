@@ -22,7 +22,14 @@ namespace Vamsurlike.Enemy
 
         private IEnemyState currentState;
         private float targetUpdateTimer;
+        private float nextRepathTime;
+        private Vector3 lastDestination;
+
         private const float TargetUpdateInterval = 0.5f;
+        private const float RepathInterval = 0.2f;
+        private const float RepathTargetMoveThresholdSqr = 0.25f;
+
+        internal float AttackCooldown { get; set; }
 
         private float stunnedUntil;
         internal bool IsStunned => Time.time < stunnedUntil;
@@ -48,12 +55,17 @@ namespace Vamsurlike.Enemy
 
             // 클라이언트에서 NavMeshAgent가 활성화된 채로 남으면 NavMesh 오류 발생.
             // OnServerSpawned()에서 서버에서만 다시 켠다.
+            Agent.autoRepath = false;
             Agent.enabled = false;
         }
 
         protected override void OnServerSpawned()
         {
             Agent.enabled = true;
+            targetUpdateTimer = Random.Range(0f, TargetUpdateInterval);
+            nextRepathTime = Time.time + Random.Range(0f, RepathInterval);
+            lastDestination = transform.position;
+            AttackCooldown = 0f;
             ChangeState(EnemyStates.Idle);
         }
 
@@ -129,6 +141,7 @@ namespace Vamsurlike.Enemy
         {
             float     closest       = float.MaxValue;
             Transform bestTransform = null;
+            Vector3   selfPosition  = transform.position;
 
             foreach (var client in NetworkManager.Singleton.ConnectedClientsList)
             {
@@ -138,11 +151,31 @@ namespace Vamsurlike.Enemy
                 var stats = playerObj.GetComponent<PlayerNetworkStats>();
                 if (stats != null && !stats.IsAlive) continue;
 
-                float sqrDist = Vector3.SqrMagnitude(transform.position - playerObj.transform.position);
+                float sqrDist = Vector3.SqrMagnitude(selfPosition - playerObj.transform.position);
                 if (sqrDist < closest) { closest = sqrDist; bestTransform = playerObj.transform; }
             }
 
             Target = bestTransform;
+        }
+
+        internal bool IsTargetInAttackRange()
+        {
+            if (Target == null || Base.Data == null) return false;
+            float range = Base.Data.attackRange;
+            return Vector3.SqrMagnitude(transform.position - Target.position) <= range * range;
+        }
+
+        internal void UpdateDestinationToTarget()
+        {
+            if (Target == null || !Agent.isOnNavMesh) return;
+
+            Vector3 targetPosition = Target.position;
+            if (Time.time < nextRepathTime && Vector3.SqrMagnitude(targetPosition - lastDestination) < RepathTargetMoveThresholdSqr)
+                return;
+
+            lastDestination = targetPosition;
+            nextRepathTime = Time.time + RepathInterval;
+            Agent.SetDestination(targetPosition);
         }
     }
 
@@ -159,8 +192,9 @@ namespace Vamsurlike.Enemy
 
     internal static class EnemyStates
     {
-        internal static readonly EnemyIdleState  Idle  = new();
-        internal static readonly EnemyChaseState Chase = new();
+        internal static readonly EnemyIdleState   Idle   = new();
+        internal static readonly EnemyChaseState  Chase  = new();
+        internal static readonly EnemyAttackState Attack = new();
     }
 
     // ─── Idle ──────────────────────────────────────────────────────────────────
@@ -190,15 +224,13 @@ namespace Vamsurlike.Enemy
         {
             if (ai.Target == null) { ai.ChangeState(EnemyStates.Idle); return; }
 
-            float dist = Vector3.Distance(ai.transform.position, ai.Target.position);
-            if (ai.Base.Data != null && dist <= ai.Base.Data.attackRange)
+            if (ai.IsTargetInAttackRange())
             {
-                ai.ChangeState(new EnemyAttackState());
+                ai.ChangeState(EnemyStates.Attack);
                 return;
             }
 
-            if (ai.Agent.isOnNavMesh)
-                ai.Agent.SetDestination(ai.Target.position);
+            ai.UpdateDestinationToTarget();
         }
 
         public void Exit(EnemyAI ai) { }
@@ -208,11 +240,9 @@ namespace Vamsurlike.Enemy
 
     internal sealed class EnemyAttackState : IEnemyState
     {
-        private float cooldown;
-
         public void Enter(EnemyAI ai)
         {
-            cooldown = 0f;
+            ai.AttackCooldown = 0f;
             if (ai.Agent.isOnNavMesh) ai.Agent.ResetPath();
         }
 
@@ -220,21 +250,20 @@ namespace Vamsurlike.Enemy
         {
             if (ai.Target == null) { ai.ChangeState(EnemyStates.Idle); return; }
 
-            float dist = Vector3.Distance(ai.transform.position, ai.Target.position);
-            if (ai.Base.Data == null || dist > ai.Base.Data.attackRange)
+            if (!ai.IsTargetInAttackRange())
             {
                 ai.ChangeState(EnemyStates.Chase);
                 return;
             }
 
-            cooldown -= Time.deltaTime;
-            if (cooldown > 0f) return;
+            ai.AttackCooldown -= Time.deltaTime;
+            if (ai.AttackCooldown > 0f) return;
 
             ai.TriggerAttackAnim();
 
             if (ai.Target.TryGetComponent<PlayerNetworkStats>(out var stats))
                 stats.TakeDamage(ai.Base.ScaledAttackPower);
-            cooldown = ai.Base.Data.attackInterval;
+            ai.AttackCooldown = ai.Base.Data.attackInterval;
         }
 
         public void Exit(EnemyAI ai) { }

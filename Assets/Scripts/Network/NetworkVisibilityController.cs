@@ -33,7 +33,7 @@ namespace Vamsurlike.Network
                     visibleClients.Add(kv.Key);
             }
             NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
-            timer = 0f;
+            timer = Random.Range(0f, updateInterval);
         }
 
         protected override void OnServerDespawned()
