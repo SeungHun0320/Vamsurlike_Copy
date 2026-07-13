@@ -21,7 +21,7 @@ MonoBehaviour:
   maxLevel: 1
   levels:
   - cooldown: 24
-    damage: 16.8
+    damage: 22
     range: 20
     projectileSpeed: 20
     projectileLifetime: 2.5

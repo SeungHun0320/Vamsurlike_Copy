@@ -9,4 +9,4 @@
 #   bossDataName    - Assets/Data/Enemies/ 폴더의 보스 EnemyDataSO 에셋명 (없으면 비워두기)
 #   clearCondition  - TimeSurvival / BossKill / BothRequired
 stageId,stageName,durationSeconds,waveGroupId,bossDataName,clearCondition
-1,Stage 01 — Survival,180,0,BossData_A,BossKill
+1,Stage 01 — Survival,300,0,BossData_A,BossKill

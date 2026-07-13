@@ -20,7 +20,7 @@ MonoBehaviour:
   vfxPrefab: {fileID: 0}
   maxLevel: 1
   levels:
-  - cooldown: 0.8
+  - cooldown: 1.5
     damage: 19.8
     range: 17
     projectileSpeed: 18
@@ -32,8 +32,8 @@ MonoBehaviour:
     duration: 0
     tickInterval: 1
     areaRadius: 0
-    orbitalCount: 4
-    orbitalRadius: 2
+    orbitalCount: 3
+    orbitalRadius: 3
     orbitalRotationSpeed: 240
     orbitalHitRadius: 0.6
     orbitalDamageMultiplier: 0.7
@@ -68,3 +68,5 @@ MonoBehaviour:
     aftershockDelay: 0.4
     lifestealRatio: 0.25
     boomerangDamageAmplifyPerStack: 0.15
+    shotgunSoloDamageMultiplier: 1.5
+    shotgunSharedDamageMultiplier: 0.6

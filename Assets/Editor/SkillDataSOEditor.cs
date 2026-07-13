@@ -112,6 +112,7 @@ namespace Vamsurlike.Editor
                     break;
 
                 case SkillCastType.OrbitalGrenade:
+                    DrawPersistentSection(level);
                     DrawOrbitalSection(level, includeProjectileDetach: false);
                     DrawSection("Orbital Grenade (충격 궤도)");
                     DrawField(level, "orbitalKnockbackForce");
@@ -170,6 +171,8 @@ namespace Vamsurlike.Editor
                 case SkillCastType.Shotgun:
                     DrawSection("Shotgun (원뿔 즉발)");
                     DrawField(level, "scatterAngle");
+                    DrawField(level, "shotgunSoloDamageMultiplier");
+                    DrawField(level, "shotgunSharedDamageMultiplier");
                     break;
 
                 case SkillCastType.Earthshatter:

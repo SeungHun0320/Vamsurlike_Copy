@@ -2,4 +2,4 @@
 # bossEnemyName: EnemySpawnManager에 등록된 에셋명 (없으면 빈 칸)
 # clearCondition: TimeSurvival / BossKill / BothRequired
 id,stageName,durationSeconds,waveGroupId,bossEnemyName,clearCondition
-1,Stage 01 — Survival,180,0,BossData_A,BossKill
+1,Stage 01 — Survival,300,0,BossData_A,BossKill

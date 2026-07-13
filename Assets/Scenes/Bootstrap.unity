@@ -1047,6 +1047,7 @@ MonoBehaviour:
     warmupCount: 20
   - prefab: {fileID: 3916538926206676985, guid: 95fda721b55515747810e5105ecea51c, type: 3}
     warmupCount: 20
+  warmupInstantiatesPerFrame: 5
 --- !u!114 &873381304
 MonoBehaviour:
   m_ObjectHideFlags: 0

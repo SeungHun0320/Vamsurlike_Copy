@@ -20,8 +20,8 @@ MonoBehaviour:
   vfxPrefab: {fileID: 0}
   maxLevel: 1
   levels:
-  - cooldown: 4.8
-    damage: 13.8
+  - cooldown: 2
+    damage: 20
     range: 12
     projectileSpeed: 18
     projectileLifetime: 2
@@ -52,7 +52,7 @@ MonoBehaviour:
     grenadeArcHeight: 3
     splashRadius: 2.5
     scatterBulletCount: 10
-    scatterAngle: 80
+    scatterAngle: 75
     burstDuration: 1.2
     meleeRange: 2.5
     meleeWidth: 3
@@ -68,3 +68,5 @@ MonoBehaviour:
     aftershockDelay: 0.4
     lifestealRatio: 0
     boomerangDamageAmplifyPerStack: 0.15
+    shotgunSoloDamageMultiplier: 1
+    shotgunSharedDamageMultiplier: 0.6

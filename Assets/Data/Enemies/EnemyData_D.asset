@@ -25,7 +25,7 @@ MonoBehaviour:
   floatingTextHeightOffset: 4
   tintColor: {r: 1, g: 0.55, b: 0.15, a: 1}
   visualScale: 1
-  saturation: 1
+  saturation: 0
   isElite: 0
   isBoss: 0
   bossMissilePrefab: {fileID: 0}

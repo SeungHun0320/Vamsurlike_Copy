@@ -105,8 +105,6 @@ namespace Vamsurlike.Stage
             {
                 yield return StartCoroutine(DefaultSpawnWave(wave));
             }
-
-            yield return new WaitForSeconds(wave.WaveDuration);
         }
 
         // GAME_PLAN §8 Co-op 밸런싱: EnemyHP *= 1+(playerCount-1)*0.3, SpawnRate *= 1+(playerCount-1)*0.5.
@@ -133,15 +131,21 @@ namespace Vamsurlike.Stage
             (float hpMul, float dmgMul, float rateMul) = GetCurrentMultipliers();
 
             foreach (var entry in wave.Entries)
-            {
-                int   count    = Mathf.RoundToInt(entry.Count * rateMul);
-                float interval = entry.SpawnInterval / rateMul;
+                StartCoroutine(SpawnEntry(entry, hpMul, dmgMul, rateMul));
 
-                for (int i = 0; i < count; i++)
-                {
-                    SpawnAnywhereOnMap(entry.EnemyName, hpMul, dmgMul);
+            yield return new WaitForSeconds(wave.WaveDuration);
+        }
+
+        private IEnumerator SpawnEntry(WaveEntry entry, float hpMul, float dmgMul, float rateMul)
+        {
+            int   count    = Mathf.RoundToInt(entry.Count * rateMul);
+            float interval = entry.SpawnInterval / rateMul;
+
+            for (int i = 0; i < count; i++)
+            {
+                SpawnAnywhereOnMap(entry.EnemyName, hpMul, dmgMul);
+                if (interval > 0f)
                     yield return new WaitForSeconds(interval);
-                }
             }
         }
 
@@ -152,7 +156,7 @@ namespace Vamsurlike.Stage
 
             var   entry = wave.Entries[0];
             int   count = Mathf.Max(1, entry.Count);
-            (float hpMul, float dmgMul, _) = GetCurrentMultipliers();
+            (float hpMul, float dmgMul, float rateMul) = GetCurrentMultipliers();
 
             for (int i = 0; i < count; i++)
             {
@@ -161,6 +165,11 @@ namespace Vamsurlike.Stage
                                 new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * spawnRadius;
                 spawnManager.SpawnEnemyByName(entry.EnemyName, pos, hpMul, dmgMul);
             }
+
+            for (int i = 1; i < wave.Entries.Count; i++)
+                StartCoroutine(SpawnEntry(wave.Entries[i], hpMul, dmgMul, rateMul));
+
+            yield return new WaitForSeconds(wave.WaveDuration);
         }
 
         private IEnumerator SpawnBossMinions(WaveData wave)

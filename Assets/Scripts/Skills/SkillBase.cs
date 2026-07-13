@@ -22,6 +22,7 @@ namespace Vamsurlike.Skills
 
             Vector3 dir = AutoTargeting.ResolveDirection(
                 context, context.CasterTransform.position, context.CasterForward, out var target);
+
             return Execute(context, dir, target);
         }
 

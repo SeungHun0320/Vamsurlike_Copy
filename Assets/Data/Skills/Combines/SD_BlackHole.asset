@@ -60,7 +60,7 @@ MonoBehaviour:
     clusterSpread: 3
     clusterSplashRadius: 1.5
     clusterDamageRatio: 0.5
-    pullSpeed: 3
+    pullSpeed: 2
     stunDuration: 1.5
     aftershockCount: 3
     aftershockRadius: 2
@@ -68,3 +68,5 @@ MonoBehaviour:
     aftershockDelay: 0.4
     lifestealRatio: 0
     boomerangDamageAmplifyPerStack: 0.15
+    shotgunSoloDamageMultiplier: 1.5
+    shotgunSharedDamageMultiplier: 0.6

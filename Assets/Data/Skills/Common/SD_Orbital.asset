@@ -21,7 +21,7 @@ MonoBehaviour:
   maxLevel: 3
   levels:
   - cooldown: 8
-    damage: 4.2
+    damage: 8
     range: 4
     projectileSpeed: 1
     projectileLifetime: 1
@@ -32,7 +32,7 @@ MonoBehaviour:
     duration: 0
     tickInterval: 0.3
     areaRadius: 0
-    orbitalCount: 1
+    orbitalCount: 3
     orbitalRadius: 5
     orbitalRotationSpeed: 180
     orbitalHitRadius: 2
@@ -68,8 +68,10 @@ MonoBehaviour:
     aftershockDelay: 0.4
     lifestealRatio: 0
     boomerangDamageAmplifyPerStack: 0.15
+    shotgunSoloDamageMultiplier: 1.5
+    shotgunSharedDamageMultiplier: 0.6
   - cooldown: 8
-    damage: 4.8
+    damage: 10
     range: 4
     projectileSpeed: 1
     projectileLifetime: 1
@@ -77,10 +79,10 @@ MonoBehaviour:
     projectileCount: 1
     spreadAngle: 0
     pierceCount: 0
-    duration: 0
+    duration: 3.5
     tickInterval: 0.3
     areaRadius: 0
-    orbitalCount: 2
+    orbitalCount: 4
     orbitalRadius: 5
     orbitalRotationSpeed: 210
     orbitalHitRadius: 2
@@ -116,8 +118,10 @@ MonoBehaviour:
     aftershockDelay: 0.4
     lifestealRatio: 0
     boomerangDamageAmplifyPerStack: 0.15
+    shotgunSoloDamageMultiplier: 1.5
+    shotgunSharedDamageMultiplier: 0.6
   - cooldown: 8
-    damage: 6
+    damage: 12
     range: 4.5
     projectileSpeed: 1
     projectileLifetime: 1
@@ -125,11 +129,11 @@ MonoBehaviour:
     projectileCount: 1
     spreadAngle: 0
     pierceCount: 0
-    duration: 0
+    duration: 3.5
     tickInterval: 0.3
     areaRadius: 0
-    orbitalCount: 3
-    orbitalRadius: 2.5
+    orbitalCount: 5
+    orbitalRadius: 5
     orbitalRotationSpeed: 240
     orbitalHitRadius: 2
     orbitalDamageMultiplier: 1
@@ -164,3 +168,5 @@ MonoBehaviour:
     aftershockDelay: 0.4
     lifestealRatio: 0
     boomerangDamageAmplifyPerStack: 0.15
+    shotgunSoloDamageMultiplier: 1.5
+    shotgunSharedDamageMultiplier: 0.6

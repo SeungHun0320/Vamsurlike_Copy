@@ -19,6 +19,7 @@ Shader "Vamsurlike/TintableDesaturate"
 
         CGPROGRAM
         #pragma surface surf Standard fullforwardshadows
+        #pragma multi_compile_instancing
         #pragma target 3.0
 
         sampler2D _MainTex;
@@ -28,19 +29,34 @@ Shader "Vamsurlike/TintableDesaturate"
             float2 uv_MainTex;
         };
 
-        fixed4 _Color;
-        half _Saturation;
         half _Glossiness;
         half _Metallic;
 
+        // _Color/_Saturation은 몬스터마다(재사용 프리팹 팔레트 스왑) 값이 달라야 하는 MaterialPropertyBlock
+        // 오버라이드 대상이다 — GPU Instancing이 켜진 상태(Enemy 재질 4종 모두 Enable Instancing)에서는
+        // 이렇게 UNITY_INSTANCING_BUFFER로 선언하지 않으면 배치된 인스턴스끼리 값이 뒤섞여
+        // 서로 다른 색으로 스폰된 적들의 색이 겹쳐 보이는 문제가 생긴다.
+        UNITY_INSTANCING_BUFFER_START(Props)
+            UNITY_DEFINE_INSTANCED_PROP(fixed4, _Color)
+            UNITY_DEFINE_INSTANCED_PROP(half, _Saturation)
+        UNITY_INSTANCING_BUFFER_END(Props)
+
         void surf (Input IN, inout SurfaceOutputStandard o)
         {
-            fixed4 albedo = tex2D(_MainTex, IN.uv_MainTex) * _Color;
-            half grey = dot(albedo.rgb, half3(0.299, 0.587, 0.114));
-            o.Albedo = lerp(grey.xxx, albedo.rgb, _Saturation);
+            fixed4 color      = UNITY_ACCESS_INSTANCED_PROP(Props, _Color);
+            half   saturation = UNITY_ACCESS_INSTANCED_PROP(Props, _Saturation);
+
+            // 채도 조절을 먼저 원본 텍스처에 적용한 뒤 틴트를 곱해야 한다 — 틴트부터 곱하고 나중에
+            // 채도를 낮추면 saturation=0일 때 색상 정보(휘도만 남고 색조는 사라짐)가 통째로 사라져서
+            // _Color가 뭐든 그냥 무채색이 되어버린다(예: 오렌지 틴트를 줘도 회색으로만 보임).
+            fixed4 tex = tex2D(_MainTex, IN.uv_MainTex);
+            half grey = dot(tex.rgb, half3(0.299, 0.587, 0.114));
+            fixed3 desaturated = lerp(grey.xxx, tex.rgb, saturation);
+
+            o.Albedo = desaturated * color.rgb;
             o.Metallic = _Metallic;
             o.Smoothness = _Glossiness;
-            o.Alpha = albedo.a;
+            o.Alpha = tex.a * color.a;
         }
         ENDCG
     }

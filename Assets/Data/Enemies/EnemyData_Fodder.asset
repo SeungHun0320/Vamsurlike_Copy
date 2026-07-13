@@ -14,13 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Data.EnemyDataSO
   enemyName: Swarmling
   prefab: {fileID: 6973261090502386799, guid: 20e7fc33d3343924788a92d1faf1308a, type: 3}
-  hp: 6
+  hp: 15
   moveSpeed: 9
   attackPower: 3
   defense: 0
   attackRange: 1.5
   attackInterval: 1
-  xpDrop: 1
+  xpDrop: 3
   dropTable: {fileID: 11400000, guid: 13c0353a0ab7756418d75acf751fb02d, type: 2}
   floatingTextHeightOffset: 4
   tintColor: {r: 1, g: 1, b: 1, a: 1}

@@ -21,7 +21,7 @@ MonoBehaviour:
   maxLevel: 1
   levels:
   - cooldown: 3.2
-    damage: 25.2
+    damage: 13
     range: 25
     projectileSpeed: 12
     projectileLifetime: 2.5
@@ -30,16 +30,16 @@ MonoBehaviour:
     spreadAngle: 0
     pierceCount: 0
     duration: 0
-    tickInterval: 1
+    tickInterval: 0.5
     areaRadius: 0
-    orbitalCount: 4
+    orbitalCount: 5
     orbitalRadius: 4.5
     orbitalRotationSpeed: 200
     orbitalHitRadius: 0.5
     orbitalDamageMultiplier: 1
     orbitalSplashRadius: 0
-    orbitalKnockbackForce: 4
-    orbitalHitCooldown: 0.2
+    orbitalKnockbackForce: 3
+    orbitalHitCooldown: 1
     orbitalProjectileScale: 0.75
     detachedOrbitalLifetimeMultiplier: 0.8
     detachedOrbitalHomingDelay: 0.2
@@ -68,3 +68,5 @@ MonoBehaviour:
     aftershockDelay: 0.4
     lifestealRatio: 0
     boomerangDamageAmplifyPerStack: 0.15
+    shotgunSoloDamageMultiplier: 1.5
+    shotgunSharedDamageMultiplier: 0.6

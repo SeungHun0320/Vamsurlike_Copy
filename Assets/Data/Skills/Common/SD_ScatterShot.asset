@@ -21,7 +21,7 @@ MonoBehaviour:
   maxLevel: 3
   levels:
   - cooldown: 5.6
-    damage: 3
+    damage: 7.5
     range: 10
     projectileSpeed: 22
     projectileLifetime: 2
@@ -69,7 +69,7 @@ MonoBehaviour:
     lifestealRatio: 0
     boomerangDamageAmplifyPerStack: 0.15
   - cooldown: 4.8
-    damage: 4.2
+    damage: 9
     range: 10
     projectileSpeed: 22
     projectileLifetime: 2
@@ -117,7 +117,7 @@ MonoBehaviour:
     lifestealRatio: 0
     boomerangDamageAmplifyPerStack: 0.15
   - cooldown: 3.52
-    damage: 5.4
+    damage: 11
     range: 10
     projectileSpeed: 22
     projectileLifetime: 2

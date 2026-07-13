@@ -34,7 +34,8 @@ namespace Vamsurlike.Skills
             Vector3 origin  = context.CasterTransform.position;
             float   range   = AutoTargeting.ResolveTargetingRange(context);
             Vector3 forward = AutoTargeting.ResolveDirection(context, origin, context.CasterForward, out _);
-            float   halfArc = levelData.spreadAngle * 0.5f;
+            float   coneAngle = Mathf.Max(0f, levelData.scatterAngle);
+            float   halfArc   = coneAngle * 0.5f;
             float   damage  = context.FinalDamage;
 
             HitTargets.Clear();
@@ -71,7 +72,7 @@ namespace Vamsurlike.Skills
                     enemy.TakeDamage(finalDamage, context.OwnerClientId, skill.name);
             }
 
-            context.VFX?.ShowMelee(SupportedCastType, origin, forward, range, levelData.spreadAngle);
+            context.VFX?.ShowMelee(SupportedCastType, origin, forward, range, coneAngle);
             return true;
         }
     }

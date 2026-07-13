@@ -73,6 +73,11 @@ namespace Vamsurlike.Network
                 return;
             }
 
+#if UNITY_EDITOR
+            // MPM 가상 플레이어가 프리팹 변경 직후 오래된 NetworkConfig 캐시로 튕기는 것을 막는다.
+            networkManager.NetworkConfig.ForceSamePrefabs = false;
+#endif
+
             ValidateSceneNames();
             sessionService = new NetworkSessionService(networkManager, transport, ResolvedClientIp, ResolvedPort);
             lobbyHostService = new LobbyHostService(networkManager);
