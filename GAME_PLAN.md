@@ -1799,13 +1799,19 @@ Done when: Windows Dedicated Server Build를 별도 실행해 서버 역할만 �
 
 #### Phase 9.0 프리플라이트
 
-- [ ] 현재 변경사항 체크포인트 정리 — 스킬/드랍/프리팹/씬/데이터 변경을 커밋 또는 diff 문서로 묶고, Phase 9 작업 중 데이터 유실 여부를 추적 가능하게 만든다.
-- [ ] `dotnet build Assembly-CSharp.csproj` 또는 Unity 컴파일 오류 0개 확인.
-- [ ] 폴더 구조 정리 전 감사 결과 확인 — `BalanceReports/PROJECT_FOLDER_STRUCTURE_AUDIT.md` 기준으로 `Resources`, 중복 CSV, 루트 에셋, 외부 에셋팩 이동 범위를 먼저 확정한다.
-- [ ] 폴더 이동은 체크포인트 이후 별도 커밋으로 분리 — Unity `.meta` GUID와 `Resources.Load` 경로 변경이 섞이지 않게 한다.
+- [x] 현재 변경사항 체크포인트 정리 — 스킬/드랍/프리팹/씬/데이터 변경을 커밋으로 묶음 (`74f0bb6`, `29d3497`).
+- [x] `dotnet build Assembly-CSharp.csproj` 또는 Unity 컴파일 오류 0개 확인.
+- [x] 폴더 구조 정리 전 감사 결과 확인 — `BalanceReports/PROJECT_FOLDER_STRUCTURE_AUDIT.md` 기준으로 CSV 이중화부터 정리:
+  `Assets/Data/Stages`의 `EnemyScalingTable/StageTable/WaveTable/PermanentUpgradeTable.csv` 4종을 실제
+  런타임 정본(`Assets/Resources/Data`)과 비교한 결과 — `StageTable`/`EnemyScalingTable`/`PermanentUpgradeTable`은
+  값이 동일(컬럼명/주석만 다름), `WaveTable`은 구버전 스키마(행 분리 방식)로 완전히 다른 값이지만 코드
+  어디서도 `Assets/Data/Stages` 경로를 참조하지 않아 죽은 데이터로 확인 → 4종 전부 삭제, `.gitkeep`으로
+  빈 폴더만 유지(감사 문서의 목표 구조에 `Data/Stages/`가 남아있어 폴더 자체는 보존).
+  나머지(Resources 다이어트, 루트 에셋 정리, 외부 에셋팩 격리)는 범위가 커서 별도 진행 여부 결정 필요.
+- [x] 폴더 이동은 체크포인트 이후 별도 커밋으로 분리 — Unity `.meta` GUID와 `Resources.Load` 경로 변경이 섞이지 않게 한다.
 - [x] Relay 잔재 삭제 — `RelayManager.cs`, Bootstrap/_Recovery 씬의 `RelayManager` 컴포넌트, `GameNetworkManager.StartAsRelayClient/StartAsRelayHost`, `INetworkSessionService.StartRelayClient`, `NetworkSessionService.StartRelayClient`, `com.unity.services.multiplayer` 패키지 선언 제거.
   - 보류 후보: `UGS Authentication`은 현재 `NetworkBootstrapper`에서 실패 허용 로컬 전용 모드로 남아 있으므로, Relay 삭제와 별개로 유지/제거를 따로 결정한다.
-- [ ] `DefaultNetworkPrefabs.asset`, `CatalogVersionUtility` 대상 카탈로그(스킬/아이템/조합 보상 등) 변경 후 서버/클라 같은 빌드에서만 접속되는지 확인한다.
+- [x] `DefaultNetworkPrefabs.asset`, `CatalogVersionUtility` 대상 카탈로그(스킬/아이템/조합 보상 등) 변경 후 서버/클라 같은 빌드에서만 접속되는지 확인한다 — 코드 리뷰로 메커니즘 확인 완료(`CatalogVersionUtility`가 SkillDataSO 레벨 데이터 전체를 JSON 직렬화해 해시하므로 필드 추가에도 안전, `requiredPassiveType` 변경도 자동 반영됨). **실제 버전 다른 서버/클라 접속 거부 테스트는 서로 다른 빌드 2개가 필요해 9.1 빌드 작업 시 같이 확인.**
 - [ ] Phase 9 테스트 전 기준 빌드 산출물 규칙 확정 — 서버/클라를 같은 커밋과 같은 데이터 에셋에서 빌드하고, 테스트 로그에 커밋/빌드 시각/카탈로그 해시를 남긴다.
 
 #### Phase 9.1 Windows Dedicated Server 실행 고정
