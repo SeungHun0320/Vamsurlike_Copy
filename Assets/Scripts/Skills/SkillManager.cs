@@ -112,6 +112,11 @@ namespace Vamsurlike.Skills
             if (GameFlowCoordinator.Instance == null
                 || !GameFlowCoordinator.Instance.IsGameplayActive)
                 return;
+            // 웨이브 시스템과 마찬가지로 모든 클라이언트의 씬 동기화가 끝날 때까지 스킬 캐스팅(투사체
+            // 스폰)도 대기 — 안 그러면 재시작 직후 빨리 로드된 플레이어가 쏜 투사체가 아직 동기화 중인
+            // 다른 클라에서 "스폰 메시지 없이 위치 갱신만 오는" 레이스에 걸려 튀어 보인다.
+            if (StageRuntime.Instance != null && !StageRuntime.Instance.IsWaveSystemReady)
+                return;
 
             float durationMultiplier = passiveStatHandler != null
                 ? passiveStatHandler.DurationMultiplier.Value
@@ -225,6 +230,11 @@ namespace Vamsurlike.Skills
                 || !GameFlowCoordinator.Instance.IsGameplayActive)
             {
                 Debug.LogWarning($"[ActivateFirstManualSkillServerRpc] FAIL - gameplay is not active.");
+                return;
+            }
+            if (StageRuntime.Instance != null && !StageRuntime.Instance.IsWaveSystemReady)
+            {
+                Debug.LogWarning($"[ActivateFirstManualSkillServerRpc] FAIL - wave system not ready yet (scene sync in progress).");
                 return;
             }
 

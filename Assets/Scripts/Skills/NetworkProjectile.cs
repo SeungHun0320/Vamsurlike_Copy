@@ -191,12 +191,17 @@ namespace Vamsurlike.Skills
                 NetworkObject.Despawn(false);
         }
 
+        // 씬 리로드(재시작) 직후처럼 로딩/GC로 어느 한 프레임의 Time.deltaTime이 비정상적으로 커지면,
+        // 그 프레임 하나에서 이동/궤도 회전이 과도하게 진행되어 "한순간 엄청 빠르게 움직이다 정상
+        // 속도로 돌아오는" 것처럼 보인다 — 한 프레임이 진행할 수 있는 시간 폭을 제한해 방지한다.
+        private const float MaxDeltaTime = 0.1f;
+
         private void Update()
         {
             if (!IsServer || !hasInitialized) return;
             if (GameFlowCoordinator.Instance == null || !GameFlowCoordinator.Instance.IsGameplayActive) return;
 
-            activeMode?.Tick(Time.deltaTime);
+            activeMode?.Tick(Mathf.Min(Time.deltaTime, MaxDeltaTime));
         }
 
         public override void OnNetworkDespawn()

@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Vamsurlike.Core;
 using Vamsurlike.Data.Runtime;
 using Vamsurlike.Network;
@@ -34,6 +36,10 @@ namespace Vamsurlike.Stage
         // 어댑터에서 타이머 페이로드 계산 시 사용 (0이면 스테이지 미로드)
         public float StageDuration => StageDurationSeconds.Value;
 
+        // 모든 클라이언트의 씬 동기화가 끝나 웨이브/드랍 스폰이 시작된 뒤에만 true — 스킬 캐스팅
+        // (투사체 스폰) 쪽에서도 같은 시점까지 대기하도록 SkillManager.Update()가 이 값을 확인한다.
+        public bool IsWaveSystemReady { get; private set; }
+
         private StageData activeStage;
         private bool      stageLoaded;
         private bool      bossPhaseTriggered;
@@ -60,6 +66,36 @@ namespace Vamsurlike.Stage
             if (!stageLoaded) return;
 
             waveController.Initialize(Spawn, activeStage.WaveGroupId);
+
+            // 서버 자신의 씬 로드가 끝나자마자 바로 웨이브를 시작하면, 아직 씬 동기화 중인(느리게
+            // 접속한) 클라이언트에게는 스폰 메시지가 도착하기도 전에 적/투사체의 NetworkTransform
+            // 갱신 메시지가 먼저 도착해버려 "스폰 안 된 오브젝트" 취급으로 버려진다(10초 뒤 타임아웃
+            // 경고, 그 오브젝트는 그 클라에서 영원히 안 보임). 플레이어 스폰(NetworkPlayerSpawner)이
+            // 이미 쓰고 있는 것과 동일한 패턴 — 모든 클라이언트의 씬 동기화가 끝나는 시점까지
+            // 대기했다가 웨이브를 시작한다.
+            if (NetworkManager.SceneManager != null)
+                NetworkManager.SceneManager.OnLoadEventCompleted += HandleLoadEventCompleted;
+            else
+                StartWaveSystem();
+        }
+
+        private void HandleLoadEventCompleted(
+            string sceneName,
+            LoadSceneMode loadSceneMode,
+            List<ulong> clientsCompleted,
+            List<ulong> clientsTimedOut)
+        {
+            if (sceneName != gameObject.scene.name) return;
+
+            if (NetworkManager.SceneManager != null)
+                NetworkManager.SceneManager.OnLoadEventCompleted -= HandleLoadEventCompleted;
+
+            StartWaveSystem();
+        }
+
+        private void StartWaveSystem()
+        {
+            IsWaveSystemReady = true;
             waveController.Begin();
         }
 
@@ -75,6 +111,9 @@ namespace Vamsurlike.Stage
 
         public override void OnDestroy()
         {
+            if (NetworkManager != null && NetworkManager.SceneManager != null)
+                NetworkManager.SceneManager.OnLoadEventCompleted -= HandleLoadEventCompleted;
+
             base.OnDestroy();
             if (Instance == this) Instance = null;
         }

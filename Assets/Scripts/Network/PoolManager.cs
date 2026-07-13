@@ -80,6 +80,11 @@ namespace Vamsurlike.Network
             if (Instance == this) Instance = null;
         }
 
+        // 스테이지 로드 직후 이 메서드가 한 프레임에서 수십 개 프리팹을 동기 Instantiate하면
+        // 재시작 시점에 눈에 띄는 히치(프레임 하나가 비정상적으로 길어짐)가 생긴다 — 코루틴으로
+        // 여러 프레임에 나눠서 워밍업한다.
+        [SerializeField, Min(1)] private int warmupInstantiatesPerFrame = 5;
+
         public void WarmupDeferredPools()
         {
             if (deferredNetworkConfigs == null || networkManager == null || !networkManager.IsServer)
@@ -88,7 +93,8 @@ namespace Vamsurlike.Network
             foreach (NetworkPoolConfig config in deferredNetworkConfigs)
             {
                 if (!IsValid(config)) continue;
-                networkObjectPool?.Warmup(config.prefab, config.warmupCount);
+                StartCoroutine(networkObjectPool.WarmupOverFrames(
+                    config.prefab, config.warmupCount, warmupInstantiatesPerFrame));
             }
         }
 

@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
@@ -90,8 +91,19 @@ namespace Vamsurlike.Network
             if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
 
             var clientIds = new List<ulong>(NetworkManager.Singleton.ConnectedClientsIds);
+            StartCoroutine(SpawnPlayersOverFrames(clientIds));
+        }
+
+        // 재시작 등으로 여러 클라이언트가 동시에 씬 동기화를 끝내면, 한 프레임에 플레이어 전원을
+        // Instantiate + SpawnAsPlayerObject 하게 되어 그 프레임 하나가 무거워진다 — 한 명씩 한 프레임에
+        // 나눠 스폰해서 그 순간의 부하를 줄인다.
+        private IEnumerator SpawnPlayersOverFrames(List<ulong> clientIds)
+        {
             foreach (ulong clientId in clientIds)
+            {
                 SpawnPlayerForClient(clientId);
+                yield return null;
+            }
         }
 
         public void SpawnPlayerForClient(ulong clientId)
