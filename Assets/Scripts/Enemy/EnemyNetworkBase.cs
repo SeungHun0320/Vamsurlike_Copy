@@ -306,8 +306,7 @@ namespace Vamsurlike.Enemy
 
             TriggerDeathAnimClientRpc();
             PlayDeathVFXClientRpc(wasBoss);
-            float deathIntensity = wasBoss ? deathShakeIntensity * bossDeathShakeMultiplier : deathShakeIntensity;
-            PlayCameraShakeClientRpc(deathIntensity, deathShakeDuration);
+            // 카메라 쉐이크는 크리티컬 히트에서만 발생 — 처치 자체는 더 이상 쉐이크를 유발하지 않는다.
             if (StageRuntime.Instance != null && StageRuntime.Instance.Drops != null)
                 StageRuntime.Instance.Drops.OnEnemyDied(data, transform.position);
 

@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
@@ -19,6 +20,10 @@ namespace Vamsurlike.Stage
         [SerializeField] private VFXSpawnEventSO vfxSpawnEvent;
         [SerializeField] private float pickupVFXDuration = 0.15f;
         [SerializeField] private SFXSpawnEventSO sfxSpawnEvent;
+
+        [Header("Pickup Fly")]
+        [SerializeField] private float flyDuration = 0.6f;
+        [SerializeField] private AnimationCurve flyEase = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
 
         // 서버 전용
         private readonly Dictionary<ulong, XPOrbEntry> activeOrbs = new();
@@ -92,10 +97,37 @@ namespace Vamsurlike.Stage
             }
 
             activeOrbs.Remove(orbId);
-            SharedLevelSystem.Instance?.AddXP(orb.Xp, clientId);
+            StartCoroutine(DelayedAddXP(orb.Xp, clientId, flyDuration));
             Vector3 collectorPosition = client.PlayerObject != null ? client.PlayerObject.transform.position : orb.Pos;
             DestroyOrbVisualClientRpc(orbId, clientId, collectorPosition);
             return true;
+        }
+
+        // 클라이언트에서 오브가 날아가는 연출(flyDuration)이 끝나는 시점에 맞춰 XP를 반영한다 —
+        // 즉시 반영하면 오브가 아직 화면에서 날아가는 중인데 XP 바가 먼저 올라가는 어긋남이 생긴다.
+        private IEnumerator DelayedAddXP(int xp, ulong clientId, float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            SharedLevelSystem.Instance?.AddXP(xp, clientId);
+        }
+
+        // 서버 전용: 자석 아이템 픽업 시 호출 — 거리 무관하게 씬에 남아있는 모든 XP 오브를 즉시 흡수한다.
+        public void CollectAll(ulong collectorClientId)
+        {
+            if (!IsServer || activeOrbs.Count == 0) return;
+
+            bool hasCollector = NetworkManager.ConnectedClients.TryGetValue(collectorClientId, out var client)
+                && client.PlayerObject != null;
+            Vector3 collectorPosition = hasCollector ? client.PlayerObject.transform.position : Vector3.zero;
+
+            // 순회 중 activeOrbs를 직접 지우면 안 되므로 키 목록을 먼저 복사한다.
+            var ids = new List<ulong>(activeOrbs.Keys);
+            foreach (ulong id in ids)
+            {
+                if (!activeOrbs.Remove(id, out XPOrbEntry orb)) continue;
+                StartCoroutine(DelayedAddXP(orb.Xp, collectorClientId, flyDuration));
+                DestroyOrbVisualClientRpc(id, collectorClientId, collectorPosition);
+            }
         }
 
         // 클라이언트 전용: PlayerPickupController가 거리 체크 시 사용
@@ -124,6 +156,7 @@ namespace Vamsurlike.Stage
                 proxy = go.AddComponent<XPOrbVisualProxy>();
 
             proxy.Initialize(id);
+            proxy.ConfigureFly(flyDuration, flyEase);
             orbVisuals[id] = go;
         }
 

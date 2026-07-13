@@ -94,7 +94,7 @@ namespace Vamsurlike.Items
                 return;
             }
 
-            if (ApplyEffect(client.PlayerObject.gameObject))
+            if (ApplyEffect(client.PlayerObject.gameObject, clientId))
             {
                 ServerConsoleLogger.Log($"[검증] 아이템 픽업 승인 (client={clientId}, item={itemData.name})");
                 // 상자는 카드 선택 화면으로 전환되므로 흡수 이펙트가 거의 안 보임 — 생략
@@ -146,6 +146,7 @@ namespace Vamsurlike.Items
                 ItemType.HealthOrb => new Color(0.4f, 1f, 0.4f, 1f),
                 ItemType.Missile   => new Color(1f, 0.5f, 0.2f, 1f),
                 ItemType.Chest     => new Color(1f, 0.85f, 0.3f, 1f),
+                ItemType.Magnet    => new Color(0.4f, 0.8f, 1f, 1f),
                 _                  => Color.white,
             };
 
@@ -168,7 +169,7 @@ namespace Vamsurlike.Items
             });
         }
 
-        private bool ApplyEffect(GameObject playerObject)
+        private bool ApplyEffect(GameObject playerObject, ulong clientId)
         {
             switch (itemData.itemType)
             {
@@ -178,6 +179,11 @@ namespace Vamsurlike.Items
 
                 case ItemType.Missile:
                     ApplyMissileAoE();
+                    return true;
+
+                case ItemType.Magnet:
+                    XPOrbManager.Instance?.CollectAll(clientId);
+                    GoldOrbManager.Instance?.CollectAll(clientId);
                     return true;
 
                 case ItemType.Chest:

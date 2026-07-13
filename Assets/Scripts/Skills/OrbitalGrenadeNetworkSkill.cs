@@ -5,8 +5,9 @@ using Vamsurlike.Enemy;
 
 namespace Vamsurlike.Skills
 {
-    // 충격 궤도: Orbital + ProjectileCount.
+    // 충격 궤도: Orbital + Defense.
     // 위성은 시각적으로만 공전하고, 데미지는 플레이어 중심 궤도 범위 안의 적에게 틱마다 1회 적용한다.
+    // 진화 조건이 방어력 패시브라 투사체 개수 증가 패시브의 영향은 받지 않는다(orbitalCount 고정).
     public sealed class OrbitalGrenadeSkill : SkillBase
     {
         private readonly List<EnemyNetworkBase> targets = new();
@@ -39,7 +40,7 @@ namespace Vamsurlike.Skills
             if (skill == null || levelData == null || context.CasterTransform == null)
                 return false;
 
-            int   count          = Mathf.Max(1, levelData.orbitalCount + context.BonusProjectileCount);
+            int   count          = Mathf.Max(1, levelData.orbitalCount);
             float radius         = Mathf.Max(0.1f, levelData.orbitalRadius * context.AreaMultiplier);
             float hitRadius      = Mathf.Max(0.05f, levelData.orbitalHitRadius * context.AreaMultiplier);
             float rotSpeed       = levelData.orbitalRotationSpeed;

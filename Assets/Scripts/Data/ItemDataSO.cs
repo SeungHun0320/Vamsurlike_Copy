@@ -6,7 +6,8 @@ namespace Vamsurlike.Data
     {
         Chest,
         HealthOrb,
-        Missile
+        Missile,
+        Magnet // 픽업 시 씬에 남아있는 모든 XP 오브를 즉시 흡수
     }
 
     [CreateAssetMenu(fileName = "ItemData_", menuName = "Vamsurlike/Data/Item")]

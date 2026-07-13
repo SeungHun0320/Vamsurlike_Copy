@@ -8,8 +8,11 @@ namespace Vamsurlike.Stage
     // XPOrbManager가 ClientRpc로 생성 시 ID를 주입한다.
     public class XPOrbVisualProxy : MonoBehaviour
     {
-        [SerializeField] private float flyDuration = 0.35f;
-        [SerializeField] private AnimationCurve flyEase = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+        // 프리팹이 아니라 XPOrbManager가 AddComponent로 생성하는 컴포넌트라 인스펙터가 없다 —
+        // 값 튜닝은 XPOrbManager의 flyDuration/flyEase 필드(인스펙터에 노출됨)에서 하고,
+        // 여기 기본값은 ConfigureFly가 호출되지 않았을 때(이론상 없음)를 위한 안전값이다.
+        private float flyDuration = 0.6f;
+        private AnimationCurve flyEase = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
 
         public ulong OrbId { get; private set; }
 
@@ -18,6 +21,13 @@ namespace Vamsurlike.Stage
         public void Initialize(ulong orbId)
         {
             OrbId = orbId;
+        }
+
+        // XPOrbManager 인스펙터 값으로 비행 연출을 튜닝할 수 있도록 주입.
+        public void ConfigureFly(float duration, AnimationCurve ease)
+        {
+            flyDuration = Mathf.Max(0.01f, duration);
+            if (ease != null) flyEase = ease;
         }
 
         public void Clear()

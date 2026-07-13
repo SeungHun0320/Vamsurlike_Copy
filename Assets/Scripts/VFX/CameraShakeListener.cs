@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using Vamsurlike.Player;
 
 namespace Vamsurlike.VFX
 {
@@ -14,8 +15,10 @@ namespace Vamsurlike.VFX
     public sealed class CameraShakeListener : MonoBehaviour
     {
         [SerializeField] private CameraShakeEventSO shakeEvent;
-        [SerializeField] private float positionMultiplier = 0.3f;
-        [SerializeField] private float maxOffset = 1.5f;     // 다중 쉐이크 합산 시 폭주 방지용 클램프
+        // 카메라가 쿼터뷰 오프셋(약 39유닛)만큼 멀리 떨어져 있어 예전 0.3 값으로는 화면상 변위가
+        // 화면 높이의 0.1% 수준이라 사실상 안 보였다 — 체감 가능한 수준으로 상향(약 8배).
+        [SerializeField] private float positionMultiplier = 2.5f;
+        [SerializeField] private float maxOffset = 2f;     // 다중 쉐이크 합산 시 폭주 방지용 클램프
 
         private struct ActiveShake
         {
@@ -69,7 +72,13 @@ namespace Vamsurlike.VFX
                 }
 
                 // 거리 감쇠: 진원지에서 반경(Radius) 밖이면 0, 진원지에 가까울수록 1에 수렴.
-                float distance = Vector3.Distance(transform.position, shake.Position);
+                // 카메라 자신의 위치가 아니라 로컬 플레이어 위치 기준으로 계산한다 — 쿼터뷰
+                // FollowOffset 때문에 카메라는 플레이어로부터 항상 수십 유닛 떨어져 있어서, 카메라
+                // 위치 기준으로 계산하면 shakeRadius를 항상 초과해 강도가 늘 0이 되어버린다.
+                Vector3 referencePosition = LocalPlayerCameraBinder.LocalPlayerTransform != null
+                    ? LocalPlayerCameraBinder.LocalPlayerTransform.position
+                    : transform.position;
+                float distance = Vector3.Distance(referencePosition, shake.Position);
                 float distanceAtten = Mathf.Clamp01(1f - distance / shake.Radius);
 
                 // 시간 감쇠: 시작 직후가 가장 강하고 지속시간 끝에서 0으로 선형 감소.

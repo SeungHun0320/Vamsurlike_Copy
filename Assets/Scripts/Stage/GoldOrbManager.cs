@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
@@ -22,6 +23,10 @@ namespace Vamsurlike.Stage
         [SerializeField] private VFXSpawnEventSO vfxSpawnEvent;
         [SerializeField] private float pickupVFXDuration = 0.15f;
         [SerializeField] private SFXSpawnEventSO sfxSpawnEvent;
+
+        [Header("Pickup Fly")]
+        [SerializeField] private float flyDuration = 0.6f;
+        [SerializeField] private AnimationCurve flyEase = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
 
         // 서버 전용
         private readonly Dictionary<ulong, GoldOrbEntry> activeOrbs = new();
@@ -85,10 +90,18 @@ namespace Vamsurlike.Stage
                 return false;
 
             activeOrbs.Remove(orbId);
-            DistributeGold(orb.Gold);
+            StartCoroutine(DelayedDistributeGold(orb.Gold, flyDuration));
 
-            DestroyOrbVisualClientRpc(orbId);
+            DestroyOrbVisualClientRpc(orbId, clientId, client.PlayerObject.transform.position);
             return true;
+        }
+
+        // 클라이언트에서 오브가 날아가는 연출(flyDuration)이 끝나는 시점에 맞춰 골드를 반영한다 —
+        // 즉시 반영하면 오브가 아직 화면에서 날아가는 중인데 골드가 먼저 올라가는 어긋남이 생긴다.
+        private IEnumerator DelayedDistributeGold(int baseGold, float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            DistributeGold(baseGold);
         }
 
         // 누가 주웠는지와 무관하게 접속 중인 모든 플레이어에게 동일한 기본량을 귀속시키고,
@@ -106,6 +119,27 @@ namespace Vamsurlike.Stage
                 int finalGold = Mathf.Max(1, Mathf.RoundToInt(baseGold * goldMultiplier));
 
                 matchStats.AddGold(finalGold);
+            }
+        }
+
+        // 서버 전용: 자석 아이템 픽업 시 호출 — 거리 무관하게 씬에 남아있는 모든 골드 오브를 즉시 흡수한다.
+        // 누가 주웠는지와 무관하게 전원에게 동일 기본량이 귀속되는 규칙(DistributeGold)은 그대로 유지되고,
+        // collectorClientId는 화면상 "누구에게 날아가는지" 연출용으로만 쓰인다.
+        public void CollectAll(ulong collectorClientId)
+        {
+            if (!IsServer || activeOrbs.Count == 0) return;
+
+            bool hasCollector = NetworkManager.ConnectedClients.TryGetValue(collectorClientId, out var client)
+                && client.PlayerObject != null;
+            Vector3 collectorPosition = hasCollector ? client.PlayerObject.transform.position : Vector3.zero;
+
+            // 순회 중 activeOrbs를 직접 지우면 안 되므로 키 목록을 먼저 복사한다.
+            var ids = new List<ulong>(activeOrbs.Keys);
+            foreach (ulong id in ids)
+            {
+                if (!activeOrbs.Remove(id, out GoldOrbEntry orb)) continue;
+                StartCoroutine(DelayedDistributeGold(orb.Gold, flyDuration));
+                DestroyOrbVisualClientRpc(id, collectorClientId, collectorPosition);
             }
         }
 
@@ -134,23 +168,41 @@ namespace Vamsurlike.Stage
                 proxy = go.AddComponent<GoldOrbVisualProxy>();
 
             proxy.Initialize(id);
+            proxy.ConfigureFly(flyDuration, flyEase);
             orbVisuals[id] = go;
         }
 
         [ClientRpc]
-        private void DestroyOrbVisualClientRpc(ulong id)
+        private void DestroyOrbVisualClientRpc(ulong id, ulong collectorClientId, Vector3 collectorPosition)
         {
             if (!orbVisuals.TryGetValue(id, out var go)) return;
             orbVisuals.Remove(id);
+            if (go == null) return;
+
+            Transform collectorTransform = NetworkManager.Singleton != null
+                && NetworkManager.Singleton.ConnectedClients.TryGetValue(collectorClientId, out var client)
+                && client.PlayerObject != null
+                    ? client.PlayerObject.transform
+                    : null;
+
+            if (go.TryGetComponent<GoldOrbVisualProxy>(out var proxy))
+            {
+                proxy.FlyToAndComplete(collectorTransform, collectorPosition, () => FinishOrbPickup(go, proxy));
+                return;
+            }
+
+            FinishOrbPickup(go, null);
+        }
+
+        private void FinishOrbPickup(GameObject go, GoldOrbVisualProxy proxy)
+        {
             if (go == null) return;
 
             vfxSpawnEvent?.Raise(new VFXCue(
                 VFXCueIds.PickupAbsorb, go.transform.position, Vector3.up, 1f, pickupVFXDuration, Color.white));
             sfxSpawnEvent?.Raise(new SFXCue(SFXCueIds.GoldPickup, go.transform.position));
 
-            if (go.TryGetComponent<GoldOrbVisualProxy>(out var proxy))
-                proxy.Clear();
-
+            proxy?.Clear();
             PoolManager.ReturnOrDestroyGO(orbVisualPrefab, go, nameof(GoldOrbManager));
         }
 

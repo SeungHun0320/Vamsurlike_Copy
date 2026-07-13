@@ -7,7 +7,7 @@ namespace Vamsurlike.Skills
     // 서버: 포물선 시뮬레이션 + 착지 스플래시
     public sealed class GrenadeSkill : SkillBase
     {
-        internal const float FlightTime = 0.6f;
+        internal const float FlightTime = 0.6f; // 이동속도 배율 1.0(기본 이동속도) 기준 비행시간
         private const float SpawnHeightOffset = 0.8f;
 
         // RULES.md: 랜덤은 시드 기반 System.Random 인스턴스 사용
@@ -38,6 +38,7 @@ namespace Vamsurlike.Skills
                     context.OwnerClientId,
                     context.Skill.name,
                     context.AreaMultiplier,
+                    context.SpeedMultiplier,
                     context.VFX));
             }
             return true;
@@ -50,6 +51,7 @@ namespace Vamsurlike.Skills
             ulong ownerClientId,
             string skillTag,
             float areaMultiplier,
+            float speedMultiplier,
             ISkillVFXBroadcaster vfx)
         {
             double rx = rng.NextDouble() * 2.0 - 1.0;
@@ -61,12 +63,16 @@ namespace Vamsurlike.Skills
             Vector3 target = origin + new Vector3((float)rx * range, 0f, (float)rz * range);
             float splashRadius = levelData.splashRadius * areaMultiplier;
 
+            // 이동속도 패시브가 투척 속도에도 반영되도록 비행시간을 반비례로 줄인다 — 이동속도가
+            // 빠를수록 수류탄도 더 빠르게 날아가 더 빨리 떨어진다(투사체 스킬의 SpeedMultiplier와 동일 취지).
+            float flightTime = FlightTime / Mathf.Max(0.1f, speedMultiplier);
+
             Vector3 spawnPos = origin + Vector3.up * SpawnHeightOffset;
-            vfx?.ShowGrenadeImpactCircle(target, splashRadius, FlightTime);
-            vfx?.ShowGrenade(spawnPos, target, levelData.grenadeArcHeight, FlightTime);
+            vfx?.ShowGrenadeImpactCircle(target, splashRadius, flightTime);
+            vfx?.ShowGrenade(spawnPos, target, levelData.grenadeArcHeight, flightTime);
 
             float elapsed = 0f;
-            while (elapsed < FlightTime)
+            while (elapsed < flightTime)
             {
                 elapsed += Time.deltaTime;
                 yield return null;

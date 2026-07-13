@@ -13,5 +13,5 @@ MonoBehaviour:
   m_Name: Recipe_OrbitalShot
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Items.CombineRecipeSO
   sourceSkill: {fileID: 11400000, guid: d524e4c633a57894fadeb5e9940f4cd5, type: 2}
-  requiredPassiveType: 13
+  requiredPassiveType: 6
   evolvedSkill: {fileID: 11400000, guid: 1ebbc7138fc424e44aa1e6e7099c113f, type: 2}

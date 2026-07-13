@@ -6905,8 +6905,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.VFX.CameraShakeListener
   shakeEvent: {fileID: 11400000, guid: 782f711cf6734360a004c7a01376de0d, type: 2}
-  positionMultiplier: 0.3
-  maxOffset: 1.5
+  positionMultiplier: 2.5
+  maxOffset: 2
 --- !u!1 &1498796226
 GameObject:
   m_ObjectHideFlags: 0

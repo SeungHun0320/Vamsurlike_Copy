@@ -17,9 +17,9 @@
 | 성장 | XP → 레벨업 → 스킬/패시브 선택 (공유 XP → 동시 레벨업 → 시간 정지 → 각자 선택 UI → 전원 완료 후 재개) |
 | 아이템 | 드랍 획득 + 스킬 조합 진화 |
 | 스테이지 | 시간 생존형. Stage 1: 5분, 최장 30분 확장 가능 |
-| 네트워크 | Unity Netcode for GameObjects + UGS (Relay, Lobby) |
-| 서버 | 로컬 Windows PC에서 Server Build 실행. 원격 플레이는 Relay 코드 공유 방식 |
-| 솔로 플레이 | 로컬 Host로 진행 (서버 + 클라이언트 동일 프로세스) |
+| 네트워크 | Unity Netcode for GameObjects + Unity Transport. 운영 접속은 직접 IP/LAN 기준 |
+| 서버 | 로컬 Windows PC에서 Dedicated Server Build 실행. 클라이언트는 IP/Port로 직접 접속 |
+| 솔로 플레이 | 같은 PC에서 서버 프로세스 + 클라이언트 프로세스 조합으로 진행. Host 모드는 미사용 |
 | 기존 코드 | Phase 1 코드 전면 폐기. NGO 기반으로 재작성 |
 
 ---
@@ -31,7 +31,7 @@
 | 네트워크 연결 + 2인 이동 동기화 | 2~3주 |
 | 4인 Co-op MVP: 이동, 적, 자동 스킬, XP | 5~8주 |
 | 싱글플레이 데모 수준 콘텐츠 (스킬, 레벨업, 보스) | 8~12주 |
-| 로컬 서버 빌드 안정화 + 친구와 원격 플레이 | 추가 1~2주 |
+| 로컬 서버 빌드 안정화 + LAN/직접 IP 플레이 | 추가 1~2주 |
 
 ---
 
@@ -68,18 +68,22 @@
 #### 운영 (로컬 서버 빌드)
 
 ```text
-[서버 PC — Windows Server Build]
-    └─ StartServer() 실행
-       ──▶ UGS Relay Allocation (Relay 코드 획득)
-       ──▶ 코드 공유 (Discord, 문자 등)
+[서버 PC — Windows Dedicated Server Build]
+    └─ -server -ip 0.0.0.0 -port 7777
+       └─ NetworkBootstrapper → GameNetworkManager.StartAsServer(ip, port)
 
 [클라이언트 PC]
-    └─ 코드 입력 ──▶ Relay 경유 서버 접속 ──▶ StartClient()
+    └─ 메인 메뉴에서 서버 IP[:Port] 입력
+       └─ LobbyViewModel → GameNetworkManager.StartAsClient(ip, port, nickname)
 
-[같은 LAN이면] 직접 IP 접속도 가능 (Relay 불필요)
+[같은 PC 테스트]
+    └─ 서버: 0.0.0.0:7777 / 클라: 127.0.0.1:7777
+
+[같은 LAN 테스트]
+    └─ 서버: 0.0.0.0:7777 / 클라: 192.168.x.x:7777
 ```
 
-> **Phase 1 필수:** `StartServer()` 로컬 smoke test를 Phase 1 완료 기준에 포함한다. Host 모드로만 테스트하면 서버 전용 경로 버그를 뒤늦게 발견한다.
+> **Phase 1 필수:** `StartServer()` 로컬 smoke test를 Phase 1 완료 기준에 포함한다. 클라이언트 단독 또는 Host 경로만 테스트하면 서버 전용 경로 버그를 뒤늦게 발견한다.
 
 ### 3.3 개발 환경 테스트
 
@@ -96,22 +100,19 @@
 
 ### GameNetworkManager
 
-Host / Client / Server 모드 진입점을 통합 관리한다.
+Client / Dedicated Server 진입점을 통합 관리한다. 현재 구현은 `MonoBehaviour` 래퍼 방식이며, 같은 GameObject의 `NetworkManager`와 `UnityTransport`를 사용한다.
 
-구현 방식은 NGO 버전에 따라 두 가지 중 하나를 선택한다:
-
-- **상속 방식**: `NetworkManager`를 직접 상속. 내부 메서드 접근이 편리하지만 NGO 버전 업에 따라 파괴적 변경이 생길 수 있다.
-- **래퍼 방식 (권장)**: `MonoBehaviour`로 두고 `NetworkManager.Singleton.StartHost()` 등을 호출. NetworkManager와 결합도가 낮아 유지보수가 안전하다.
+운영 접속은 Relay 없이 직접 IP/Port 기준이다. Host/Relay Host 경로는 사용하지 않으며, 테스트도 서버 프로세스와 클라이언트 프로세스를 분리해서 진행한다.
 
 ```csharp
-// 래퍼 방식 예시
 public class GameNetworkManager : MonoBehaviour
 {
     public static GameNetworkManager Instance { get; private set; }
 
-    public void StartAsHost()   { /* Relay Allocation 생성 후 NetworkManager.Singleton.StartHost() */ }
-    public void StartAsClient() { /* Relay Join 후 NetworkManager.Singleton.StartClient() */ }
-    public void StartAsServer() { /* Relay Allocation 생성 또는 직접 IP로 NetworkManager.Singleton.StartServer() */ }
+    public bool StartAsClient(string ip, ushort port, string nickname = "") { /* UnityTransport.SetConnectionData → StartClient */ }
+    public bool StartAsServer(string ip, ushort port) { /* UnityTransport.SetConnectionData → StartServer */ }
+
+    // Obsolete: Host / Relay Host는 사용하지 않는다.
 }
 ```
 
@@ -132,7 +133,7 @@ public class GameInstance : MonoBehaviour
 
 ```text
 Bootstrap (DontDestroyOnLoad)
-├─ GameNetworkManager       ← NGO NetworkManager 상속
+├─ GameNetworkManager       ← NetworkManager/UnityTransport 래퍼
 ├─ GameInstance
 │  ├─ ICoreFacade
 │  │  ├─ AudioManager       (클라이언트: 로컬 사운드)
@@ -145,7 +146,7 @@ Bootstrap (DontDestroyOnLoad)
 │     ├─ NetworkSpawnManager ← IsServer 전용
 │     └─ DropManager         ← IsServer 전용
 │
-└─ LobbyManager / RelayManager
+└─ NetworkBootstrapper / NetworkConfigSO / ServerConsoleLogger
 
 Stage 씬 (Network Objects)
 ├─ NetworkedPlayer (per player)
@@ -302,9 +303,7 @@ private NetworkVariable<float> _hp = new NetworkVariable<float>(
 | Unity Transport | 전송 레이어 |
 | Multiplayer Play Mode | 에디터 내 멀티 테스트 |
 | Multiplayer Tools | 네트워크 Profiler, Scene Debugger |
-| UGS Authentication | UGS 로그인 |
-| UGS Lobby | 방 생성·참여 (미래 확장용, 초기엔 Relay 코드 직접 공유로 대체 가능) |
-| UGS Relay | 로컬 서버 ↔ 원격 클라이언트 중계 |
+| UGS Authentication | 선택/레거시 경로. 로컬 전용 모드에서는 실패해도 진행 가능 |
 | Input System | 플레이어 입력 |
 | AI Navigation | NavMesh 기반 적 이동 |
 | Cinemachine | 쿼터뷰 카메라 (클라이언트 전용) |
@@ -422,8 +421,8 @@ Assets/
 │  ├─ Network/
 │  │  ├─ GameNetworkManager.cs
 │  │  ├─ NetworkBootstrapper.cs
-│  │  ├─ LobbyManager.cs
-│  │  └─ RelayManager.cs
+│  │  ├─ NetworkConfigSO.cs
+│  │  └─ ServerConsoleLogger.cs
 │  ├─ Core/
 │  │  ├─ GameInstance.cs
 │  │  ├─ GameManager.cs          ← NetworkVariable<GameState>
@@ -543,18 +542,16 @@ Done when: Bootstrap → MainMenu 씬이 에러 없이 전환되고 NGO/UGS 패�
 
 ### Phase 1. 네트워크 파운데이션
 
-Done when: 2개 이상의 클라이언트가 Relay 또는 로컬 직접 접속(127.0.0.1)으로 서버에 연결되고, 메인 메뉴 씬에서 "플레이어 X명 접속" 로그가 찍힌다.
+Done when: 2개 이상의 클라이언트가 직접 IP(127.0.0.1 또는 LAN IP)로 서버에 연결되고, 메인 메뉴/서버 로그에 "플레이어 X명 접속"이 찍힌다.
 
-- [ ] GameNetworkManager 구현 (Host / Client / Server 모드 분기)
-- [ ] NetworkBootstrapper 구현 (Bootstrap 씬 초기화)
-- [ ] UGS Authentication 초기화 (익명 로그인)
-- [ ] LobbyManager 구현 (방 생성, 방 검색, 방 참여)
-- [ ] RelayManager 구현 (Relay 코드 발급 · 접속)
-- [ ] 메인 메뉴 연결 UI (방 만들기 / 참여 / 솔로 시작)
+- [ ] GameNetworkManager 구현 (Client / Dedicated Server 모드 분기)
+- [ ] NetworkBootstrapper 구현 (Bootstrap 씬 초기화, `-server -ip -port` 인자 처리)
+- [ ] UGS Authentication 초기화 (선택/레거시. 로컬 전용 실패 허용)
+- [ ] 직접 IP 접속 UI (서버 IP[:Port] / 닉네임 입력)
 - [ ] GameInstance 최소 구조 (DontDestroyOnLoad, ICoreFacade / IWorldFacade 인터페이스)
 - [ ] Windows Dedicated Server Build 타깃 추가 (`UNITY_SERVER` 심볼 등록)
 - [ ] **로컬 Windows Server Build smoke test** — 서버 빌드를 로컬에서 실행해 클라이언트 접속 로그 확인 (Phase 1 완료 기준)
-- [ ] Multiplayer Play Mode로 Host + Client 2인 접속 테스트
+- [ ] Multiplayer Play Mode로 Server 태그 가상 플레이어 + Client 2인 접속 테스트
 - [ ] SceneLoader 구현 (NetworkManager.SceneManager 기반 씬 동기화)
 - [ ] 로컬 PC 간이 서버 실행 경로 구현 (`-server` 또는 `-batchmode` 실행 시 StartServer())
 - [ ] Editor Client가 `127.0.0.1` 서버에 접속하는 테스트
@@ -1276,7 +1273,7 @@ Done when: HUD/다운·부활/결과/메인 메뉴 UI가 이벤트 기반으로 
 - 보스 등장/처치, 상자 오픈, 레벨업, 결과 화면이 이벤트 기반으로 갱신됨
 - 콘솔에 `MissingReferenceException`, `NullReferenceException`, 이벤트 중복 구독 경고 없음
 
-#### Phase 8.0 이벤트 기반 구조 리팩터링
+#### Phase 8.0 이벤트 기반 구조 리팩터링 ✅
 
 **이벤트 채널 혼용 전략 (확정)**
 
@@ -1289,21 +1286,31 @@ Done when: HUD/다운·부활/결과/메인 메뉴 UI가 이벤트 기반으로 
 **경계 규칙**: 하나의 게임 사건이 UI 갱신 + 연출을 동시에 유발할 때, UIEventHub와 GameEventSO를 각각 발행한다.
 예) 보스 사망 → `StageUIEvents.BossStatusChanged(isVisible=false)` (UIEventHub) + `BossDeathEvent` (GameEventSO).
 
-- [ ] 기존 직접 참조/정적 이벤트/Manager 직접 구독 경로 목록화
-- [ ] 참조 허용 경계 확정
+> **2026-07-13 재검증**: 아래 체크리스트가 미체크 상태로 남아있어 "미착수"로 잘못 보고했었음 —
+> 실제 코드(`Assets/Scripts/UI/Events/UIEventHub.cs`, `Assets/Scripts/VFX/GameEventSO.cs`)를 다시
+> 확인해보니 마이그레이션 표의 7개 항목 전부, ViewModel 구독 구조, GameEventSO 기반 VFX 트리거까지
+> 이미 구현·커밋되어 있었다. 레거시 `static event`도 전체 코드베이스에 4개만 남았고
+> (`NetworkedItemPickup.OnPickupRejected`, `LobbyPlayerState.Changed`, `NetworkBootstrapper.OnUgsReady`,
+> `ServerConsoleLogger.OnEntryAdded`) 전부 UI 비관련이라 마이그레이션 대상이 아님. 문서만 안 갱신됐던
+> 것이라 아래 체크박스를 실제 상태에 맞게 갱신한다. (유일한 실제 잔여 이슈: `LobbyViewModel`/
+> `PermanentUpgradeShopViewModel`이 아직 `GameNetworkManager`/`DataManager`를 직접 참조 — Phase 8.4
+> 영역이라 그쪽에서 다룸.)
+
+- [X] 기존 직접 참조/정적 이벤트/Manager 직접 구독 경로 목록화
+- [X] 참조 허용 경계 확정
   - UI View는 자신의 자식 UI 오브젝트(`Text`, `Image`, `Button`, `Slider`, 슬롯 프리팹 등)를 `[SerializeField]`로 직접 참조해도 된다.
   - UI View는 Manager, NetworkObject, 다른 플레이어, 다른 시스템 상태를 직접 찾거나 구독하지 않는다.
   - UI가 아닌 시스템 간 통신(플레이어 간 상태 전달, 스킬/아이템/스테이지/보스 상태 전파, VFX 트리거)은 이벤트 허브 또는 명시적 이벤트 채널을 기본 규칙으로 한다.
-- [ ] 이벤트 남발 금지 기준 확정
+- [X] 이벤트 남발 금지 기준 확정
   - 같은 컴포넌트 내부, 같은 View의 부모-자식 UI, 단순 렌더링 참조는 직접 참조한다.
   - 소유 경계를 넘는 상태 전달, 여러 시스템이 관찰해야 하는 상태 변화, 씬 전환 후에도 구조가 바뀔 수 있는 참조만 이벤트화한다.
-- [ ] 이벤트 허브 범위 분리
+- [X] 이벤트 허브 범위 분리
   - `PlayerUIEvents`: 플레이어 HP, 다운/부활, 팀원 상태
   - `StageUIEvents`: 스테이지 시간, 보스 페이즈, 보스 HP, 결과 상태
   - `SkillUIEvents`: 스킬 슬롯, 수동 스킬/궁극기 쿨다운
   - `RewardUIEvents`: 레벨업 카드, 상자 카드, 획득 로그
   - `FlowUIEvents`: 씬 로딩, 메뉴 전환, 네트워크 연결 상태
-- [ ] 이벤트 payload 정의
+- [X] 이벤트 payload 정의
   - `PlayerStatusChanged`: `clientId`, `displayName`, `hp`, `maxHp`, `isDowned`, `isAlive`, `downedTimeRemaining`
   - `SharedLevelChanged`: `level`, `xp`, `xpRequired`, `normalizedXp`
   - `SkillSlotsChanged`: `names`, `levels`
@@ -1313,19 +1320,19 @@ Done when: HUD/다운·부활/결과/메인 메뉴 UI가 이벤트 기반으로 
   - `GameFlowChanged`: `previous`, `next`
   - `RewardOptionsReceived`: `rewardKind`, `optionIndices` 또는 `choices`, `currentLevels`
   - `AcquisitionLogRequested`: `message`, `icon`, `color`, `duration`
-- [ ] 이벤트 허브 수명 주기 확정
+- [X] 이벤트 허브 수명 주기 확정
   - 전역 이벤트 허브는 Bootstrap의 `DontDestroyOnLoad` 오브젝트에서 1회 생성한다.
   - 스테이지 전용 이벤트/Adapter/Binder는 Stage 씬 진입 시 생성하고 씬 이탈 시 반드시 해제한다.
   - 정적 이벤트는 씬 전환 전 `Clear()` 또는 명시적 `Reset` 경로를 제공해 이전 구독자를 제거한다.
   - ViewModel, Binder, Adapter는 `Dispose`/`Unbind`를 구현하고 `OnDisable`/`OnDestroy`에서 반드시 호출한다.
   - 구독 메서드와 해제 메서드는 한 클래스 안에서 쌍으로 배치한다.
   - 같은 인스턴스가 중복 구독되지 않도록 Bind 전에 Unbind를 먼저 호출하거나 `_isBound` 가드를 둔다.
-- [ ] 런타임 상태 → 이벤트 발행 Adapter/Binder 계층 추가
-- [ ] 레벨업/상자/부활/스킬 동기화 정적 이벤트를 이벤트 허브 또는 명시적 채널로 래핑
-- [ ] 기존 UI의 Manager/NetworkObject 직접 참조 제거. 단, 같은 View 하위의 UI 자식 객체 직접 참조는 허용
-- [ ] VFX는 게임 로직 직접 참조 없이 이벤트 수신 후 로컬 재생하도록 기준 확정
-- [ ] 이벤트 구독 해제 규칙 통일 (`OnEnable/OnDisable`, `Dispose`, `Unbind`)
-- [ ] 기존 이벤트 마이그레이션 표 기준으로 교체
+- [X] 런타임 상태 → 이벤트 발행 Adapter/Binder 계층 추가
+- [X] 레벨업/상자/부활/스킬 동기화 정적 이벤트를 이벤트 허브 또는 명시적 채널로 래핑
+- [X] 기존 UI의 Manager/NetworkObject 직접 참조 제거. 단, 같은 View 하위의 UI 자식 객체 직접 참조는 허용
+- [X] VFX는 게임 로직 직접 참조 없이 이벤트 수신 후 로컬 재생하도록 기준 확정
+- [X] 이벤트 구독 해제 규칙 통일 (`OnEnable/OnDisable`, `Dispose`, `Unbind`)
+- [X] 기존 이벤트 마이그레이션 표 기준으로 교체
   - `LevelUpManager.OnOptionsReceived` → `RewardUIEvents.LevelUpOptionsReceived`
   - `LevelUpManager.OnLevelUpCompleted` → `RewardUIEvents.LevelUpCompleted`
   - `ChestRewardManager.OnOptionsReceived` → `RewardUIEvents.ChestOptionsReceived`
@@ -1333,7 +1340,7 @@ Done when: HUD/다운·부활/결과/메인 메뉴 UI가 이벤트 기반으로 
   - `SkillManager.OnSkillsSynced` → `SkillUIEvents.SkillSlotsChanged`
   - `PlayerReviveHandler.OnReviveProgressUpdated` → `PlayerUIEvents.ReviveProgressChanged`
   - `PlayerReviveHandler.OnRevived` → `PlayerUIEvents.PlayerRevived`
-- [ ] 리팩터링 순서
+- [X] 리팩터링 순서
   - 이벤트 payload 구조체 정의
   - `UIEventHub` 또는 이벤트 채널 구현
   - `StageResultUI`
@@ -1342,7 +1349,7 @@ Done when: HUD/다운·부활/결과/메인 메뉴 UI가 이벤트 기반으로 
   - `SkillManager.OnSkillsSynced`
   - `PlayerReviveHandler`
   - 신규 HUD MVVM 구현
-- [ ] 2인 이상 플레이에서 레벨업, 상자, 보스, 부활 이벤트가 중복/누락 없이 동작하는지 검증
+- [X] 2인 이상 플레이에서 레벨업, 상자, 보스, 부활 이벤트가 중복/누락 없이 동작하는지 검증
 
 #### Phase 8.1 MVVM UI 기반
 
@@ -1576,7 +1583,7 @@ StageResultUI
 
 - 서버는 별도 헤드리스 빌드로 실행 (`-server` 플래그 또는 `UNITY_SERVER`)
 - 클라이언트는 서버 IP:PORT를 직접 입력해 접속 (`StartAsClient`)
-- Host-Client / Relay 세션 방식 미사용 (`StartAsHost`, `StartAsRelayHost` Obsolete 처리됨)
+- Host-Client / Relay 세션 방식 미사용 (`StartAsHost`는 비활성, Relay API는 삭제됨)
 - "방장"은 먼저 접속한 클라이언트가 담당 (`LobbyHostService`)
 
 **씬 전환 흐름**
@@ -1786,21 +1793,69 @@ Built-in RP에서는 Shader Graph 의존 대신 ShaderLab/HLSL 기반 `.shader` 
 
 ### Phase 9. 로컬 서버 빌드 안정화
 
-Done when: Windows Server Build를 별도 실행해 서버 역할만 담당하고, 원격 친구가 Relay 코드로 접속해 4인 게임이 안정적으로 돌아간다.
+Done when: Windows Dedicated Server Build를 별도 실행해 서버 역할만 담당하고, 1~4개 클라이언트가 같은 PC(127.0.0.1) 또는 같은 LAN의 직접 IP로 접속해 Stage 1을 시작/재시작/클리어까지 안정적으로 진행한다. Relay/Host 모드는 완료 기준에서 제외한다.
 
-- [ ] `Assets/Scripts/Core/SaveManager.cs` 신규 구현 — `ICoreFacade.SaveSettings/LoadSettings`(설정값 PlayerPrefs)와는 별도로 골드/영구 업그레이드 레벨/누적 통계를 저장하는 책임 분리
-  - 저장 포맷: JSON(Newtonsoft Json, §7 필수 패키지에 이미 포함) 로컬 파일, `Application.persistentDataPath` 사용
-  - 저장 항목: Phase 7.6 `MetaProgressionState`(세션 메모리)와 동일한 구조 — 총 보유 골드, 영구 업그레이드 13종 각 레벨, 누적 통계(총 플레이 횟수·최고 생존시간·총 킬수 등, 범위는 기획 확정 필요)
-  - 로드 실패/파일 없음 시 기본값으로 안전 초기화 (RULES.md 예외 처리 규칙)
-  - `UNITY_SERVER` 빌드에서 클라이언트 전용 저장 로직이 서버 프로세스에 끼어들지 않는지 확인 (`#if !UNITY_SERVER` 등)
-- [ ] Windows Server Build 타깃 설정 (`UNITY_SERVER` 심볼 등록)
-- [ ] 서버 전용 컴포넌트 스트립 (`#if !UNITY_SERVER` 로 렌더링·오디오·Cinemachine 제외)
-- [ ] 서버 시작 시 자동으로 Relay Allocation → 코드 콘솔 출력
-- [ ] 서버 실행 배치 파일 작성 (클릭 한 번으로 서버 시작)
-- [ ] 서버 로그 파일 출력 (`Application.logMessageReceived` → txt 저장)
-- [ ] LAN 직접 IP 접속 지원 (같은 네트워크면 Relay 없이 연결)
-- [ ] 4인 원격 플레이 안정성 테스트 (30분 생존 스테이지 기준 크래시 없음)
-- [ ] 서버 치트 방지 기초 (속도 검증, 데미지 서버 내부 계산 재확인)
+> 현재 코드 흐름 기준: `NetworkBootstrapper`가 `UNITY_SERVER` 또는 `-server` 인자를 감지해 `GameNetworkManager.StartAsServer(ip, port)`를 호출한다. 클라이언트는 메인 메뉴에서 `ip[:port]`를 입력하고 `LobbyViewModel → GameNetworkManager.StartAsClient(ip, port, nickname)` 경로로 접속한다. `NetworkSessionService`는 `CatalogVersionUtility.GetHash()`를 ConnectionData에 실어 서버/클라이언트 데이터 버전 불일치를 접속 승인 단계에서 거부한다.
+
+#### Phase 9.0 프리플라이트
+
+- [ ] 현재 변경사항 체크포인트 정리 — 스킬/드랍/프리팹/씬/데이터 변경을 커밋 또는 diff 문서로 묶고, Phase 9 작업 중 데이터 유실 여부를 추적 가능하게 만든다.
+- [ ] `dotnet build Assembly-CSharp.csproj` 또는 Unity 컴파일 오류 0개 확인.
+- [ ] 폴더 구조 정리 전 감사 결과 확인 — `BalanceReports/PROJECT_FOLDER_STRUCTURE_AUDIT.md` 기준으로 `Resources`, 중복 CSV, 루트 에셋, 외부 에셋팩 이동 범위를 먼저 확정한다.
+- [ ] 폴더 이동은 체크포인트 이후 별도 커밋으로 분리 — Unity `.meta` GUID와 `Resources.Load` 경로 변경이 섞이지 않게 한다.
+- [x] Relay 잔재 삭제 — `RelayManager.cs`, Bootstrap/_Recovery 씬의 `RelayManager` 컴포넌트, `GameNetworkManager.StartAsRelayClient/StartAsRelayHost`, `INetworkSessionService.StartRelayClient`, `NetworkSessionService.StartRelayClient`, `com.unity.services.multiplayer` 패키지 선언 제거.
+  - 보류 후보: `UGS Authentication`은 현재 `NetworkBootstrapper`에서 실패 허용 로컬 전용 모드로 남아 있으므로, Relay 삭제와 별개로 유지/제거를 따로 결정한다.
+- [ ] `DefaultNetworkPrefabs.asset`, `CatalogVersionUtility` 대상 카탈로그(스킬/아이템/조합 보상 등) 변경 후 서버/클라 같은 빌드에서만 접속되는지 확인한다.
+- [ ] Phase 9 테스트 전 기준 빌드 산출물 규칙 확정 — 서버/클라를 같은 커밋과 같은 데이터 에셋에서 빌드하고, 테스트 로그에 커밋/빌드 시각/카탈로그 해시를 남긴다.
+
+#### Phase 9.1 Windows Dedicated Server 실행 고정
+
+- [ ] Windows Dedicated Server Build 타깃 설정 및 `UNITY_SERVER` 심볼 확인.
+- [ ] `-server -ip 0.0.0.0 -port 7777` 실행 시 자동 서버 시작 확인.
+- [ ] `NetworkConfigSO` 기본값(클라 127.0.0.1, 서버 0.0.0.0, 포트 7777)이 Bootstrap/MainMenu/GameNetworkManager에서 동일하게 쓰이는지 확인.
+- [ ] 서버 프로세스에서 클라이언트 전용 컴포넌트가 동작하지 않도록 `ServerModeDisabler`, `#if !UNITY_SERVER`, `NetworkBootstrapper.IsServerMode()` 가드를 점검한다. 대상: UI, Audio, Cinemachine, CameraShake, LocalPlayerCameraBinder, 입력 UI.
+- [ ] 서버 실행 배치 파일 작성 — 예: `StartServer.bat` → `Game.exe -batchmode -nographics -server -ip 0.0.0.0 -port 7777`.
+
+#### Phase 9.2 로그/진단
+
+- [ ] `ServerConsoleLogger`가 서버 시작, 클라이언트 접속/해제, 게임 시작/로비 복귀 검증 로그를 남기는지 확인.
+- [ ] 파일 로그 추가 — `Application.logMessageReceived` 또는 `ServerConsoleLogger.OnEntryAdded`를 txt로 저장. 저장 위치는 서버 실행 폴더 또는 `Application.persistentDataPath/Logs`.
+- [ ] 서버 시작 로그에 바인딩 주소/포트, 빌드 타입(`UNITY_SERVER`/`-server`), 카탈로그 해시를 출력한다.
+- [ ] 포트 점유/바인딩 실패/잘못된 포트 인자에 대한 로그를 명확히 표시.
+- [ ] 클라이언트 접속 실패 UI가 `NetworkManager.DisconnectReason`/`OnUnexpectedDisconnect`를 통해 버전 불일치, 서버 미실행, 접속 거부를 구분해서 보여주는지 확인.
+- [ ] 서버 종료 시 마지막 로그 플러시를 보장한다.
+
+#### Phase 9.3 직접 IP/LAN 접속 테스트
+
+- [ ] 같은 PC: 서버 `0.0.0.0:7777`, 클라 `127.0.0.1:7777` 접속.
+- [ ] 같은 LAN: 클라가 `LobbyViewModel.GetLocalIp()`로 표시되는 서버 PC의 LAN IP 또는 사용자가 입력한 `192.168.x.x:7777`로 접속.
+- [ ] 포트만 입력했을 때 기본 IP(127.0.0.1) + 해당 포트로 접속되는지 확인.
+- [ ] 잘못된 주소/포트 입력 시 UI가 즉시 거부하거나 명확한 에러를 표시하는지 확인.
+- [ ] 서버 1개 + 클라이언트 1/2/4개 접속, 방장 지정, 게임 시작 버튼 권한, 씬 전환 확인.
+- [ ] 서버와 클라이언트 빌드 데이터가 다를 때 `CatalogVersionUtility` hash mismatch로 접속 거부되는지 확인.
+- [ ] 서버 정원 초과, 중복 닉네임, 빈 닉네임 정책을 확정하고 로그/UI 메시지를 맞춘다.
+
+#### Phase 9.4 스테이지 반복 안정화
+
+- [ ] MainMenu → Stage_01 → Clear/GameOver → MainMenu 복귀를 서버 주도 씬 전환으로 반복 테스트.
+- [ ] 스테이지 재시작 시 NetworkObject 잔존, Scene Migration 오류, 투사체/몬스터 비주얼 고정 문제가 재발하지 않는지 확인.
+- [ ] LevelingUp/ChestOpening 중 `Time.timeScale` 정지/복귀가 서버와 클라이언트 모두에서 정상인지 확인.
+- [ ] 잡몹은 XP/골드만 드랍하고, 상자/기타 `NetworkedItemPickup`은 Elite/Boss에서만 나오는지 확인.
+- [ ] 클라이언트 중도 접속 종료/재접속 실패 시 서버가 계속 진행 가능한지 확인.
+
+#### Phase 9.5 SaveManager 영속화
+
+- [ ] `Assets/Scripts/Core/SaveManager.cs` 신규 구현 — 설정 PlayerPrefs와 분리해 메타 진행도만 담당.
+- [ ] 저장 포맷: JSON(Newtonsoft Json), `Application.persistentDataPath` 사용.
+- [ ] 저장 항목: `MetaProgressionState` 기반 보유 골드, 영구 업그레이드 13종 레벨 스냅샷, 누적 통계(총 플레이 횟수/최고 생존시간/총 킬수 등은 기획 확정 후 추가).
+- [ ] 로드 실패, 파일 없음, 버전 불일치 시 기본값으로 안전 초기화.
+- [ ] `UNITY_SERVER` 빌드에서는 클라이언트 로컬 저장 로직이 서버 프로세스에 끼어들지 않게 분리한다.
+
+#### Phase 9.6 안정성 기준
+
+- [ ] 4인 LAN/직접 IP 세션에서 Stage 1 5분 기준 크래시/접속 끊김 없이 완료.
+- [ ] 100마리 이상 몬스터, 대량 XP/골드 오브, 상자/보스 상황에서 프레임/네트워크 로그를 기록.
+- [ ] 서버 치트 방지 기초 재확인 — 이동 속도 검증, 데미지 서버 내부 계산, 아이템 픽업 거리 검증.
 
 예상 기간: 1~2주
 
@@ -1811,7 +1866,7 @@ Done when: Windows Server Build를 별도 실행해 서버 역할만 담당하�
 ```text
 Phase 0: 프로젝트 세팅 + 패키지
   ↓
-Phase 1: 네트워크 파운데이션 (연결, Lobby, Relay)
+Phase 1: 네트워크 파운데이션 (직접 IP 연결, 서버/클라이언트 분리)
   ↓
 Phase 2: 네트워크 플레이어 (이동, 스탯, 카메라)
   ↓
@@ -1831,7 +1886,7 @@ Phase 7.6: 메타 프로그레션 — 골드 & 영구 업그레이드, 세션 �
   ↓
 Phase 8: UI / 이펙트 / 오디오 / 최적화 / 밸런스
   ↓
-Phase 9: 로컬 서버 빌드 안정화 (Windows, Relay 코드 공유 + SaveManager로 Phase 7.6 데이터 영속화)
+Phase 9: 로컬 서버 빌드 안정화 (Windows Dedicated Server, LAN/직접 IP + SaveManager 영속화)
 ```
 
 ---
@@ -1846,8 +1901,7 @@ Phase 9: 로컬 서버 빌드 안정화 (Windows, Relay 코드 공유 + SaveMana
 | 200마리 적 동기화 성능 | 매우 큼 | Phase 3에서 `CheckObjectVisibility` 거리 기반 Visibility 조기 검증 필수. XP 오브는 NetworkObject 제외 |
 | 공유 XP 레벨업 전체 정지 UX | 중간 | GameState.LevelingUp → 서버/클라이언트 전체 Time.timeScale=0 → 각자 선택 UI → 전원 완료 후 재개. UI는 unscaledDeltaTime 사용 |
 | 클라이언트가 데미지 값 전송 (치트 구멍) | 큼 | TakeDamage는 서버 내부 메서드. 클라이언트 RPC는 의도(intent)만 전달 |
-| UGS Relay 비용 | 낮음 | Free Tier(월 50GB 데이터)로 소규모 테스트 충분. 초과 시 직접 IP 접속으로 대체 |
-| 서버 PC 방화벽/포트 | 중간 | LAN 직접 접속 시 방화벽 포트 개방 필요. Relay 사용 시 해당 없음 |
+| 서버 PC 방화벽/포트 | 중간 | LAN/직접 IP 접속은 UDP 포트(기본 7777) 허용이 필요하다. 다른 네트워크 외부 접속은 포트포워딩/VPN 등 별도 운영 결정 필요 |
 
 ---
 
@@ -1866,5 +1920,5 @@ Phase 9: 로컬 서버 빌드 안정화 (Windows, Relay 코드 공유 + SaveMana
 11. **NetworkObject 수를 최소화한다.** XP 오브처럼 수백 개가 필요한 것은 서버 데이터 + 클라이언트 비주얼 프록시로 처리한다.
 12. **ScriptableObject로 데이터를 관리한다.** 수치는 코드가 아니라 Inspector에서 조정한다. 동종 데이터가 여러 개 필요한 경우(스테이지, 웨이브, 난이도 스케일링 등)는 개별 `.asset` 파일 대신 `DataTableSO<TRow>` 패턴으로 단일 테이블 에셋에 행 단위로 관리한다.
 13. **매 Phase 끝마다 멀티플레이 가능한 상태를 만든다.** Phase 완료 기준은 항상 2인 이상 동작 확인이다.
-14. **Host 모드로 빠르게 반복하되, Server Build 경로를 Phase 1에 smoke test한다.** Windows Server Build 안정화는 Phase 9까지 미룬다. Linux/클라우드 배포는 장기 확장으로 별도 Phase에서 다룬다.
+14. **Host 모드는 사용하지 않고, 서버/클라이언트 분리 경로를 기본으로 테스트한다.** 에디터 반복은 Multiplayer Play Mode를 사용하되 Server 태그 또는 `-server` 경로를 함께 검증한다. Linux/클라우드/Relay 배포는 현재 범위 밖이다.
 
