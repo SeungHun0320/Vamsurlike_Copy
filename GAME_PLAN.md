@@ -1827,11 +1827,11 @@ Done when: Windows Dedicated Server Build를 별도 실행해 서버 역할만 �
 
 #### Phase 9.1 Windows Dedicated Server 실행 고정
 
-- [ ] Windows Dedicated Server Build 타깃 설정 및 `UNITY_SERVER` 심볼 확인.
-- [ ] `-server -ip 0.0.0.0 -port 7777` 실행 시 자동 서버 시작 확인.
-- [ ] `NetworkConfigSO` 기본값(클라 127.0.0.1, 서버 0.0.0.0, 포트 7777)이 Bootstrap/MainMenu/GameNetworkManager에서 동일하게 쓰이는지 확인.
-- [ ] 서버 프로세스에서 클라이언트 전용 컴포넌트가 동작하지 않도록 `ServerModeDisabler`, `#if !UNITY_SERVER`, `NetworkBootstrapper.IsServerMode()` 가드를 점검한다. 대상: UI, Audio, Cinemachine, CameraShake, LocalPlayerCameraBinder, 입력 UI.
-- [ ] 서버 실행 배치 파일 작성 — 예: `StartServer.bat` → `Game.exe -batchmode -nographics -server -ip 0.0.0.0 -port 7777`.
+- [ ] Windows Dedicated Server Build 타깃 설정 및 `UNITY_SERVER` 심볼 확인 — 현재 에디터는 `StandaloneWindows64 / Player` 서브타깃 상태(`Server`로 전환 안 됨, `execute_script`로 확인). 실제 전환+빌드는 수 분 이상 소요되고 에디터 빌드 타깃이 바뀌므로 사용자 확인 후 진행.
+- [x] `-server -ip 0.0.0.0 -port 7777` 실행 시 자동 서버 시작 확인 — `NetworkBootstrapper` 코드 리뷰로 확인 완료(`-server` 인자 또는 `UNITY_SERVER` 감지 → `GameNetworkManager.StartAsServer(ip, port)`).
+- [x] `NetworkConfigSO` 기본값(클라 127.0.0.1, 서버 0.0.0.0, 포트 7777)이 Bootstrap/MainMenu/GameNetworkManager에서 동일하게 쓰이는지 확인 — 코드 리뷰로 일치 확인.
+- [x] 서버 프로세스에서 클라이언트 전용 컴포넌트가 동작하지 않도록 `ServerModeDisabler` 가드를 점검 — `MainMenu.unity`에 가드가 전혀 없던 것(Main Camera/Canvas/EventSystem)과 `Stage_01.unity` Main Camera(CinemachineBrain/Camera/AudioListener/CameraShakeListener 보유)에 누락된 것을 발견, 전부 추가함(`a5f1e2f`). Stage_01의 나머지 UI 캔버스 4곳은 기존에 이미 가드 있었음.
+- [x] 서버 실행 배치 파일 작성 — `StartServer.bat` 추가(`%GAME_EXE% -batchmode -nographics -server -ip 0.0.0.0 -port 7777`), 빌드 산출물 경로는 `Builds\Server\Vamsurlike.exe` 가정.
 
 #### Phase 9.2 로그/진단
 
