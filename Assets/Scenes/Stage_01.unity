@@ -6779,6 +6779,7 @@ GameObject:
   - component: {fileID: 1481783742}
   - component: {fileID: 1481783741}
   - component: {fileID: 1481783745}
+  - component: {fileID: 1481783746}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -6907,6 +6908,18 @@ MonoBehaviour:
   shakeEvent: {fileID: 11400000, guid: 782f711cf6734360a004c7a01376de0d, type: 2}
   positionMultiplier: 2.5
   maxOffset: 2
+--- !u!114 &1481783746
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1481783740}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 27866d70f2d00a8488c3d47cca94fb8f, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Network.ServerModeDisabler
 --- !u!1 &1498796226
 GameObject:
   m_ObjectHideFlags: 0
