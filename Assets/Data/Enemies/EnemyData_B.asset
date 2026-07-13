@@ -21,7 +21,11 @@ MonoBehaviour:
   attackRange: 1.5
   attackInterval: 0.8
   xpDrop: 8
-  dropTable: {fileID: 11400000, guid: 13c0353a0ab7756418d75acf751fb02d, type: 2}
+  dropTable: {fileID: 11400000, guid: d1215519f06a3914d94ec25a12f71c2a, type: 2}
   floatingTextHeightOffset: 4
-  isElite: 0
+  tintColor: {r: 1, g: 1, b: 1, a: 1}
+  visualScale: 1
+  saturation: 1
+  isElite: 1
   isBoss: 0
+  bossMissilePrefab: {fileID: 0}

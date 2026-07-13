@@ -14,11 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Data.DropTableSO
   entries:
   - item: {fileID: 11400000, guid: 19b06f6caa77e9142a6aebb22b944364, type: 2}
-    chance: 0.15
-  - item: {fileID: 11400000, guid: 3fdc95bc044b14942892853539b8513a, type: 2}
     chance: 0.1
+  - item: {fileID: 11400000, guid: 3fdc95bc044b14942892853539b8513a, type: 2}
+    chance: 0.15
   - item: {fileID: 11400000, guid: b071a133fe886fb40821ef13cdeb0c13, type: 2}
     chance: 0.05
+  - item: {fileID: 11400000, guid: 113e6a9e3efe6a84a8d6eeddf1a73ee3, type: 2}
+    chance: 0.05
   goldDropChance: 0.5
-  minGold: 3
-  maxGold: 6
+  minGold: 15
+  maxGold: 30

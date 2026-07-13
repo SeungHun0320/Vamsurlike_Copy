@@ -54,17 +54,6 @@ namespace Vamsurlike.Network
             return started;
         }
 
-        public bool StartRelayClient()
-        {
-            if (!CanStart(nameof(StartRelayClient))) return false;
-
-            ConfigureConnectionApproval();
-            SetVersionPayload();
-            bool started = networkManager.StartClient();
-            Debug.Log($"[{nameof(NetworkSessionService)}] Relay Client 시작 (ok={started})");
-            return started;
-        }
-
         public bool StartServer(string ip, ushort port)
         {
             if (!CanStart(nameof(StartServer)) || !TrySetTransport(ip, port)) return false;

@@ -1,0 +1,18 @@
+구분,스킬,CastType,공격력,치명타,스킬가속,범위,지속시간,투사체수,이동속도,획득반경,경험치,골드,체력재생,비고
+기본,Basic Projectile,Projectile,O,O,O,-,-,O,O,-,-,-,-,범위 업그레이드는 기본 사거리 탐색에 미적용
+기본,Pierce Projectile,Projectile,O,O,O,-,-,O,O,-,-,-,-,범위 업그레이드는 기본 사거리 탐색에 미적용
+기본,Damage Aura,AreaAura,O,O,O,O,O,-,-,-,-,-,-,오라 반경과 지속시간 적용
+기본,Orbital Blades,Orbital,O,O,O,O,O,-,-,-,-,-,-,궤도 반경과 히트 반경 적용
+기본,Bullet Storm,Ultimate,O,O,O,-,-,O,-,-,-,-,-,탄막 투사체 수 증가
+기본,수류탄,Grenade,O,O,O,O,-,O,-,-,-,-,-,투척 수와 스플래시 범위 적용
+기본,기관총,ScatterShot,O,O,O,-,-,O,O,-,-,-,-,발사 수와 탄속에 영향
+기본,망치,Melee,O,O,O,O,-,-,-,-,-,-,-,근접 사거리와 폭 적용
+기본,샷건,Shotgun,O,O,O,O,-,-,-,-,-,-,-,원뿔 판정 사거리 적용; 투사체수 미사용
+조합,클러스터 수류탄,ClusterGrenade,O,O,O,O,-,O,-,-,-,-,-,투사체수는 메인 수류탄 수만 증가; clusterCount는 증가하지 않음
+조합,충격 궤도,OrbitalGrenade,O,O,O,O,O,O,-,-,-,-,-,위성 개수와 반경/히트 반경 적용
+조합,블랙홀,BlackHole,O,O,O,O,O,-,-,-,-,-,-,자체 코루틴에서 범위와 지속시간 적용
+조합,관통 산탄,PierceShotgun,O,O,O,O,-,-,-,-,-,-,-,원뿔 판정 사거리 적용; 투사체수 미사용
+조합,대지분쇄자,Earthshatter,O,O,O,O,-,-,-,-,-,-,-,사거리/폭/여진 반경 적용
+조합,질풍확산탄,GaleSpread,O,O,O,-,-,O,O,-,-,-,-,스킬가속이 쿨다운과 버스트 발사 간격 모두 감소
+조합,왕복 관통창,PiercingBoomerang,O,O,O,O,-,-,O,-,-,-,-,최대거리/히트 반경과 비행/귀환 속도 적용
+조합,생명흡수탄,LifeDrainBolt,O,O,O,O,-,O,O,-,-,-,-,체력재생은 조합 재료 성격; 획득 후 직접 스케일 없음

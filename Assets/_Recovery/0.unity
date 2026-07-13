@@ -132,7 +132,6 @@ GameObject:
   - component: {fileID: 873381298}
   - component: {fileID: 873381297}
   - component: {fileID: 873381296}
-  - component: {fileID: 873381295}
   - component: {fileID: 873381294}
   - component: {fileID: 873381301}
   - component: {fileID: 873381302}
@@ -157,18 +156,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0a4e22a29d4deb74a9f84c89a9c9da2e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Core.SceneLoader
---- !u!114 &873381295
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 873381293}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9096dff8b7ff7e447b86cb9f3bc02d13, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Vamsurlike.Network.RelayManager
 --- !u!114 &873381296
 MonoBehaviour:
   m_ObjectHideFlags: 0

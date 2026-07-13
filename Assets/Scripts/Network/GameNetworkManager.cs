@@ -134,23 +134,9 @@ namespace Vamsurlike.Network
             return false;
         }
 
-        [Obsolete("호스트 모드 미사용. 전용 서버 아키텍처로 전환됨 - StartAsServer() + StartAsRelayClient() 사용.")]
-        public bool StartAsRelayHost()
-        {
-            Debug.LogError($"[{nameof(GameNetworkManager)}] StartAsRelayHost는 더 이상 사용하지 않습니다.");
-            return false;
-        }
-
         public bool StartAsClient(string ip = DefaultClientIp, ushort port = DefaultPort, string nickname = "")
         {
             bool started = sessionService?.StartClient(ip, port, nickname) ?? false;
-            if (started) RegisterMessagingHandlers();
-            return started;
-        }
-
-        public bool StartAsRelayClient()
-        {
-            bool started = sessionService?.StartRelayClient() ?? false;
             if (started) RegisterMessagingHandlers();
             return started;
         }

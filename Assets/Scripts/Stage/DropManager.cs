@@ -38,7 +38,9 @@ namespace Vamsurlike.Stage
 
             if (data.dropTable != null)
             {
-                HandleItemDrop(data.dropTable, position);
+                if (data.isElite || data.isBoss)
+                    HandleItemDrop(data.dropTable, position);
+
                 HandleGoldDrop(data.dropTable, position);
             }
         }

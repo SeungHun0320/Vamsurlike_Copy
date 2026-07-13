@@ -20,7 +20,7 @@ MonoBehaviour:
   vfxPrefab: {fileID: 0}
   maxLevel: 3
   levels:
-  - cooldown: 0.8
+  - cooldown: 0.7
     damage: 16
     range: 12
     projectileSpeed: 14
@@ -48,6 +48,7 @@ MonoBehaviour:
     waveCount: 1
     waveDelay: 0.15
     rotationPerWave: 30
+    grenadeCount: 1
     grenadeRange: 6
     grenadeArcHeight: 3
     splashRadius: 2.5
@@ -70,7 +71,7 @@ MonoBehaviour:
     boomerangDamageAmplifyPerStack: 0.15
     shotgunSoloDamageMultiplier: 1.5
     shotgunSharedDamageMultiplier: 0.6
-  - cooldown: 0.75
+  - cooldown: 0.7
     damage: 16
     range: 12
     projectileSpeed: 14.5
@@ -98,6 +99,7 @@ MonoBehaviour:
     waveCount: 1
     waveDelay: 0.15
     rotationPerWave: 30
+    grenadeCount: 1
     grenadeRange: 6
     grenadeArcHeight: 3
     splashRadius: 2.5
@@ -120,7 +122,7 @@ MonoBehaviour:
     boomerangDamageAmplifyPerStack: 0.15
     shotgunSoloDamageMultiplier: 1.5
     shotgunSharedDamageMultiplier: 0.6
-  - cooldown: 0.7
+  - cooldown: 0.6
     damage: 16
     range: 13
     projectileSpeed: 15
@@ -148,6 +150,7 @@ MonoBehaviour:
     waveCount: 1
     waveDelay: 0.15
     rotationPerWave: 30
+    grenadeCount: 1
     grenadeRange: 6
     grenadeArcHeight: 3
     splashRadius: 2.5

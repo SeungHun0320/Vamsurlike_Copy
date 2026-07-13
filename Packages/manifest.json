@@ -15,7 +15,6 @@
     "com.unity.netcode.gameobjects": "2.11.2",
     "com.unity.nuget.newtonsoft-json": "3.2.1",
     "com.unity.services.authentication": "3.6.1",
-    "com.unity.services.multiplayer": "1.0.0",
     "com.unity.test-framework": "1.6.0",
     "com.unity.timeline": "1.8.10",
     "com.unity.ugui": "2.0.0",
