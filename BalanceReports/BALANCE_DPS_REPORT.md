@@ -1,61 +1,100 @@
-# 밸런스 DPS 리포트
+# Balance DPS Report
 
-생성일: 2026-07-10
+Generated: 2026-07-13
 
-계산 기준: ScriptableObject/CSV 원본 데이터 기반의 1차 이론값. 실제 명중률, 타겟 수, 오버킬, 이동, 넉백, 치명타, 패시브 배율, 플레이어 수 보정은 제외했다.
+## Assumptions
 
-## 산출 파일
+- Defense, crit, passive multipliers, skill haste, projectile travel miss, overkill, and target uptime are excluded.
+- `Single DPS` is rough DPS against one target.
+- `Total/Area DPS` is theoretical summed DPS when every projectile/orbital/tick can hit useful targets.
+- AoE, piercing, shotgun, and cone skills can exceed listed per-target DPS when multiple enemies are inside the area.
+- Piercing boomerang return-stack amplification is excluded from base DPS because it depends on outbound hit count.
 
-- `BALANCE_SKILL_DPS.csv`: 스킬 레벨별 이론 DPS
-- `BALANCE_ENEMY_TABLE.csv`: 몬스터 기본 스탯과 시간별 HP
-- `BALANCE_TTK_MATRIX.csv`: 만렙 스킬 기준 몬스터 처치 시간
-- `BALANCE_WAVE_BUDGET.csv`: 웨이브별 총 HP/XP 예산
+## Common Skills
 
-## 만렙 스킬 DPS 순위
+| Skill | Type | Lv | Cooldown | Damage | Key Params | Single DPS | Total/Area DPS | Notes |
+|---|---:|---:|---:|---:|---|---:|---:|---|
+| Basic Projectile | Projectile | 1 | 0.8 | 16 |  | 20.0 | 20.0 | damage/cooldown |
+| Basic Projectile | Projectile | 2 | 0.75 | 16 |  | 21.3 | 21.3 | damage/cooldown |
+| Basic Projectile | Projectile | 3 | 0.7 | 16 |  | 22.9 | 22.9 | damage/cooldown |
+| Pierce Projectile | Projectile | 1 | 1.6 | 12 |  | 7.50 | 7.50 | damage/cooldown |
+| Pierce Projectile | Projectile | 2 | 1.52 | 15 |  | 9.87 | 9.87 | damage/cooldown |
+| Damage Aura | AreaAura | 1 | 1.28 | 8 | tick 0.8 | 10.0 | 10.0 | damage/tickInterval |
+| Damage Aura | AreaAura | 2 | 1.04 | 10 | tick 0.65 | 15.4 | 15.4 | damage/tickInterval |
+| Orbital Blades | Orbital | 1 | 8 | 8 | orb 3, hitCd 0.2 | 40.0 | 120 | damage*orbitalDamageMultiplier*orbitalCount/orbitalHitCooldown |
+| Orbital Blades | Orbital | 2 | 8 | 10 | orb 4, hitCd 0.2 | 50.0 | 200 | damage*orbitalDamageMultiplier*orbitalCount/orbitalHitCooldown |
+| Orbital Blades | Orbital | 3 | 8 | 12 | orb 5, hitCd 0.2 | 60.0 | 300 | damage*orbitalDamageMultiplier*orbitalCount/orbitalHitCooldown |
+| Bullet Storm | Ultimate | 1 | 24 | 22 | proj 15 | 0.92 | 55.0 | damage*waveCount*projectileCount/cooldown |
+| 수류탄 | Grenade | 1 | 6.4 | 30 |  | 4.69 | 4.69 | damage/cooldown |
+| 수류탄 | Grenade | 2 | 4.8 | 42 |  | 8.75 | 8.75 | damage/cooldown |
+| 수류탄 | Grenade | 3 | 4 | 55 |  | 13.8 | 13.8 | damage/cooldown |
+| 기관총 | ScatterShot | 1 | 5.6 | 7.5 | bullets 8 | 1.34 | 10.7 | damage*scatterBulletCount/cooldown; burst 1.5s |
+| 기관총 | ScatterShot | 2 | 4.8 | 9 | bullets 10 | 1.88 | 18.8 | damage*scatterBulletCount/cooldown; burst 1.8s |
+| 기관총 | ScatterShot | 3 | 3.52 | 11 | bullets 12 | 3.13 | 37.5 | damage*scatterBulletCount/cooldown; burst 2.2s |
+| 망치 | Melee | 1 | 3.2 | 30 |  | 9.38 | 9.38 | damage/cooldown |
+| 망치 | Melee | 2 | 2.88 | 45 |  | 15.6 | 15.6 | damage/cooldown |
+| 망치 | Melee | 3 | 2.4 | 60 |  | 25.0 | 25.0 | damage/cooldown |
+| 샷건 | Shotgun | 1 | 1.5 | 20 | proj 3, solo 1, shared 0.7 | 13.3 | 9.33 | single: damage*solo/cooldown, multi per-target: damage*shared/cooldown |
+| 샷건 | Shotgun | 2 | 1.3 | 20 | proj 3, solo 1, shared 0.7 | 15.4 | 10.8 | single: damage*solo/cooldown, multi per-target: damage*shared/cooldown |
 
-| Rank | Skill | Type | Lv | DPS_Est | BurstPotential | Note |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | 충격 궤도 | OrbitalGrenade | 1 | 504.0 | 504.0 | orbital grenade sustained, ideal contact |
-| 2 | 생명흡수탄 | LifeDrainBolt | 1 | 123.8 | 99.0 | life drain bolt: projectile + orbiting satellites rough potential |
-| 3 | 대지분쇄자 | Earthshatter | 1 | 94.3 | 211.3 | earthshatter: main + aftershock if same target overlaps |
-| 4 | Orbital Blades | Orbital | 3 | 90.0 | 90.0 | orbital sustained per second, ideal contact |
-| 5 | 질풍확산탄 | GaleSpread | 1 | 61.9 | 198.0 | gale spread: haste bonus not included |
-| 6 | Basic Projectile | Projectile | 5 | 45.0 | 39.6 | projectile: includes pierce potential |
-| 7 | Pierce Projectile | Projectile | 2 | 43.4 | 66.0 | projectile: includes pierce potential |
-| 8 | Bullet Storm | Ultimate | 1 | 42.0 | 1008.0 | ultimate: full burst averaged over cooldown |
-| 9 | 왕복 관통창 | PiercingBoomerang | 1 | 24.8 | 39.6 | boomerang: outbound+return, stack amp not included |
-| 10 | 망치 | Melee | 3 | 20.8 | 50.0 | melee box main hit |
-| 11 | 기관총 | ScatterShot | 3 | 18.4 | 64.8 | scatter: assumes every bullet hits |
-| 12 | 수류탄 | Grenade | 3 | 12.0 | 48.0 | grenade main splash, single target |
-| 13 | 클러스터 수류탄 | ClusterGrenade | 1 | 11.2 | 71.4 | cluster: main + sub grenade damage potential |
-| 14 | 블랙홀 | BlackHole | 1 | 8.2 | 153.6 | black hole ticks averaged over cooldown+duration |
-| 15 | Damage Aura | AreaAura | 2 | 7.1 | 32.4 | aura: one target inside area |
-| 16 | 샷건 | Shotgun | 2 | 4.1 | 7.2 | shotgun: current code nearest 1 target |
-| 17 | 관통 산탄 | PierceShotgun | 1 | 2.9 | 13.8 | pierce shotgun: per target in cone |
+## Combine Skills
 
-## 몬스터 기준표
+| Skill | Type | Lv | Cooldown | Damage | Key Params | Single DPS | Total/Area DPS | Notes |
+|---|---:|---:|---:|---:|---|---:|---:|---|
+| 클러스터 수류탄 | ClusterGrenade | 1 | 6.4 | 20.4 | cluster 5x0.5 | 3.19 | 11.2 | (damage + damage*clusterDamageRatio*clusterCount)/cooldown |
+| 충격 궤도 | OrbitalGrenade | 1 | 3.2 | 13 | orb 5, hitCd 1 | 13.0 | 65.0 | damage*orbitalDamageMultiplier*orbitalCount/orbitalHitCooldown |
+| 블랙홀 | BlackHole | 1 | 12.8 | 9.6 | tick 0.4 | 24.0 | 24.0 | damage/tickInterval |
+| 관통 산탄 | PierceShotgun | 1 | 2 | 20 |  | 10.0 | 10.0 | per target: damage/cooldown; total scales by enemies in cone |
+| 대지분쇄자 | Earthshatter | 1 | 2.24 | 65 | after 3x0.75 | 29.0 | 94.3 | (damage + damage*aftershockDamageRatio*aftershockCount)/cooldown |
+| 질풍확산탄 | GaleSpread | 1 | 3.2 | 9 | bullets 22 | 2.81 | 61.9 | damage*scatterBulletCount/cooldown; burst 0.8s |
+| 왕복 관통창 | PiercingBoomerang | 1 | 1.6 | 19.8 |  | 12.4 | 12.4 | base damage/cooldown; return-stack amplification excluded; +22% per outbound stack on return |
+| 생명흡수탄 | LifeDrainBolt | 1 | 1.5 | 19.8 | orb 3, hitCd 0.2, orbMul 0.7 | 69.3 | 208 | damage*orbitalDamageMultiplier*orbitalCount/orbitalHitCooldown; lifesteal 0.25 |
 
-| EnemyId | Name | BaseHP | MoveSpeed | AttackPower | AtkInterval | DPS_ToPlayer | XP | HP@0m | HP@3m | HP@6m | HP@9m |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| BossData_A | Boss | 1000.0 | 3.0 | 40.0 | 1.20 | 33.3 | 500 | 1000.0 | 1300.0 | 1750.0 | 1750.0 |
-| EnemyData_A | Enemy | 50.0 | 7.0 | 10.0 | 1.00 | 10.0 | 10 | 50.0 | 65.0 | 87.5 | 87.5 |
-| EnemyData_B | Scout | 30.0 | 10.0 | 8.0 | 0.80 | 10.0 | 8 | 30.0 | 39.0 | 52.5 | 52.5 |
-| EnemyData_C | Brute | 150.0 | 3.0 | 20.0 | 2.00 | 10.0 | 25 | 150.0 | 195.0 | 262.5 | 262.5 |
+## 15 HP Fodder Time-To-Kill Snapshot
 
-## 웨이브 예산
+| Skill | Type | Lv | Damage/Hit | Hits To Kill 15 HP |
+|---|---:|---:|---:|---:|
+| Basic Projectile | Projectile | 1 | 16.0 | 1 |
+| Basic Projectile | Projectile | 2 | 16.0 | 1 |
+| Basic Projectile | Projectile | 3 | 16.0 | 1 |
+| Pierce Projectile | Projectile | 1 | 12.0 | 2 |
+| Pierce Projectile | Projectile | 2 | 15.0 | 1 |
+| Damage Aura | AreaAura | 1 | 8.00 | 2 |
+| Damage Aura | AreaAura | 2 | 10.0 | 2 |
+| Orbital Blades | Orbital | 1 | 8.00 | 2 |
+| Orbital Blades | Orbital | 2 | 10.0 | 2 |
+| Orbital Blades | Orbital | 3 | 12.0 | 2 |
+| Bullet Storm | Ultimate | 1 | 22.0 | 1 |
+| 수류탄 | Grenade | 1 | 30.0 | 1 |
+| 수류탄 | Grenade | 2 | 42.0 | 1 |
+| 수류탄 | Grenade | 3 | 55.0 | 1 |
+| 기관총 | ScatterShot | 1 | 7.50 | 2 |
+| 기관총 | ScatterShot | 2 | 9.00 | 2 |
+| 기관총 | ScatterShot | 3 | 11.0 | 2 |
+| 망치 | Melee | 1 | 30.0 | 1 |
+| 망치 | Melee | 2 | 45.0 | 1 |
+| 망치 | Melee | 3 | 60.0 | 1 |
+| 샷건 | Shotgun | 1 | 20.0 | 1 |
+| 샷건 | Shotgun | 2 | 20.0 | 1 |
 
-| Wave | Duration | Loop | Action | EnemyId | Count | SpawnInterval | SpawnRatePerSec | TotalBaseHP | TotalHP@6m | XPTotal |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | 20 | FALSE |  | EnemyData_A | 12 | 0.35 | 2.86 | 600.0 | 1050.0 | 120 |
-| 1 | 25 | FALSE |  | EnemyData_A | 14 | 0.25 | 4.00 | 700.0 | 1225.0 | 140 |
-| 1 | 25 | FALSE |  | EnemyData_B | 10 | 0.25 | 4.00 | 300.0 | 525.0 | 80 |
-| 2 | 22 | TRUE |  | EnemyData_B | 16 | 0.2 | 5.00 | 480.0 | 840.0 | 128 |
-| 2 | 22 | TRUE |  | EnemyData_C | 10 | 0.35 | 2.86 | 1500.0 | 2625.0 | 250 |
-| 3 | 35 | FALSE | SpawnEliteRing | EnemyData_C | 16 | 0 | instant | 2400.0 | 4200.0 | 400 |
+## Quick Ranking By Max Level Total/Area DPS
 
-## 해석 팁
-
-- `DPS_Est`가 높아도 광역/관통 전제면 실제 단일 보스 DPS와 다를 수 있다.
-- 초반 일반몹 TTK가 1초 미만이면 스폰량을 늘리거나 HP를 올려도 된다.
-- 웨이브 `TotalHP@6m`이 플레이어 총 DPS보다 너무 낮으면 몬스터가 화면에 쌓이지 않는다.
-- 조합 스킬은 즉시 Lv.Max라서 `BALANCE_TTK_MATRIX.csv`의 만렙 기준을 우선 보면 된다.
+| Rank | Skill | Type | Category | Max Lv | Single DPS | Total/Area DPS |
+|---:|---|---:|---:|---:|---:|---:|
+| 1 | Orbital Blades | Orbital | Common | 3 | 60.0 | 300 |
+| 2 | 생명흡수탄 | LifeDrainBolt | Combine | 1 | 69.3 | 208 |
+| 3 | 대지분쇄자 | Earthshatter | Combine | 1 | 29.0 | 94.3 |
+| 4 | 충격 궤도 | OrbitalGrenade | Combine | 1 | 13.0 | 65.0 |
+| 5 | 질풍확산탄 | GaleSpread | Combine | 1 | 2.81 | 61.9 |
+| 6 | Bullet Storm | Ultimate | Common | 1 | 0.92 | 55.0 |
+| 7 | 기관총 | ScatterShot | Common | 3 | 3.13 | 37.5 |
+| 8 | 망치 | Melee | Common | 3 | 25.0 | 25.0 |
+| 9 | 블랙홀 | BlackHole | Combine | 1 | 24.0 | 24.0 |
+| 10 | Basic Projectile | Projectile | Common | 3 | 22.9 | 22.9 |
+| 11 | Damage Aura | AreaAura | Common | 2 | 15.4 | 15.4 |
+| 12 | 수류탄 | Grenade | Common | 3 | 13.8 | 13.8 |
+| 13 | 왕복 관통창 | PiercingBoomerang | Combine | 1 | 12.4 | 12.4 |
+| 14 | 클러스터 수류탄 | ClusterGrenade | Combine | 1 | 3.19 | 11.2 |
+| 15 | 샷건 | Shotgun | Common | 2 | 15.4 | 10.8 |
+| 16 | 관통 산탄 | PierceShotgun | Combine | 1 | 10.0 | 10.0 |
+| 17 | Pierce Projectile | Projectile | Common | 2 | 9.87 | 9.87 |

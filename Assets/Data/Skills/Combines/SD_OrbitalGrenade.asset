@@ -30,7 +30,7 @@ MonoBehaviour:
     spreadAngle: 0
     pierceCount: 0
     duration: 0
-    tickInterval: 0.5
+    tickInterval: 0.6
     areaRadius: 0
     orbitalCount: 5
     orbitalRadius: 4.5
@@ -48,6 +48,7 @@ MonoBehaviour:
     waveCount: 1
     waveDelay: 0.15
     rotationPerWave: 30
+    grenadeCount: 1
     grenadeRange: 6
     grenadeArcHeight: 3
     splashRadius: 2.5

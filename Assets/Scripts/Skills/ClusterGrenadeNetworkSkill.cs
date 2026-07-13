@@ -23,16 +23,22 @@ namespace Vamsurlike.Skills
                 || context.CoroutineRunner == null)
                 return false;
 
-            context.CoroutineRunner.StartSkillCoroutine(ThrowCoroutine(
-                context.CasterTransform.position,
-                context.LevelData,
-                context.FinalDamage,
-                context.OwnerClientId,
-                context.Skill.name,
-                context.CoroutineRunner,
-                context.AreaMultiplier,
-                context.BonusProjectileCount,
-                context.VFX));
+            // 기본 수류탄과 동일한 패턴 — 투사체 개수 증가 패시브는 "메인 수류탄을 몇 번 던지는가"
+            // (grenadeCount)에만 가산한다. 착지 후 분열하는 서브 그레네이드 수(clusterCount)는
+            // ThrowCoroutine 안에서 이 패시브의 영향을 받지 않고 레벨 데이터 값 그대로 쓴다.
+            int count = Mathf.Max(1, context.LevelData.grenadeCount + context.BonusProjectileCount);
+            for (int i = 0; i < count; i++)
+            {
+                context.CoroutineRunner.StartSkillCoroutine(ThrowCoroutine(
+                    context.CasterTransform.position,
+                    context.LevelData,
+                    context.FinalDamage,
+                    context.OwnerClientId,
+                    context.Skill.name,
+                    context.CoroutineRunner,
+                    context.AreaMultiplier,
+                    context.VFX));
+            }
             return true;
         }
 
@@ -44,14 +50,15 @@ namespace Vamsurlike.Skills
             string skillTag,
             ISkillCoroutineRunner coroutineRunner,
             float areaMultiplier,
-            int bonusProjectileCount,
             ISkillVFXBroadcaster vfx)
         {
             float grenadeRange = levelData.grenadeRange * areaMultiplier;
             float splashRadius = levelData.splashRadius * areaMultiplier;
             float clusterSpread = levelData.clusterSpread * areaMultiplier;
             float clusterSplashRadius = levelData.clusterSplashRadius * areaMultiplier;
-            int clusterCount = Mathf.Max(0, levelData.clusterCount + bonusProjectileCount);
+            // 튀는 서브 그레네이드 개수는 투사체 개수 증가 패시브의 영향을 받지 않는다 — 레벨 데이터의
+            // clusterCount 그대로 고정.
+            int clusterCount = Mathf.Max(0, levelData.clusterCount);
 
             Vector3 target = PickRandomTarget(origin, grenadeRange);
 

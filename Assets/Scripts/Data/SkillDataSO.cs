@@ -67,6 +67,7 @@ namespace Vamsurlike.Data
         [Min(0f)] public float rotationPerWave = 30f;
 
         [Header("Grenade")]
+        [Min(1)]    public int   grenadeCount     = 1;    // 한 번 시전 시 던지는 메인 수류탄 개수(투사체 개수 증가 패시브가 여기에 가산됨)
         [Min(0.5f)] public float grenadeRange     = 6f;   // 착탄 가능 반경
         [Min(0.1f)] public float grenadeArcHeight = 3f;   // 포물선 최고 높이
         [Min(0.1f)] public float splashRadius     = 2.5f; // 착지 스플래시 반경
@@ -81,7 +82,7 @@ namespace Vamsurlike.Data
         [Min(0.5f)] public float meleeWidth    = 3f;   // 좌우 판정 폭 (사각형 가로 길이) — 샷건(원뿔)과 판정 형태를 구분하기 위해 도입
 
         [Header("ClusterGrenade")]
-        [Min(1)]    public int   clusterCount        = 4;    // 착지 후 분열 서브 그레네이드 수
+        [Min(1)]    public int   clusterCount        = 4;    // 착지 후 분열 서브 그레네이드 수 (투사체 개수 증가 패시브 영향 없음 — grenadeCount만 영향받음)
         [Min(0.5f)] public float clusterSpread       = 3f;   // 서브 그레네이드 착탄 반경
         [Min(0.1f)] public float clusterSplashRadius = 1.5f; // 서브 그레네이드 개별 스플래시 반경
         [Range(0f, 1f)] public float clusterDamageRatio = 0.5f; // 서브 그레네이드 데미지 = 메인 * 비율

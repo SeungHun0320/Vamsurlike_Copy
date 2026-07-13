@@ -136,6 +136,7 @@ namespace Vamsurlike.Editor
 
                 case SkillCastType.Grenade:
                     DrawSection("Grenade");
+                    DrawField(level, "grenadeCount");
                     DrawField(level, "grenadeRange");
                     DrawField(level, "grenadeArcHeight");
                     DrawField(level, "splashRadius");
@@ -143,6 +144,7 @@ namespace Vamsurlike.Editor
 
                 case SkillCastType.ClusterGrenade:
                     DrawSection("Grenade");
+                    DrawField(level, "grenadeCount");
                     DrawField(level, "grenadeRange");
                     DrawField(level, "grenadeArcHeight");
                     DrawField(level, "splashRadius");
