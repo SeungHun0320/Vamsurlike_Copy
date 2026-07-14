@@ -8,12 +8,12 @@ namespace Vamsurlike.UI
 {
     public class MainMenuUI : MonoBehaviour
     {
-        private const string PrefKeyName   = "PlayerName";
         private const string PrefKeyLastIp = "LastServerIp";
+        private const string PrefKeyLoginUsername = "LoginUsername"; // LoginUI와 동일한 PlayerPrefs 키 — 로그인 아이디가 곧 닉네임.
 
         [SerializeField] private GameObject      connectPanel;
+        [SerializeField] private LoginUI         loginUI;
         [SerializeField] private LobbyUI         lobbyUI;
-        [SerializeField] private TMP_InputField  nameInput;
         [SerializeField] private TMP_InputField  serverIpInput;
         [SerializeField] private Button          joinButton;
         [SerializeField] private TextMeshProUGUI statusText;
@@ -35,17 +35,25 @@ namespace Vamsurlike.UI
         [SerializeField] private string startRequestMessage      = "게임 시작 요청 중...";
 
         private LobbyViewModel viewModel;
+        private bool isLoggedIn;
+        private string loginNickname = "";
 
         private void Awake()
         {
             if (IsServerMode())
             {
                 if (connectPanel != null) connectPanel.SetActive(false);
+                if (loginUI      != null) loginUI.gameObject.SetActive(false);
                 if (lobbyUI      != null) lobbyUI.gameObject.SetActive(false);
                 if (statusText   != null) statusText.gameObject.SetActive(false);
                 enabled = false;
                 return;
             }
+
+            // 로그인(Username/Password) 완료 전까지는 접속 패널을 숨긴다.
+            isLoggedIn = NetworkBootstrapper.IsSignedIn;
+            if (connectPanel != null) connectPanel.SetActive(isLoggedIn);
+            if (loginUI      != null) loginUI.gameObject.SetActive(!isLoggedIn);
 
             // 공유 NetworkConfig가 있으면 그쪽을 우선시켜, GameNetworkManager 등 다른 곳과
             // 기본 IP/포트가 어긋나지 않게 한다. 없으면 위 [SerializeField] 기본값을 그대로 사용.
@@ -75,9 +83,6 @@ namespace Vamsurlike.UI
 
             RestorePrefs();
 
-            if (nameInput != null)
-                nameInput.onEndEdit.AddListener(SaveName);
-
             if (joinButton != null)
                 joinButton.onClick.AddListener(OnJoinClicked);
 
@@ -87,6 +92,11 @@ namespace Vamsurlike.UI
 
         private void OnEnable()
         {
+            if (loginUI != null) loginUI.LoggedIn += HandleLoggedIn;
+            NetworkBootstrapper.OnUgsReady += HandleUgsReady;
+            // UGS 초기화가 Awake() 시점 이후에 끝나며 캐시된 세션으로 이미 로그인된 상태가 될 수 있어 재확인.
+            if (!isLoggedIn && NetworkBootstrapper.IsSignedIn) HandleLoggedIn(PlayerPrefs.GetString(PrefKeyLoginUsername, ""));
+
             if (viewModel == null) return;
             viewModel.OnLobbyChanged += RefreshLobbyControls;
             viewModel.OnStatus       += SetStatus;
@@ -97,10 +107,27 @@ namespace Vamsurlike.UI
 
         private void OnDisable()
         {
+            if (loginUI != null) loginUI.LoggedIn -= HandleLoggedIn;
+            NetworkBootstrapper.OnUgsReady -= HandleUgsReady;
+
             if (viewModel == null) return;
             viewModel.OnLobbyChanged -= RefreshLobbyControls;
             viewModel.OnStatus       -= SetStatus;
             viewModel.Unbind();
+        }
+
+        private void HandleLoggedIn(string username)
+        {
+            isLoggedIn = true;
+            loginNickname = username ?? "";
+            if (loginUI != null) loginUI.gameObject.SetActive(false);
+            RefreshLobbyControls(false, false, 0);
+        }
+
+        private void HandleUgsReady()
+        {
+            if (!isLoggedIn && NetworkBootstrapper.IsSignedIn)
+                HandleLoggedIn(PlayerPrefs.GetString(PrefKeyLoginUsername, ""));
         }
 
         private void OnDestroy()
@@ -110,20 +137,17 @@ namespace Vamsurlike.UI
 
         private void OnJoinClicked()
         {
-            string name = nameInput != null ? nameInput.text.Trim() : "";
-            SaveName(name);
             string ip = serverIpInput != null ? serverIpInput.text.Trim() : "";
             if (!string.IsNullOrEmpty(ip))
                 PlayerPrefs.SetString(PrefKeyLastIp, ip);
-            _ = viewModel.ConnectAsync(ip, name);
+            _ = viewModel.ConnectAsync(ip, loginNickname);
         }
 
         private void RefreshLobbyControls(bool isConnected, bool isHost, int _)
         {
-            if (connectPanel != null) connectPanel.SetActive(!isConnected);
+            if (connectPanel != null) connectPanel.SetActive(!isConnected && isLoggedIn);
             if (lobbyUI      != null) lobbyUI.gameObject.SetActive(isConnected);
             if (joinButton    != null) joinButton.gameObject.SetActive(!isConnected);
-            if (nameInput     != null) nameInput.interactable = !isConnected;
             if (serverIpInput != null) serverIpInput.interactable = !isConnected;
         }
 
@@ -135,13 +159,7 @@ namespace Vamsurlike.UI
 
         private void RestorePrefs()
         {
-            if (nameInput     != null) nameInput.text     = PlayerPrefs.GetString(PrefKeyName, "");
             if (serverIpInput != null) serverIpInput.text = PlayerPrefs.GetString(PrefKeyLastIp, "");
-        }
-
-        private void SaveName(string value)
-        {
-            PlayerPrefs.SetString(PrefKeyName, value.Trim());
         }
 
         private static bool IsServerMode() => NetworkBootstrapper.IsServerMode();

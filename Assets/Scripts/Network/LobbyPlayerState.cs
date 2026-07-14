@@ -12,7 +12,8 @@ namespace Vamsurlike.Network
     // 게임 씬 전환 후에도 유지되며 플레이어 스폰 시 서버가 ColorIndex를 읽어 PlayerColorSync에 적용.
     public class LobbyPlayerState : NetworkBehaviour
     {
-        private const string PrefKeyName = "PlayerName";
+        // LoginUI가 저장하는 로그인 아이디 키와 동일해야 한다 — 로그인 아이디가 곧 닉네임.
+        private const string PrefKeyName = "LoginUsername";
 
         // clientId → LobbyPlayerState 조회용 (서버·클라이언트 모두 사용)
         public static readonly Dictionary<ulong, LobbyPlayerState> All = new();

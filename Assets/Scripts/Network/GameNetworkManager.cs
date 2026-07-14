@@ -3,6 +3,7 @@ using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine;
 using Vamsurlike.Core;
+using Vamsurlike.Upgrades;
 
 namespace Vamsurlike.Network
 {
@@ -26,6 +27,7 @@ namespace Vamsurlike.Network
         private INetworkSessionService sessionService;
         private ILobbyHostService lobbyHostService;
         private IGameStartService gameStartService;
+        private IPlayerProgressionService playerProgressionService;
 
         public static GameNetworkManager Instance { get; private set; }
 
@@ -86,6 +88,7 @@ namespace Vamsurlike.Network
                 lobbyHostService,
                 lobbySceneName,
                 stageSceneName);
+            playerProgressionService = new PlayerProgressionService(networkManager);
         }
 
         private void OnEnable()
@@ -120,6 +123,7 @@ namespace Vamsurlike.Network
 
         private void OnDestroy()
         {
+            playerProgressionService?.Dispose();
             gameStartService?.Dispose();
             lobbyHostService?.Dispose();
             sessionService?.Dispose();
@@ -169,14 +173,43 @@ namespace Vamsurlike.Network
             return gameStartService?.RequestReturnToLobby() ?? false;
         }
 
+        // 클라이언트: 서버에 영구 업그레이드 구매를 요청한다. 결과는 동기화 메시지로 비동기 반영된다.
+        public void RequestPurchase(PermanentUpgradeType type)
+        {
+            playerProgressionService?.RequestPurchase(type);
+        }
+
+        public void RequestDebugGrantGold(int amount)
+        {
+            playerProgressionService?.RequestDebugGrantGold(amount);
+        }
+
+        public void RequestDebugResetUpgrades()
+        {
+            playerProgressionService?.RequestDebugResetUpgrades();
+        }
+
+        public void RequestDebugResetGold()
+        {
+            playerProgressionService?.RequestDebugResetGold();
+        }
+
+        // 서버 전용 — 매치 종료 등으로 서버가 직접 골드를 지급할 때 사용(클라이언트 자가 신고 아님).
+        public void CreditGold(ulong clientId, int amount)
+        {
+            playerProgressionService?.CreditGold(clientId, amount);
+        }
+
         private void RegisterMessagingHandlers()
         {
             lobbyHostService?.RegisterMessageHandler();
             gameStartService?.RegisterMessageHandler();
+            playerProgressionService?.RegisterMessageHandler();
         }
 
         private void UnregisterMessagingHandlers()
         {
+            playerProgressionService?.UnregisterMessageHandler();
             gameStartService?.UnregisterMessageHandler();
             lobbyHostService?.UnregisterMessageHandler();
         }
@@ -184,6 +217,7 @@ namespace Vamsurlike.Network
         private void HandleClientConnected(ulong clientId)
         {
             lobbyHostService?.HandleClientConnected(clientId);
+            playerProgressionService?.HandleClientConnected(clientId);
             OnClientConnected?.Invoke(clientId);
             Debug.Log($"[{nameof(GameNetworkManager)}] 플레이어 {ConnectedPlayerCount}명 접속 (clientId: {clientId})");
         }
@@ -191,6 +225,7 @@ namespace Vamsurlike.Network
         private void HandleClientDisconnected(ulong clientId)
         {
             lobbyHostService?.HandleClientDisconnected(clientId);
+            playerProgressionService?.HandleClientDisconnected(clientId);
             OnClientDisconnected?.Invoke(clientId);
             Debug.Log($"[{nameof(GameNetworkManager)}] clientId {clientId} 종료. 현재 {ConnectedPlayerCount}명");
         }

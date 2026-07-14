@@ -1857,19 +1857,51 @@ Done when: Windows Dedicated Server Build를 별도 실행해 서버 역할만 �
 
 #### Phase 9.4 스테이지 반복 안정화
 
-- [ ] MainMenu → Stage_01 → Clear/GameOver → MainMenu 복귀를 서버 주도 씬 전환으로 반복 테스트.
-- [ ] 스테이지 재시작 시 NetworkObject 잔존, Scene Migration 오류, 투사체/몬스터 비주얼 고정 문제가 재발하지 않는지 확인.
-- [ ] LevelingUp/ChestOpening 중 `Time.timeScale` 정지/복귀가 서버와 클라이언트 모두에서 정상인지 확인.
-- [ ] 잡몹은 XP/골드만 드랍하고, 상자/기타 `NetworkedItemPickup`은 Elite/Boss에서만 나오는지 확인.
-- [ ] 클라이언트 중도 접속 종료/재접속 실패 시 서버가 계속 진행 가능한지 확인.
+- [x] MainMenu → Stage_01 → Clear/GameOver → MainMenu 복귀를 서버 주도 씬 전환으로 반복 테스트 — 여러 차례 반복 플레이로 확인 완료.
+- [x] 스테이지 재시작 시 NetworkObject 잔존, Scene Migration 오류, 투사체/몬스터 비주얼 고정 문제가 재발하지 않는지 확인 — 반복 테스트에서 재발 없음.
+- [x] LevelingUp/ChestOpening 중 `Time.timeScale` 정지/복귀가 서버와 클라이언트 모두에서 정상인지 확인 — 반복 테스트에서 이상 없음.
+- [ ] 잡몹은 XP/골드만 드랍하고, 상자/기타 `NetworkedItemPickup`은 Elite/Boss에서만 나오는지 확인 — 별도로 확인 안 함.
+- [ ] 클라이언트 중도 접속 종료/재접속 실패 시 서버가 계속 진행 가능한지 확인 — 별도로 확인 안 함.
 
 #### Phase 9.5 SaveManager 영속화
 
-- [ ] `Assets/Scripts/Core/SaveManager.cs` 신규 구현 — 설정 PlayerPrefs와 분리해 메타 진행도만 담당.
-- [ ] 저장 포맷: JSON(Newtonsoft Json), `Application.persistentDataPath` 사용.
-- [ ] 저장 항목: `MetaProgressionState` 기반 보유 골드, 영구 업그레이드 13종 레벨 스냅샷, 누적 통계(총 플레이 횟수/최고 생존시간/총 킬수 등은 기획 확정 후 추가).
-- [ ] 로드 실패, 파일 없음, 버전 불일치 시 기본값으로 안전 초기화.
-- [ ] `UNITY_SERVER` 빌드에서는 클라이언트 로컬 저장 로직이 서버 프로세스에 끼어들지 않게 분리한다.
+> 최초 설계(클라이언트 로컬 SaveManager)는 구현 직후 치팅 취약점(세이브 파일 직접 수정)이 지적되어
+> **서버 권위 방식으로 재설계**했다 — 클라이언트는 저장/검증을 전혀 하지 않고 표시만 한다.
+
+- [x] 서버 전용 저장 서비스 구현 — `Assets/Scripts/Network/ServerSaveFileStore.cs`(디스크 I/O) +
+  `PlayerProgressionService.cs`(clientId별 `MetaProgressionState` 보유, 구매 검증, 골드 지급, 동기화 전송).
+  당초 계획했던 `Assets/Scripts/Core/SaveManager.cs`(클라 로컬)는 이 설계로 대체되어 삭제.
+- [x] 저장 포맷: JSON(Newtonsoft Json), 서버 프로세스의 `Application.persistentDataPath/Saves/<UGS PlayerId>.json` 사용.
+- [x] 저장 항목: 보유 골드, 영구 업그레이드 13종 레벨 스냅샷. 누적 통계(총 플레이 횟수/최고 생존시간/총
+  킬수 등)는 기획 미확정으로 계속 보류.
+- [x] 로드 실패, 파일 없음, 버전 불일치 시 기본값으로 안전 초기화 — `ServerSaveFileStore.LoadOrCreate`.
+- [x] 클라이언트 로컬 저장 로직 자체가 없음(전량 서버 이동) — `UNITY_SERVER`와 무관하게 서버만 디스크에 접근.
+- [x] 구매 플로우를 서버 왕복 방식으로 전환(`PermanentUpgradeShopViewModel.RequestPurchase` → 서버 검증 →
+  동기화 응답) — UI는 "요청 중..." 표시 후 응답 오면 구매 전/후 레벨 비교로 성공/실패 표시.
+- [x] 디버그 지급/초기화도 서버 경유로 유지(`F9` 골드 지급, `F12` 업그레이드 초기화, `Backspace` 골드
+  초기화) — 전부 `#if UNITY_EDITOR || DEVELOPMENT_BUILD`로 서버가 프로덕션 빌드에서 응답하지 않게 가드.
+
+#### Phase 9.5.1 보안 강화 — UGS Username/Password 로그인 + AccessToken 서명 검증
+
+> 접속 페이로드에 UGS PlayerId를 실어보내는 최초 방식은 **클라이언트 자기신고 값을 서버가 그냥
+> 신뢰**하는 구조라, 악의적 클라이언트가 임의의 PlayerId를 보내 다른 사람의 세이브(골드/업그레이드)를
+> 불러오거나 덮어쓸 수 있는 취약점이 있었다. Matchmaker/Multiplay 없이도 Unity Authentication의
+> JWKS 공개키 엔드포인트(`https://player-auth.services.api.unity.com/.well-known/jwks.json`)로
+> 표준 JWT 서명 검증(RS256)이 가능함을 확인하고, 익명 로그인을 실계정(Username/Password) 로그인으로
+> 교체 + 서버가 AccessToken 서명을 직접 검증하는 방식으로 재설계했다.
+
+- [x] UGS Dashboard에 Player Authentication 서비스 추가, Identity Provider로 **Username & Password** 활성화.
+- [x] 클라이언트 익명 로그인(`SignInAnonymouslyAsync`) 자동 호출 제거 — `NetworkBootstrapper`는 UGS 코어
+  초기화만 담당, 실제 로그인은 `LoginUI`가 사용자 입력으로 수행.
+- [x] `LoginUI.cs`(신규) — MainMenu 씬에 로그인/회원가입 패널 구성(기존 ConnectPanel 스타일과 통일).
+  로그인 성공 전까지 접속 패널은 숨김.
+- [x] 접속 페이로드를 UGS PlayerId(자기신고 문자열) 대신 **AccessToken(JWT)**로 변경(`NetworkSessionService`).
+- [x] `UgsJwtVerifier.cs`(신규, 서버 전용) — JWKS 공개키 캐시(8시간 주기 갱신) + RS256 서명 검증 +
+  `exp`/`nbf` 클레임 검사. 검증된 `sub` 클레임만 세이브 식별자로 신뢰.
+- [x] `NetworkSessionService.HandleConnectionApproval`을 NGO 비동기 승인 패턴(`response.Pending`)으로
+  전환 — JWKS 검증(네트워크 호출) 완료 후 승인/거부 확정.
+- [x] 닉네임 입력칸 제거, 로그인 아이디를 그대로 게임 내 닉네임으로 사용(`MainMenuUI`, `LobbyPlayerState`).
+- [x] 라이브 테스트 완료 — 회원가입/로그인/접속/닉네임 표시 정상 확인.
 
 #### Phase 9.6 안정성 기준
 

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
+using Unity.Services.Authentication;
 using UnityEngine;
 
 namespace Vamsurlike.Network
@@ -9,6 +10,10 @@ namespace Vamsurlike.Network
     {
         // 서버에서 clientId → 닉네임 임시 저장 (스폰 시 PlayerMatchStats에 주입)
         internal static readonly Dictionary<ulong, string> PendingPlayerNames = new();
+
+        // 서버에서 clientId → UGS PlayerId 저장 (PlayerProgressionService가 저장 파일 식별에 사용).
+        // 닉네임과 달리 스폰 시 소비되어 사라지지 않고 접속 종료까지 유지된다.
+        internal static readonly Dictionary<ulong, string> PendingPlayerIds = new();
 
         private readonly NetworkManager networkManager;
         private readonly UnityTransport transport;
@@ -48,7 +53,11 @@ namespace Vamsurlike.Network
             if (!CanStart(nameof(StartClient)) || !TrySetTransport(ip, port)) return false;
 
             ConfigureConnectionApproval();
-            SetVersionPayload(nickname);
+            // 서버는 이 AccessToken을 자기신고 값으로 신뢰하지 않고 JWKS 서명 검증을 거친다 (UgsJwtVerifier).
+            string accessToken = AuthenticationService.Instance != null && AuthenticationService.Instance.IsSignedIn
+                ? AuthenticationService.Instance.AccessToken
+                : "";
+            SetVersionPayload(nickname, accessToken);
             bool started = networkManager.StartClient();
             Debug.Log($"[{nameof(NetworkSessionService)}] Client 시작 - {ip}:{port} (ok={started})");
             return started;
@@ -115,27 +124,48 @@ namespace Vamsurlike.Network
             return true;
         }
 
-        private void SetVersionPayload(string nickname = "")
+        // 페이로드 형식: [4바이트 카탈로그 해시][2바이트 닉네임 길이][닉네임 UTF8][AccessToken UTF8(나머지 전부)]
+        private void SetVersionPayload(string nickname, string accessToken)
         {
             byte[] hashBytes = System.BitConverter.GetBytes(CatalogVersionUtility.GetHash());
             byte[] nameBytes = System.Text.Encoding.UTF8.GetBytes(
                 string.IsNullOrWhiteSpace(nickname) ? "" : nickname.Trim());
-            var payload = new byte[hashBytes.Length + nameBytes.Length];
-            hashBytes.CopyTo(payload, 0);
-            nameBytes.CopyTo(payload, hashBytes.Length);
+            byte[] nameLenBytes = System.BitConverter.GetBytes((ushort)nameBytes.Length);
+            byte[] idBytes = System.Text.Encoding.UTF8.GetBytes(accessToken ?? "");
+
+            var payload = new byte[hashBytes.Length + nameLenBytes.Length + nameBytes.Length + idBytes.Length];
+            int offset = 0;
+            hashBytes.CopyTo(payload, offset);     offset += hashBytes.Length;
+            nameLenBytes.CopyTo(payload, offset);  offset += nameLenBytes.Length;
+            nameBytes.CopyTo(payload, offset);     offset += nameBytes.Length;
+            idBytes.CopyTo(payload, offset);
+
             networkManager.NetworkConfig.ConnectionData = payload;
         }
 
-        private static void HandleConnectionApproval(
+        // NGO의 비동기 승인 패턴: response.Pending = true로 완료를 미루고, JWKS 서명 검증(네트워크 호출)이
+        // 끝난 뒤 최종 Approved/Reason/Pending을 채운다.
+        private static async void HandleConnectionApproval(
             NetworkManager.ConnectionApprovalRequest request,
             NetworkManager.ConnectionApprovalResponse response)
         {
-            if (!ValidatePayload(request.Payload, out string reason, out string nickname))
+            if (!ValidatePayload(request.Payload, out string reason, out string nickname, out string accessToken))
             {
                 response.Approved = false;
                 response.Reason   = reason;
                 response.Pending  = false;
                 Debug.LogWarning($"[{nameof(NetworkSessionService)}] 접속 거부 (clientId={request.ClientNetworkId}): {reason}");
+                return;
+            }
+
+            response.Pending = true;
+            JwtVerifyResult verifyResult = await UgsJwtVerifier.VerifyAsync(accessToken);
+            if (!verifyResult.Success)
+            {
+                response.Approved = false;
+                response.Reason   = verifyResult.FailureReason;
+                response.Pending  = false;
+                ServerConsoleLogger.Log($"[검증] 접속 거부 (clientId={request.ClientNetworkId}): {verifyResult.FailureReason}");
                 return;
             }
 
@@ -149,6 +179,7 @@ namespace Vamsurlike.Network
             }
 
             PendingPlayerNames[request.ClientNetworkId] = nickname;
+            PendingPlayerIds[request.ClientNetworkId] = verifyResult.PlayerId;
             response.Approved           = true;
             response.CreatePlayerObject = false;
             response.Pending            = false;
@@ -166,10 +197,11 @@ namespace Vamsurlike.Network
             return false;
         }
 
-        private static bool ValidatePayload(byte[] payload, out string reason, out string nickname)
+        private static bool ValidatePayload(byte[] payload, out string reason, out string nickname, out string accessToken)
         {
             nickname = "Player";
-            if (payload == null || payload.Length < sizeof(int))
+            accessToken = "";
+            if (payload == null || payload.Length < sizeof(int) + sizeof(ushort))
             {
                 reason = "연결 데이터가 없습니다.";
                 return false;
@@ -184,13 +216,26 @@ namespace Vamsurlike.Network
                 return false;
             }
 
-            int nameStart = sizeof(int);
-            if (payload.Length > nameStart)
+            int offset = sizeof(int);
+            ushort nameLen = System.BitConverter.ToUInt16(payload, offset);
+            offset += sizeof(ushort);
+
+            if (offset + nameLen > payload.Length)
             {
-                string name = System.Text.Encoding.UTF8.GetString(payload, nameStart, payload.Length - nameStart).Trim();
+                reason = "연결 데이터 형식이 올바르지 않습니다.";
+                return false;
+            }
+
+            if (nameLen > 0)
+            {
+                string name = System.Text.Encoding.UTF8.GetString(payload, offset, nameLen).Trim();
                 if (!string.IsNullOrEmpty(name))
                     nickname = name;
             }
+            offset += nameLen;
+
+            if (payload.Length > offset)
+                accessToken = System.Text.Encoding.UTF8.GetString(payload, offset, payload.Length - offset).Trim();
 
             reason = null;
             return true;

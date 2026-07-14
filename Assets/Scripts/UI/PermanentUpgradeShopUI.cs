@@ -20,6 +20,8 @@ namespace Vamsurlike.UI
         [SerializeField] private Key debugGrantGoldKey = Key.F9;
         [SerializeField] private Key debugPurchaseSelectedKey = Key.F10;
         [SerializeField] private Key debugApplyKey = Key.F11;
+        [SerializeField] private Key debugResetUpgradesKey = Key.F12;
+        [SerializeField] private Key debugResetGoldKey = Key.Backspace;
 
         [Header("Header")]
         [SerializeField] private TextMeshProUGUI goldText;
@@ -68,13 +70,20 @@ namespace Vamsurlike.UI
         private void OnEnable()
         {
             viewModel.Changed += Refresh;
+            viewModel.PurchaseResult += OnPurchaseResult;
             viewModel.Bind();
         }
 
         private void OnDisable()
         {
             viewModel.Changed -= Refresh;
+            viewModel.PurchaseResult -= OnPurchaseResult;
             viewModel.Dispose();
+        }
+
+        private void OnPurchaseResult(bool success)
+        {
+            SetStatus(success ? "구매 완료" : "구매 실패");
         }
 
         private void Update()
@@ -99,6 +108,18 @@ namespace Vamsurlike.UI
                 SetStatus(viewModel.ApplyToLocalPlayer()
                     ? "F11: 현재 플레이어에 적용 요청"
                     : "F11: 플레이어 없음 — 다음 스테이지 시작 시 자동 적용");
+            }
+
+            if (keyboard[debugResetUpgradesKey].wasPressedThisFrame)
+            {
+                viewModel.DebugResetUpgrades();
+                SetStatus("F12: 영구 업그레이드 초기화 요청");
+            }
+
+            if (keyboard[debugResetGoldKey].wasPressedThisFrame)
+            {
+                viewModel.DebugResetGold();
+                SetStatus("Backspace: 골드 초기화 요청");
             }
         }
 
@@ -157,7 +178,8 @@ namespace Vamsurlike.UI
         private void OnBuyClicked()
         {
             if (!viewModel.SelectedType.HasValue) return;
-            SetStatus(viewModel.TryPurchase(viewModel.SelectedType.Value) ? "구매 완료" : "구매 실패");
+            viewModel.RequestPurchase(viewModel.SelectedType.Value);
+            SetStatus("요청 중...");
         }
 
         private void SetStatus(string message)

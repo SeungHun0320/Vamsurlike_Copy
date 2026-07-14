@@ -59,8 +59,10 @@ public static class BuildPermanentUpgradeShopUI
         var vm = (Vamsurlike.UI.ViewModels.PermanentUpgradeShopViewModel)vmField.GetValue(ui);
         vm.DebugGrantGold(500);
         vm.SelectDetail(Vamsurlike.Upgrades.PermanentUpgradeType.Defense);
-        bool bought = vm.TryPurchase(Vamsurlike.Upgrades.PermanentUpgradeType.Defense);
-        Debug.Log($"[Build] TestPurchaseFlow bought={bought}");
+        // 서버 왕복이 필요해져서(구매가 비동기), 결과는 더 이상 여기서 동기적으로 알 수 없다 —
+        // 요청만 보내고 실제 반영 여부는 게임을 띄운 채 확인해야 한다.
+        vm.RequestPurchase(Vamsurlike.Upgrades.PermanentUpgradeType.Defense);
+        Debug.Log("[Build] TestPurchaseFlow: 구매 요청 전송(결과는 서버 동기화 후 확인).");
     }
 
     public static void ClickShopButton()

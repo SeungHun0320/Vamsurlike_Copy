@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Vamsurlike.Core;
 using Vamsurlike.Data.Runtime;
+using Vamsurlike.Network;
 using Vamsurlike.Upgrades;
 
 namespace Vamsurlike.UI.ViewModels
@@ -9,6 +10,8 @@ namespace Vamsurlike.UI.ViewModels
     public sealed class PermanentUpgradeShopViewModel : IDisposable
     {
         public event Action Changed;
+        // 요청했던 구매가 서버 동기화로 실제 반영됐는지(true=성공) 확인되면 한 번 발생한다.
+        public event Action<bool> PurchaseResult;
 
         public int Gold { get; private set; }
         public IReadOnlyList<PermanentUpgradeShopRow> Rows => rows;
@@ -18,6 +21,10 @@ namespace Vamsurlike.UI.ViewModels
 
         private readonly List<PermanentUpgradeShopRow> rows = new();
         private MetaProgressionState Meta => GameInstance.I != null ? GameInstance.I.MetaProgression : null;
+
+        // 서버 응답(동기화)이 올 때까지 기다리는 구매 요청 — 응답 전후 레벨을 비교해 성공 여부를 판단한다.
+        private PermanentUpgradeType? pendingPurchaseType;
+        private int pendingPurchaseBeforeLevel;
 
         public void Bind()
         {
@@ -62,6 +69,14 @@ namespace Vamsurlike.UI.ViewModels
             if (SelectedType == null && rows.Count > 0)
                 SelectedType = rows[0].Type;
 
+            if (pendingPurchaseType.HasValue)
+            {
+                PermanentUpgradeType type = pendingPurchaseType.Value;
+                pendingPurchaseType = null;
+                bool success = (Meta != null ? Meta.GetLevel(type) : 0) > pendingPurchaseBeforeLevel;
+                PurchaseResult?.Invoke(success);
+            }
+
             Changed?.Invoke();
         }
 
@@ -99,17 +114,29 @@ namespace Vamsurlike.UI.ViewModels
             return true;
         }
 
-        public bool TryPurchase(PermanentUpgradeType type)
+        // 서버에 구매를 요청만 한다 — 실제 반영(비용 검증/차감/레벨업)은 서버가 하고,
+        // 결과는 PlayerProgressionService의 동기화 메시지를 통해 Meta.Changed로 비동기 반영된다.
+        public void RequestPurchase(PermanentUpgradeType type)
         {
-            bool purchased = Meta != null && Meta.TryPurchase(type);
-            Refresh();
-            return purchased;
+            pendingPurchaseType = type;
+            pendingPurchaseBeforeLevel = Meta != null ? Meta.GetLevel(type) : 0;
+            GameNetworkManager.Instance?.RequestPurchase(type);
         }
 
+        // 디버그 전용 — 서버(DEVELOPMENT_BUILD/에디터에서만 응답)에 지급/초기화를 요청한다.
         public void DebugGrantGold(int amount)
         {
-            Meta?.AddGold(amount);
-            Refresh();
+            GameNetworkManager.Instance?.RequestDebugGrantGold(amount);
+        }
+
+        public void DebugResetUpgrades()
+        {
+            GameNetworkManager.Instance?.RequestDebugResetUpgrades();
+        }
+
+        public void DebugResetGold()
+        {
+            GameNetworkManager.Instance?.RequestDebugResetGold();
         }
 
         public bool ApplyToLocalPlayer()

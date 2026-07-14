@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Unity.Collections;
 using Unity.Netcode;
-using Vamsurlike.Core;
+using Vamsurlike.Network;
 using Vamsurlike.Player;
 using Vamsurlike.UI.Events;
 
@@ -33,7 +33,18 @@ namespace Vamsurlike.Stage
             if (next != GameFlowState.Clear && next != GameFlowState.GameOver) return;
 
             hasBroadcast = true;
-            SendMatchResultClientRpc(BuildEntries());
+            MatchResultEntry[] entries = BuildEntries();
+            CreditGoldServerAuthoritative(entries);
+            SendMatchResultClientRpc(entries);
+        }
+
+        // 서버가 직접 지급 — 클라이언트가 자기 결과를 보고 스스로 골드를 더하는 방식은 치팅에 취약해
+        // GameNetworkManager.CreditGold(서버 전용 PlayerProgressionService)를 통해서만 반영한다.
+        private static void CreditGoldServerAuthoritative(MatchResultEntry[] entries)
+        {
+            if (entries == null) return;
+            foreach (var entry in entries)
+                GameNetworkManager.Instance?.CreditGold(entry.ClientId, entry.GoldEarned);
         }
 
         private MatchResultEntry[] BuildEntries()
@@ -102,23 +113,9 @@ namespace Vamsurlike.Stage
         [ClientRpc]
         private void SendMatchResultClientRpc(MatchResultEntry[] entries)
         {
-            ApplyLocalMetaProgression(entries);
+            // 골드는 서버가 CreditGold를 통해 이미 반영했다 — 여기서는 통계 표시만 갱신한다.
+            // 실제 골드/업그레이드 화면 갱신은 PlayerProgressionService의 동기화 메시지가 담당한다.
             UIEventHub.Instance?.Flow.PublishMatchResult(new MatchResultPayload(entries));
-        }
-
-        // Phase 7.6 — 이번 판 결과에서 "내" 항목을 찾아 골드를 세션 로컬 메타 진행도에 누적.
-        private static void ApplyLocalMetaProgression(MatchResultEntry[] entries)
-        {
-            if (entries == null || NetworkManager.Singleton == null) return;
-            if (GameInstance.I == null) return;
-
-            ulong localId = NetworkManager.Singleton.LocalClientId;
-            foreach (var entry in entries)
-            {
-                if (entry.ClientId != localId) continue;
-                GameInstance.I.MetaProgression.AddGold(entry.GoldEarned);
-                break;
-            }
         }
     }
 }

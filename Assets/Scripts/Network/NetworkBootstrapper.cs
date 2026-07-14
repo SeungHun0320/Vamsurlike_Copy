@@ -18,6 +18,10 @@ namespace Vamsurlike.Network
         public static bool IsUgsReady    { get; private set; }
         public static bool IsServerBuild { get; private set; }
 
+        // UGS 코어 초기화(IsUgsReady)와는 별개 — 실제 로그인(Username/Password) 완료 여부.
+        // LoginUI가 이 값과 AuthenticationService.Instance.IsSignedIn을 참조해 connectPanel 노출을 결정한다.
+        public static bool IsSignedIn => AuthenticationService.Instance != null && AuthenticationService.Instance.IsSignedIn;
+
         public static event Action OnUgsReady;
 
         private void Awake()
@@ -116,21 +120,22 @@ namespace Vamsurlike.Network
             return defaultValue;
         }
 
+        // 익명 로그인은 더 이상 자동으로 하지 않는다 — 실제 로그인(Username/Password)은
+        // LoginUI가 사용자 입력을 받아 AuthenticationService.Instance.SignInWithUsernamePasswordAsync/
+        // SignUpWithUsernamePasswordAsync로 직접 수행한다. 여기서는 UGS 코어 초기화만 담당한다.
         private async Task InitializeUgsAsync()
         {
             try
             {
                 await UnityServices.InitializeAsync();
-                if (!AuthenticationService.Instance.IsSignedIn)
-                    await AuthenticationService.Instance.SignInAnonymouslyAsync();
-                Debug.Log($"[{nameof(NetworkBootstrapper)}] UGS 인증 완료. PlayerId: {AuthenticationService.Instance.PlayerId}");
+                Debug.Log($"[{nameof(NetworkBootstrapper)}] UGS 코어 초기화 완료.");
                 IsUgsReady = true;
                 OnUgsReady?.Invoke();
             }
             catch (Exception e)
             {
                 // 오프라인 환경에서도 로컬 플레이는 가능
-                Debug.LogWarning($"[{nameof(NetworkBootstrapper)}] UGS 인증 실패 (로컬 전용 모드): {e.Message}");
+                Debug.LogWarning($"[{nameof(NetworkBootstrapper)}] UGS 초기화 실패 (로컬 전용 모드): {e.Message}");
             }
         }
     }
