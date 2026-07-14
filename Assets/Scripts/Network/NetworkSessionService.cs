@@ -139,10 +139,31 @@ namespace Vamsurlike.Network
                 return;
             }
 
+            if (IsNicknameTaken(nickname))
+            {
+                response.Approved = false;
+                response.Reason   = "이미 사용 중인 닉네임입니다. 다른 이름을 입력하세요.";
+                response.Pending  = false;
+                Debug.LogWarning($"[{nameof(NetworkSessionService)}] 접속 거부 (clientId={request.ClientNetworkId}): 닉네임 중복 '{nickname}'");
+                return;
+            }
+
             PendingPlayerNames[request.ClientNetworkId] = nickname;
             response.Approved           = true;
             response.CreatePlayerObject = false;
             response.Pending            = false;
+        }
+
+        // 현재 로비에 접속 중인 다른 플레이어와 닉네임이 겹치는지 확인 (대소문자 무시).
+        private static bool IsNicknameTaken(string nickname)
+        {
+            foreach (var state in LobbyPlayerState.All.Values)
+            {
+                if (state == null) continue;
+                if (string.Equals(state.DisplayName.Value.ToString().Trim(), nickname, System.StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
         }
 
         private static bool ValidatePayload(byte[] payload, out string reason, out string nickname)

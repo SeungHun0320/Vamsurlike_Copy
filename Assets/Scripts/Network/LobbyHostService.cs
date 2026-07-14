@@ -113,6 +113,7 @@ namespace Vamsurlike.Network
         {
             if (networkManager == null || !networkManager.IsServer || networkManager.CustomMessagingManager == null)
                 return;
+            if (networkManager.ConnectedClientsIds.Count == 0) return;
 
             using FastBufferWriter writer = new(sizeof(ulong), Allocator.Temp);
             writer.WriteValueSafe(LobbyHostClientId);
