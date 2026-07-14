@@ -1827,11 +1827,12 @@ Done when: Windows Dedicated Server Build를 별도 실행해 서버 역할만 �
 
 #### Phase 9.1 Windows Dedicated Server 실행 고정
 
-- [ ] Windows Dedicated Server Build 타깃 설정 및 `UNITY_SERVER` 심볼 확인 — 현재 에디터는 `StandaloneWindows64 / Player` 서브타깃 상태(`Server`로 전환 안 됨, `execute_script`로 확인). 실제 전환+빌드는 수 분 이상 소요되고 에디터 빌드 타깃이 바뀌므로 사용자 확인 후 진행.
+- [x] Windows Dedicated Server Build 타깃 설정 및 `UNITY_SERVER` 심볼 확인 — Build Profiles에서 Windows Server로 전환해 `Builds/Server/`, Windows로 전환해 `Builds/Client/`에 실제 빌드 완료. `StartServer.bat`으로 서버 정상 기동, 여러 클라이언트 접속까지 확인. Dedicated Server Optimizations로 인한 셰이더/폰트 스트리핑 부작용 발견(아래 참고).
 - [x] `-server -ip 0.0.0.0 -port 7777` 실행 시 자동 서버 시작 확인 — `NetworkBootstrapper` 코드 리뷰로 확인 완료(`-server` 인자 또는 `UNITY_SERVER` 감지 → `GameNetworkManager.StartAsServer(ip, port)`).
 - [x] `NetworkConfigSO` 기본값(클라 127.0.0.1, 서버 0.0.0.0, 포트 7777)이 Bootstrap/MainMenu/GameNetworkManager에서 동일하게 쓰이는지 확인 — 코드 리뷰로 일치 확인.
 - [x] 서버 프로세스에서 클라이언트 전용 컴포넌트가 동작하지 않도록 `ServerModeDisabler` 가드를 점검 — `MainMenu.unity`에 가드가 전혀 없던 것(Main Camera/Canvas/EventSystem)과 `Stage_01.unity` Main Camera(CinemachineBrain/Camera/AudioListener/CameraShakeListener 보유)에 누락된 것을 발견, 전부 추가함(`a5f1e2f`). Stage_01의 나머지 UI 캔버스 4곳은 기존에 이미 가드 있었음.
 - [x] 서버 실행 배치 파일 작성 — `StartServer.bat` 추가(`%GAME_EXE% -batchmode -nographics -server -ip 0.0.0.0 -port 7777`), 빌드 산출물 경로는 `Builds\Server\Vamsurlike.exe` 가정.
+- [x] 클라이언트 D3D12 크래시(DXGI_ERROR_DEVICE_REMOVED, 하이브리드 GPU 노트북에서 씬 전환 직후 발생) 발견 — 근본 해결로 `PlayerSettings`의 Windows Standalone 그래픽 API를 자동선택(D3D12 우선)에서 **D3D11 고정**으로 변경(`m_Automatic: 0`, `m_APIs`=Direct3D11만). 기존 빌드는 반영 전이라 재빌드 필요.
 
 #### Phase 9.2 로그/진단
 
@@ -1839,18 +1840,20 @@ Done when: Windows Dedicated Server Build를 별도 실행해 서버 역할만 �
 - [ ] 파일 로그 추가 — `Application.logMessageReceived` 또는 `ServerConsoleLogger.OnEntryAdded`를 txt로 저장. 저장 위치는 서버 실행 폴더 또는 `Application.persistentDataPath/Logs`.
 - [ ] 서버 시작 로그에 바인딩 주소/포트, 빌드 타입(`UNITY_SERVER`/`-server`), 카탈로그 해시를 출력한다.
 - [ ] 포트 점유/바인딩 실패/잘못된 포트 인자에 대한 로그를 명확히 표시.
-- [ ] 클라이언트 접속 실패 UI가 `NetworkManager.DisconnectReason`/`OnUnexpectedDisconnect`를 통해 버전 불일치, 서버 미실행, 접속 거부를 구분해서 보여주는지 확인.
+- [x] 클라이언트 접속 실패 UI가 `NetworkManager.DisconnectReason`/`OnUnexpectedDisconnect`를 통해 버전 불일치, 서버 미실행, 접속 거부를 구분해서 보여주는지 확인 — `NetworkErrorDialog`가 사유별 문자열을 그대로 표시(닉네임 중복 포함). 단 이 다이얼로그에 `GraphicRaycaster`가 아예 없어서 확인 버튼이 안 눌리던 버그를 같이 발견/수정(`6bcd394`).
+- [x] 콘솔 한글 인코딩 문제 수정 — `StartServer.bat`을 ASCII로 재작성하고 `chcp 65001` 추가(exe를 직접 실행하면 적용 안 되므로 반드시 배치 파일로 실행해야 함).
 - [ ] 서버 종료 시 마지막 로그 플러시를 보장한다.
 
 #### Phase 9.3 직접 IP/LAN 접속 테스트
 
-- [ ] 같은 PC: 서버 `0.0.0.0:7777`, 클라 `127.0.0.1:7777` 접속.
-- [ ] 같은 LAN: 클라가 `LobbyViewModel.GetLocalIp()`로 표시되는 서버 PC의 LAN IP 또는 사용자가 입력한 `192.168.x.x:7777`로 접속.
-- [ ] 포트만 입력했을 때 기본 IP(127.0.0.1) + 해당 포트로 접속되는지 확인.
+- [x] 같은 PC: 서버 `0.0.0.0:7777`, 클라 `127.0.0.1:7777` 접속 — 실제 빌드로 확인.
+- [x] 같은 LAN: 다른 PC에서 서버 PC의 LAN IP(`192.168.x.x:7777`)로 접속 확인. 방화벽 인바운드 허용(`vamsurlike` 규칙) 확인.
+- [x] 포트만 입력했을 때 기본 IP(127.0.0.1) + 해당 포트로 접속되는지 확인 — 실제로 다른 PC에서 포트만 입력해 접속 실패하는 걸로 이 동작을 역으로 확인(다른 PC에서는 반드시 `IP:포트`를 다 입력해야 함).
 - [ ] 잘못된 주소/포트 입력 시 UI가 즉시 거부하거나 명확한 에러를 표시하는지 확인.
-- [ ] 서버 1개 + 클라이언트 1/2/4개 접속, 방장 지정, 게임 시작 버튼 권한, 씬 전환 확인.
-- [ ] 서버와 클라이언트 빌드 데이터가 다를 때 `CatalogVersionUtility` hash mismatch로 접속 거부되는지 확인.
-- [ ] 서버 정원 초과, 중복 닉네임, 빈 닉네임 정책을 확정하고 로그/UI 메시지를 맞춘다.
+- [x] 서버 1개 + 클라이언트 2개 접속(MPM), 방장 지정, 게임 시작 버튼 권한 확인. 4개 동시 접속은 아직 안 해봄.
+- [ ] 서버와 클라이언트 빌드 데이터가 다를 때 `CatalogVersionUtility` hash mismatch로 접속 거부되는지 확인 — 실제 테스트 아직 안 함(서로 다른 데이터로 빌드한 2개 필요).
+- [x] 중복 닉네임 정책 확정 — 접속 자체를 거부(대소문자 무시 비교), 사유는 `NetworkErrorDialog`로 표시(`6bcd394`). 서버 정원 초과/빈 닉네임 정책은 아직 미확정.
+- [x] 같은 네트워크가 아닌 원격 플레이어 테스트 — Hamachi(가상 LAN)로 접속 확인. Unity Relay는 Phase 9.0에서 이미 제거된 상태라 향후 원격 플레이는 가상 LAN 또는 포트포워딩/클라우드 배포로 처리.
 
 #### Phase 9.4 스테이지 반복 안정화
 
