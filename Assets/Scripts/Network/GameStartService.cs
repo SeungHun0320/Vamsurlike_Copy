@@ -9,7 +9,9 @@ namespace Vamsurlike.Network
     internal sealed class GameStartService : IGameStartService
     {
         private const string StartGameRequestMessage    = "Vamsurlike.StartGameRequest";
+        private const string ReturnToLobbyRequestMessage = "Vamsurlike.ReturnToLobbyRequest";
         private const byte StartGameRequestCode    = 1;
+        private const byte ReturnToLobbyRequestCode = 2;
 
         private readonly NetworkManager networkManager;
         private readonly ILobbyHostService lobbyHostService;
@@ -37,6 +39,8 @@ namespace Vamsurlike.Network
 
             networkManager.CustomMessagingManager.RegisterNamedMessageHandler(
                 StartGameRequestMessage, HandleStartGameRequestMessage);
+            networkManager.CustomMessagingManager.RegisterNamedMessageHandler(
+                ReturnToLobbyRequestMessage, HandleReturnToLobbyRequestMessage);
             isMessageHandlerRegistered = true;
         }
 
@@ -45,6 +49,7 @@ namespace Vamsurlike.Network
             if (!isMessageHandlerRegistered || networkManager?.CustomMessagingManager == null) return;
 
             networkManager.CustomMessagingManager.UnregisterNamedMessageHandler(StartGameRequestMessage);
+            networkManager.CustomMessagingManager.UnregisterNamedMessageHandler(ReturnToLobbyRequestMessage);
             isMessageHandlerRegistered = false;
         }
 
@@ -72,23 +77,76 @@ namespace Vamsurlike.Network
             return true;
         }
 
+        public bool RequestReturnToLobby()
+        {
+            if (networkManager == null) return false;
+
+            // 서버면 직접 처리
+            if (networkManager.IsServer)
+            {
+                ExecuteReturnToLobby();
+                return true;
+            }
+
+            // 클라이언트면 서버에 요청
+            if (!networkManager.IsConnectedClient || networkManager.CustomMessagingManager == null)
+            {
+                Debug.LogWarning($"[{nameof(GameStartService)}] 서버에 연결되지 않아 로비 복귀를 요청할 수 없습니다.");
+                return false;
+            }
+
+            using FastBufferWriter writer = new(sizeof(byte), Allocator.Temp);
+            writer.WriteValueSafe(ReturnToLobbyRequestCode);
+            networkManager.CustomMessagingManager.SendNamedMessage(
+                ReturnToLobbyRequestMessage,
+                NetworkManager.ServerClientId,
+                writer);
+            Debug.Log($"[{nameof(GameStartService)}] 로비 복귀 요청 전송. clientId={networkManager.LocalClientId}");
+            return true;
+        }
+
         public void Dispose()
         {
             UnregisterMessageHandler();
         }
 
-        // 개별 플레이어는 GameNetworkManager.Disconnect()로 스스로 나간다(다른 플레이어에게 영향 없음).
-        // 그 결과 접속자가 0명이 되면, 서버 자신을 로비 씬으로 되돌려 다음 접속자가 스테이지 잔여 상태로
-        // 동기화되는 것을 막는다. GameNetworkManager.HandleClientDisconnected에서 호출됨.
-        public void HandlePlayerCountChanged()
+        private void HandleReturnToLobbyRequestMessage(ulong senderClientId, FastBufferReader reader)
         {
             if (networkManager == null || !networkManager.IsServer) return;
-            if (networkManager.ConnectedClientsIds.Count > 0) return;
+
+            ServerConsoleLogger.Log($"[검증] 로비 복귀 요청 수신 — sender={senderClientId}");
+
+            byte requestCode;
+            try
+            {
+                reader.ReadValueSafe(out requestCode);
+            }
+            catch (Exception exception)
+            {
+                ServerConsoleLogger.Log($"[검증] 로비 복귀 요청 파싱 실패: {exception.Message}");
+                return;
+            }
+
+            if (requestCode != ReturnToLobbyRequestCode)
+            {
+                ServerConsoleLogger.Log($"[검증] 로비 복귀 요청 코드 불일치 — expected={ReturnToLobbyRequestCode}, got={requestCode} → 거부");
+                return;
+            }
 
             string currentScene = SceneManager.GetActiveScene().name;
-            if (currentScene == lobbySceneName) return;
+            if (currentScene == lobbySceneName)
+            {
+                ServerConsoleLogger.Log($"[검증] 이미 로비 씬({lobbySceneName})입니다 — 무시");
+                return;
+            }
 
-            ServerConsoleLogger.Log($"[검증] 접속 플레이어 없음 → '{lobbySceneName}' 로 리셋");
+            ServerConsoleLogger.Log($"[검증] 로비 복귀 승인 — sender={senderClientId}, currentScene={currentScene}");
+            ExecuteReturnToLobby();
+        }
+
+        private void ExecuteReturnToLobby()
+        {
+            ServerConsoleLogger.Log($"로비 복귀 실행 → '{lobbySceneName}' 로드");
             isGameStartRequested = false;
             networkManager.SceneManager.LoadScene(lobbySceneName, LoadSceneMode.Single);
         }

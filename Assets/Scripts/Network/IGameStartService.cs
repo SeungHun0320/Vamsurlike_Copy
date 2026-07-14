@@ -7,6 +7,6 @@ namespace Vamsurlike.Network
         void RegisterMessageHandler();
         void UnregisterMessageHandler();
         bool RequestStartGame();
-        void HandlePlayerCountChanged();
+        bool RequestReturnToLobby();
     }
 }

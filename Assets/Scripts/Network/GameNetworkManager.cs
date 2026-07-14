@@ -164,6 +164,11 @@ namespace Vamsurlike.Network
             return gameStartService?.RequestStartGame() ?? false;
         }
 
+        public bool RequestReturnToLobby()
+        {
+            return gameStartService?.RequestReturnToLobby() ?? false;
+        }
+
         private void RegisterMessagingHandlers()
         {
             lobbyHostService?.RegisterMessageHandler();
@@ -186,7 +191,6 @@ namespace Vamsurlike.Network
         private void HandleClientDisconnected(ulong clientId)
         {
             lobbyHostService?.HandleClientDisconnected(clientId);
-            gameStartService?.HandlePlayerCountChanged();
             OnClientDisconnected?.Invoke(clientId);
             Debug.Log($"[{nameof(GameNetworkManager)}] clientId {clientId} 종료. 현재 {ConnectedPlayerCount}명");
         }

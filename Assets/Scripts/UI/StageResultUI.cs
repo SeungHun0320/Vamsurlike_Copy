@@ -96,11 +96,14 @@ namespace Vamsurlike.UI
 
         private void OnMainMenuClicked()
         {
-            // 개별 퇴장: 나만 연결을 끊고 로컬로 메인메뉴로 전환한다.
-            // 통계 화면을 보고 있는 다른 플레이어는 영향받지 않는다.
             if (GameNetworkManager.Instance != null && GameNetworkManager.Instance.IsListening)
-                GameNetworkManager.Instance.Disconnect();
+            {
+                // 서버가 모든 클라이언트를 로비로 복귀시킴 (연결 유지)
+                GameNetworkManager.Instance.RequestReturnToLobby();
+                return;
+            }
 
+            // 미연결 상태(에디터 단독 테스트 등) 폴백
             if (SceneLoader.Instance != null)
                 SceneLoader.Instance.LoadSceneLocal(mainMenuScene);
         }
